@@ -49,6 +49,7 @@ pip install -r requirements.txt
   pip freeze > requirements.txt
   ```
 
+* **Install + run:** Quick Start, all of above for Linux:
   ```
   python -m venv .venv
   source .venv/bin/activate
