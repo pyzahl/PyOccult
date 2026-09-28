@@ -245,9 +245,13 @@ def fetch_and_propagate_stars(
 def CoordinateDistance(parallax_mas):
     """Helper to convert parallax safely to distance."""
     # Where parallax is 0, place the star effectively at infinity (100,000 parsecs)
-    distance_pc = np.where(parallax_mas > 0, 1000.0 / parallax_mas, 100000.0)
-    return distance_pc * u.pc
 
+    # Create a mask for where the parallax is safe
+    condition = parallax_mas > 0
+
+    # Compute safely: out fills the fallback value, where restricts execution
+    distance_pc = np.divide(1000.0, parallax_mas, out=np.full_like(parallax_mas, 100000.0), where=condition)
+    return distance_pc * u.pc
 
 
 
@@ -264,127 +268,6 @@ if force_cleanup:
             print ('removing: ', filename)
             os.remove(filename)
 
-
-
-# 1. Define the precise API parameters for 19 Fortuna (SPK-ID: 2000019)
-url = "https://ssd.jpl.nasa.gov/api/horizons.api"
-params = {
-    "format": "json",
-    "COMMAND": "'19;'",  # '19;' targets asteroid 19 Fortuna directly
-    "EPHEM_TYPE": "SPK",
-    "OBJ_DATA": "NO",
-    "START_TIME": "2026-01-01",
-    "STOP_TIME": "2027-01-01",
-}
-
-print("Fetching precise data stream from NASA JPL Horizons...")
-response = requests.get(url, params=params)
-result = response.json()
-
-# 2. Extract and decode the raw binary file payload
-if "spk" in result:
-    print("Decoding binary file payload...")
-    binary_data = base64.b64decode(result["spk"])
-
-    with open("19_fortuna.bsp", "wb") as f:
-        f.close_write = f.write(binary_data)
-    print("Success! File saved precisely as '19_fortuna.bsp'")
-else:
-    print("Error generating SPK. Server returned:")
-    print(json.dumps(result, indent=2))
-
-
-  
-# Configure the request for asteroid 200019
-
-# 1. Define the JPL Horizons API endpoint
-url = "https://nasa.gov"
-
-
-# 2. Configure parameters for a small-body SPK file
-params = {
-    "COMMAND": "'200019;'",       # Asteroid target body sequence
-    "OBJ_DATA": "NO",             # Turn off text metadata summaries
-    "MAKE_EPHEM": "YES",          # Request ephemeris generation
-    "EPHEM_TYPE": "SPK",          # Requests the raw binary BSP stream
-    "START_TIME": "2026-01-01",
-    "STOP_TIME": "2027-01-01",
-}
-
-print("Requesting SPK file from JPL Horizons...")
-
-# 3. Use stream=True to handle the binary file download safely
-response = requests.get(url, params=params, stream=True)
-
-# 4. Check for success and write the binary content directly to a file
-if response.status_code == 200:
-    output_filename = "asteroid_200019.bsp"
-    
-    with open(output_filename, "wb") as f:
-        # Read the raw binary content chunks and write to disk
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
-            
-    if os.path.getsize(output_filename) > 500:  # Simple check to make sure it isn't an error message
-        print(f"Success! Saved SPK file to: {os.path.abspath(output_filename)}")
-    else:
-        # If the file is tiny, it means JPL returned a text error message instead of an SPK
-        with open(output_filename, "r") as f:
-            print("\nJPL Error Message:")
-            print(f.read())
-        os.remove(output_filename) # Clean up the broken text file
-else:
-    print(f"Server error: HTTP {response.status_code}")
-
-
-
-
-# 1. Official JPL Horizons API Endpoint
-url = "https://ssd.jpl.nasa.gov/api/horizons.api"
-
-# 2. Configure parameters
-# For a numbered asteroid, the ID must have a trailing semicolon inside the quotes
-params = {
-    'format': 'json',
-    'COMMAND': '200019;',
-    'EPHEM_TYPE': 'SPK',
-    'MAKE_EPHEM': 'YES',
-    'START_TIME': '2026-01-01',
-    'STOP_TIME': '2027-01-01',
-    "OBJ_DATA": "NO",
-}
-
-print("Querying JPL API...")
-response = requests.get(url, params=params)
-
-# 3. Handle response content-type safely
-if response.status_code == 200:
-    content_type = response.headers.get("Content-Type", "")
-    
-    if "application/json" in content_type:
-        data = response.json()
-        
-        if "spk" in data:
-            print("SPK data block found. Decoding Base64 stream...")
-            # JPL packages the binary BSP stream inside a base64-encoded string
-            spk_binary = base64.b64decode(data["spk"])
-            
-            output_filename = "asteroid_200019.bsp"
-            with open(output_filename, "wb") as f:
-                f.write(spk_binary)
-                
-            print(f"Success! Saved binary SPK to: {os.path.abspath(output_filename)}")
-        else:
-            print("❌ JPL returned JSON, but it didn't contain an SPK file.")
-            print("JPL Message:", data.get("result", "No details available."))
-            
-    else:
-        print("❌ Received non-JSON response (likely an HTML webpage or raw configuration text).")
-        print("First 300 characters of response:")
-        print(response.text[:300])
-       
-else:
-    print(f"❌ HTTP Error: Server responded with status code {response.status_code}")
 
 
     
@@ -467,42 +350,41 @@ if download_kernels():
         spice.furnsh("pck00010.tpc")       # Planetary constants
         spice.furnsh("de440.bsp")          # Major planets base
         spice.furnsh("earth_latest_high_prec.bpc")
-        spice.furnsh("19_fortuna.bsp")     # specific asteroid data
-        spice.furnsh("asteroid_200019.bsp")
-        # 2. Force SPICE to map the name string "200019" to the internal NAIF ID 2200019
-        spice.boddef("200019", 2200019)
         
         print ('* Testing Compute Kernels *')
         
         et = spice.str2et("2026-09-28 UTC")
         print(f"🚀 Success! CSPICE Active. Target ET: {et}")
 
+        if 0:
+            #spice.furnsh("19_fortuna.bsp")     # specific asteroid data
+            #spice.furnsh("asteroid_200019.bsp")
+            # 2. Force SPICE to map the name string "200019" to the internal NAIF ID 2200019
+            #spice.boddef("200019", 2200019)
+            # 2. Extract the exact hidden NAIF ID code from your SPK file cover
+            # spkobj returns an array of all integer IDs present in the file
+            spk_ids = spice.spkobj("asteroid_200019.bsp")
+
+            if spk_ids:
+                actual_jpl_id = int(spk_ids[0])
+                print(f" Detected ID inside file: {actual_jpl_id}")
+
+                # 3. Explicitly alias all variations to this detected ID code
+                spice.boddef("200019", actual_jpl_id)
+                spice.boddef("2200019", actual_jpl_id)
+
+                # 4. Perform the evaluation safely using the mapped string name
+                et = spice.str2et("2026 SEP 28 00:01:09.182")
+                state, lt = spice.spkezr("200019",et, "J2000", "NONE", "0")
+                print("\n✅ Success! State Vector relative to SSB (0):")
+                print(state)
+            else:
+                print("❌ Critical: The asteroid_200019.bsp file appears empty or corrupted.")
 
 
-        # 2. Extract the exact hidden NAIF ID code from your SPK file cover
-        # spkobj returns an array of all integer IDs present in the file
-        spk_ids = spice.spkobj("asteroid_200019.bsp")
-
-        if spk_ids:
-            actual_jpl_id = int(spk_ids[0])
-            print(f" Detected ID inside file: {actual_jpl_id}")
-
-            # 3. Explicitly alias all variations to this detected ID code
-            spice.boddef("200019", actual_jpl_id)
-            spice.boddef("2200019", actual_jpl_id)
-
-            # 4. Perform the evaluation safely using the mapped string name
-            et = spice.str2et("2026 SEP 28 00:01:09.182")
-            state, lt = spice.spkezr("200019",et, "J2000", "NONE", "0")
-            print("\n✅ Success! State Vector relative to SSB (0):")
-            print(state)
-        else:
-            print("❌ Critical: The asteroid_200019.bsp file appears empty or corrupted.")
-
-
-        print ('List of Asterioids:')
-        # Execute the iteration
-        list_spk_contents("asteroid_200019.bsp")
+            print ('List of Asterioids:')
+            # Execute the iteration
+            list_spk_contents("asteroid_200019.bsp")
 
 
             
@@ -517,136 +399,75 @@ print ('* Ready *')
 # Note: For a real asteroid, you would also download its specific orbital .bsp kernel
 # from JPL Horizons and load it here: spice.furnsh("asteroid_name.bsp")
 
-# ==========================================
-# 2. BESSELIAN PLANE SOLVER ENGINE
-# ==========================================
-def get_besselian_miss_distance(et, star_vector, observer_geo, asteroid_target):
-    """
-    Calculates the distance between the observer and the center of the asteroid's
-    shadow axis on the Besselian Fundamental Plane at Ephemeris Time (et).
-    """
-    # 1. Direction vector from Earth center to the Star (z-axis of Besselian plane)
-    z_axis = star_vector / np.linalg.norm(star_vector)
 
-    # 2. Construct the rest of the fundamental plane coordinate system (x and y axes)
-    # Define a temporary vector to cross with to get equatorial perpendiculars
-    temp_vec = np.array([0.0, 0.0, 1.0]) if abs(z_axis[2]) < 0.99 else np.array([0.0, 1.0, 0.0])
-    x_axis = np.cross(temp_vec, z_axis)
-    x_axis /= np.linalg.norm(x_axis)
-    y_axis = np.cross(z_axis, x_axis)
-
-    # Transform matrix from J2000 to Besselian Plane
-    M_bessel = np.vstack((x_axis, y_axis, z_axis))
-
-    # 3. Position of Asteroid relative to Earth Center (J2000), corrected for light time
-    # (Using '3' for Earth Center, 'CN+S' for converged Newtonian light time + stellar aberration)
-    try:
-        ast_pos, _ = spice.spkpos(asteroid_target, et, 'J2000', 'CN+S', '3')
-    except spice.stypes.SpiceException:
-        # Fallback to an available body (e.g., Moon '301') if running this as a test mock
-        ast_pos, _ = spice.spkpos('301', et, 'J2000', 'CN+S', '3')
-
-    # 4. Position of Observer relative to Earth Center (ITRF93 converted to J2000 at time et)
-    # Convert geodetic to body-fixed XYZ
-    r_earth = 6378.137  # Earth equatorial radius
-    f_earth = 1.0 / 298.257223563  # Flattening factor
-    obs_itrf = spice.georec(observer_geo['lon'], observer_geo['lat'], observer_geo['alt'], r_earth, f_earth)
+def fetch_target_orbit (target_id='99942', epochs={'start': '2026-10-01', 'stop': '2027-10-01', 'step': '1d'}):
     
-    # Get rotation matrix from Earth-fixed frame to J2000 inertial frame
-    m_rot = spice.pxform('ITRF93', 'J2000', et)
-    obs_j2000 = spice.mxv(m_rot, obs_itrf)
+    output_filename = "/dev/shm/temp_PyOccult_asteroid_"+target_id+"_kernel.bsp"
 
-    # 5. Project both vectors onto the Besselian Plane
-    ast_bessel = spice.mxv(M_bessel, ast_pos)
-    obs_bessel = spice.mxv(M_bessel, obs_j2000)
-
-    # On the Fundamental Plane, we only care about the x and y coordinates
-    # The shadow axis passes through the asteroid's x, y coordinates
-    dx = ast_bessel[0] - obs_bessel[0]
-    dy = ast_bessel[1] - obs_bessel[1]
-    
-    # Return the scalar distance (miss distance of shadow center to observer)
-    return np.sqrt(dx**2 + dy**2)
-
-
-# ==========================================
-# 3. EXECUTION AND TEST HARNESS
-# ==========================================
-def test_star (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m),
-               center_time_utc = "2026-10-01T04:30:00", time_span = 24*3600,
-               star_ra=np.radians(68.98), star_dec=np.radians(16.50),
-               asteroid_id = "200019"):
-    # Define Target Star Coordinates (ICRS / J2000)
-    # Example: Aldebaran or target star of choice
-    #star_ra = np.radians(68.98)   # RA in radians
-    #star_dec = np.radians(16.50)  # Dec in radians
-    
-    # Unit vector pointing to the star
-    star_direction = np.array([
-        np.cos(star_dec) * np.cos(star_ra),
-        np.cos(star_dec) * np.sin(star_ra),
-        np.sin(star_dec)
-    ])
-
-    # Define Target Asteroid (SPICE ID or Name string if loaded in kernel)
-    # For this demonstration template, we fall back to '301' (Moon) if specific asteroid .bsp isn't found
-    #asteroid_id = "200019"  # Example SPICE ID for Asteroid 19 Fortuna
-
-    # Define Observer Location via Astropy
-    #loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m)
-    obs_geo = {
-        'lon': loc.lon.to(u.rad).value,
-        'lat': loc.lat.to(u.rad).value,
-        'alt': loc.height.to(u.km).value
-    }
-
-    
-    # Center-of-window Guess Time (UTC)
-    # center_time_utc = "2026-10-01T04:30:00"
-
-    #print (loc, obs_geo, center_time_utc)
-
-    et_center = spice.str2et(center_time_utc)
-    
-    print(f"Targeting window around: {center_time_utc} UTC")
-    print(f"Initial Ephemeris Time (ET): {et_center:.3f}\n")
-
-    # Objective function to minimize for root-finding
-    def objective_func(et):
-        return get_besselian_miss_distance(et, star_direction, obs_geo, asteroid_id)
-
-    # Use a bounded scalar minimizer (+/- 10 minutes or 600 seconds from guess)
-    #time_span2 = (24*3600) / 2 # in sec
-    time_span2 = time_span/2
-    print("Computing exact time of closest approach...")
-    result = minimize_scalar(
-        objective_func, 
-        bounds=(et_center - time_span2, et_center + time_span2), 
-        method='bounded',
-        options={'xatol': 1e-5} # sub-millisecond convergence tolerance
-    )
-
-    if result.success:
-        best_et = result.x
-        min_distance = result.fun
-        best_utc = spice.et2utc(best_et, "ISOC", 3)
-        
-        print("\n--- OCCULTATION SOLVER RESULTS ---")
-        print(f"Time of Maximum Occultation: {best_utc} UTC")
-        print(f"Minimum Shadow Axis Distance to Observer: {min_distance:.3f} km")
-        
-        # Real-world condition mapping:
-        # Assuming an asteroid radius R_ast (e.g., 50 km)
-        r_asteroid = 50.0 
-        if min_distance < r_asteroid:
-            print(f"👉 SUCCESS: An occultation is PREDICTED at this site! Observer inside the shadow path.")
-        else:
-            print(f"❌ MISS: Shadow path misses observer by {min_distance - r_asteroid:.3f} km.")
+    fp = Path(output_filename)
+    if fp.is_file():
+        print ('Already fetched: ', output_filename)
     else:
-        print("Solver failed to converge on an event window.")
+        # 1. Official JPL Horizons API Endpoint
+        url = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
+        # 2. Configure parameters
+        # For a numbered asteroid, the ID must have a trailing semicolon inside the quotes
+        params = {
+            'format': 'json',
+            'COMMAND': target_id+';',
+            'EPHEM_TYPE': 'SPK',
+            'MAKE_EPHEM': 'YES',
+            'START_TIME': epochs['start'],
+            'STOP_TIME': epochs['stop'],
+            "OBJ_DATA": "NO",
+        }
 
+        print("Querying JPL API...", params)
 
+        response = requests.get(url, params=params)
+
+        # 3. Handle response content-type safely
+        if response.status_code == 200:
+            content_type = response.headers.get("Content-Type", "")
+
+            if "application/json" in content_type:
+                data = response.json()
+
+                if "spk" in data:
+                    print("SPK data block found. Decoding Base64 stream...")
+                    # JPL packages the binary BSP stream inside a base64-encoded string
+                    spk_binary = base64.b64decode(data["spk"])
+
+                    with open(output_filename, "wb") as f:
+                        f.write(spk_binary)
+
+                    print(f"Success! Saved binary SPK to: {os.path.abspath(output_filename)}")
+                else:
+                    print("❌ JPL returned JSON, but it didn't contain an SPK file.")
+                    print("JPL Message:", data.get("result", "No details available."))
+
+            else:
+                print("❌ Received non-JSON response (likely an HTML webpage or raw configuration text).")
+                print("First 300 characters of response:")
+                print(response.text[:300])
+
+        else:
+            print(f"❌ HTTP Error: Server responded with status code {response.status_code}")
+
+    print ('Loading orbit for: ', target_id)
+    spice.furnsh(output_filename)
+    spk_ids = spice.spkobj(output_filename)
+    actual_jpl_id = int(spk_ids[0])
+    spice.boddef(target_id, actual_jpl_id)
+
+    # You can now query the asteroid's position relative to Earth or the Sun
+    # (Replace 'ASTEROID_ID' with the actual SPICE ID or name string in the kernel)
+    et = spice.str2et(epochs['start']+" 22:00:00 UTC")
+    state, ltt = spice.spkezr(target_id, et, "ECLIPJ2000", "NONE", "EARTH")
+    print("\n✅ Success! State Vector relative to SSB (0):")
+    print(state)
+            
 
 def get_asteroid_ra_dec(target_id, utc_time, observer="EARTH", ref_frame="J2000", abcorr="LT+S"):
     """Calculates the high-precision RA and Dec of an asteroid using SPICE.
@@ -718,10 +539,150 @@ def get_asteroid_ra_dec(target_id, utc_time, observer="EARTH", ref_frame="J2000"
 
 
 
+
+    
+# ==========================================
+# 2. BESSELIAN PLANE SOLVER ENGINE
+# ==========================================
+def get_besselian_miss_distance(et, star_vector, observer_geo, asteroid_target):
+    """
+    Calculates the distance between the observer and the center of the asteroid's
+    shadow axis on the Besselian Fundamental Plane at Ephemeris Time (et).
+    """
+    # 1. Direction vector from Earth center to the Star (z-axis of Besselian plane)
+    z_axis = star_vector / np.linalg.norm(star_vector)
+
+    # 2. Construct the rest of the fundamental plane coordinate system (x and y axes)
+    # Define a temporary vector to cross with to get equatorial perpendiculars
+    temp_vec = np.array([0.0, 0.0, 1.0]) if abs(z_axis[2]) < 0.99 else np.array([0.0, 1.0, 0.0])
+    x_axis = np.cross(temp_vec, z_axis)
+    x_axis /= np.linalg.norm(x_axis)
+    y_axis = np.cross(z_axis, x_axis)
+
+    # Transform matrix from J2000 to Besselian Plane
+    M_bessel = np.vstack((x_axis, y_axis, z_axis))
+
+    # 3. Position of Asteroid relative to Earth Center (J2000), corrected for light time
+    # (Using '3' for Earth Center, 'CN+S' for converged Newtonian light time + stellar aberration)
+    try:
+        ast_pos, _ = spice.spkpos(asteroid_target, et, 'J2000', 'CN+S', '3')
+    except spice.stypes.SpiceException:
+        # Fallback to an available body (e.g., Moon '301') if running this as a test mock
+        ast_pos, _ = spice.spkpos('301', et, 'J2000', 'CN+S', '3')
+
+    # 4. Position of Observer relative to Earth Center (ITRF93 converted to J2000 at time et)
+    # Convert geodetic to body-fixed XYZ
+    r_earth = 6378.137  # Earth equatorial radius
+    f_earth = 1.0 / 298.257223563  # Flattening factor
+    obs_itrf = spice.georec(observer_geo['lon'], observer_geo['lat'], observer_geo['alt'], r_earth, f_earth)
+    
+    # Get rotation matrix from Earth-fixed frame to J2000 inertial frame
+    m_rot = spice.pxform('ITRF93', 'J2000', et)
+    obs_j2000 = spice.mxv(m_rot, obs_itrf)
+
+    # 5. Project both vectors onto the Besselian Plane
+    ast_bessel = spice.mxv(M_bessel, ast_pos)
+    obs_bessel = spice.mxv(M_bessel, obs_j2000)
+
+    # On the Fundamental Plane, we only care about the x and y coordinates
+    # The shadow axis passes through the asteroid's x, y coordinates
+    dx = ast_bessel[0] - obs_bessel[0]
+    dy = ast_bessel[1] - obs_bessel[1]
+    
+    # Return the scalar distance (miss distance of shadow center to observer)
+    return np.sqrt(dx**2 + dy**2)
+
+
+# ==========================================
+# 3. EXECUTION AND TEST HARNESS
+# ==========================================
+def test_star (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m),
+               center_time_utc = "2026-10-01T04:30:00", time_span = 24*3600,
+               star_ra=np.radians(68.98), star_dec=np.radians(16.50),
+               asteroid_id = "200019",
+               r_asteroid_km = 50.0):
+    # Define Target Star Coordinates (ICRS / J2000)
+    # Example: Aldebaran or target star of choice
+    #star_ra = np.radians(68.98)   # RA in radians
+    #star_dec = np.radians(16.50)  # Dec in radians
+    
+    # Unit vector pointing to the star
+    star_direction = np.array([
+        np.cos(star_dec) * np.cos(star_ra),
+        np.cos(star_dec) * np.sin(star_ra),
+        np.sin(star_dec)
+    ])
+
+    # Define Target Asteroid (SPICE ID or Name string if loaded in kernel)
+    # For this demonstration template, we fall back to '301' (Moon) if specific asteroid .bsp isn't found
+    #asteroid_id = "200019"  # Example SPICE ID for Asteroid 19 Fortuna
+
+    # Define Observer Location via Astropy
+    #loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m)
+    obs_geo = {
+        'lon': loc.lon.to(u.rad).value,
+        'lat': loc.lat.to(u.rad).value,
+        'alt': loc.height.to(u.km).value
+    }
+
+    
+    # Center-of-window Guess Time (UTC)
+    # center_time_utc = "2026-10-01T04:30:00"
+
+    #print (loc, obs_geo, center_time_utc)
+
+    et_center = spice.str2et(center_time_utc)
+    
+    print(f"Targeting window around: {center_time_utc} UTC")
+    print(f"Initial Ephemeris Time (ET): {et_center:.3f}\n")
+
+    # Objective function to minimize for root-finding
+    def objective_func(et):
+        return get_besselian_miss_distance(et, star_direction, obs_geo, asteroid_id)
+
+    # Use a bounded scalar minimizer (+/- 10 minutes or 600 seconds from guess)
+    #time_span2 = (24*3600) / 2 # in sec
+    time_span2 = time_span/2
+    print("Computing exact time of closest approach...")
+    result = minimize_scalar(
+        objective_func, 
+        bounds=(et_center - time_span2, et_center + time_span2), 
+        method='bounded',
+        options={'xatol': 1e-5} # sub-millisecond convergence tolerance
+    )
+
+    if result.success:
+        best_et = result.x
+        min_distance = result.fun
+        best_utc = spice.et2utc(best_et, "ISOC", 3)
+        
+        print("\n--- OCCULTATION SOLVER RESULTS ---")
+        print(f"Time of Maximum Occultation: {best_utc} UTC")
+        print(f"Minimum Shadow Axis Distance to Observer: {min_distance:.3f} km")
+        
+        # Real-world condition mapping:
+        # Assuming an asteroid radius R_ast (e.g., 50 km)
+        #r_asteroid_km = 50.0 
+        if min_distance < r_asteroid_km:
+            print(f"👉 SUCCESS: An occultation is PREDICTED at this site! Observer inside the shadow path.")
+            print(f"*** ", asteroid_id, ", with star RA=",star_ra, " DE=", star_de, " @ET=", best_et, ", UTC=", best_utc, " d=", min_distance, " km ", "***")
+            return { "best_utc": best_utc, "et": best_et, "min_distance": min_istance_pc }
+            
+        else:
+            print(f"❌ MISS: Shadow path misses observer by {min_distance - r_asteroid_km:.3f} km.")
+    else:
+        print("Solver failed to converge on an event window.")
+
+    return None
+
+
+
+
 def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m),
                  event_search_center_time_utc = "2026-10-01T04:30:00", time_span=24*3600,
                  target_id="200019",
-                 mag_lim = 20.0):
+                 mag_lim = 20.0,
+                 r_asteroid_km = 50.0):
         
     # Define column shortcut headers based on your target date
     # (Assumes the column name dynamically created by the script, e.g., 'ra_20261105')
@@ -732,6 +693,9 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
     ra_col = "ra_20261001"
     dec_col = "dec_20261001"
 
+    epochs={'start': '2026-10-01', 'stop': '2027-10-01', 'step': '1d'}
+
+    fetch_target_orbit (target_id, epochs)
     
     target = get_asteroid_ra_dec(target_id,
                                  utc_time=event_search_center_time_utc, #"2026-11-05 04:15:30",
@@ -755,7 +719,8 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
         star_id = row.source_id
         mag = row.phot_g_mean_mag
 
-        print (row, star_id)
+        #print (row, star_id)
+        print ('---')
         
         if mag <= mag_lim:
             # Retrieve the exact propagated coordinates for your event time
@@ -763,21 +728,63 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
             propagated_dec = getattr(row, dec_col)
 
             print(f"Star ID: {star_id} | Mag: {mag:.2f} | Propagated RA: {propagated_ra:.6f}° | Dec: {propagated_dec:.6f}°")
-            test_star (loc,
-                       event_search_center_time_utc, time_span,
-                       np.radians (propagated_ra), np.radians (propagated_dec), "200019")
+            res = test_star (loc,
+                             event_search_center_time_utc, time_span,
+                             np.radians (propagated_ra), np.radians (propagated_dec),
+                             target_id,
+                             r_asteroid_km)
+            if res != None:
+                # { "best_utc": best_utc, "et": best_et, "min_distance": min_istance_pc }
+                record = {
+                    'best_utc': res['best_utc'],
+                    'best_et': res['best_et'],
+                    'min_distance': res['min_distance'],
+                    'target_id': target_id,
+                    'star': start_id,
+                    'mag': mag,
+                    }
+                df_new = pd.DataFrame(record)
+                csv_file = "hits_log.csv"
+                file_exists = os.path.isfile(csv_file)
+                df_new.to_csv(csv_file, mode='a', index=False, header=not file_exists)
 
 
 ## TEST MAIN
     
 if __name__ == "__main__":
 
-    test_target (EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m), # Observer Location
-                 "2026-10-01T04:30:00", # Center of search time interval UTC
-                 24*3600,               # Search Time Interval in sec
-                 target_id="200019",    # asteriod target to check (Fortuna 19)
-                 mag_lim = 20.0)        # star mag limit
-    
+    mag_min = 20
+    obs_loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m)
+    ct = "2026-10-01T04:30:00"  # Center of search time interval UTC
+    spn = 3600                  # Search Time Interval in sec (1h)
+
+    targets = { "200018", "200019", "200026", "200041", } ## targets to search for events
+
+    for t in targets:
+        print ('Target: ',t)
+
+        # Generate an array of incremental timestamps
+        time_indices = pd.date_range(
+            start=ct, 
+            periods=8, 
+            freq="60min"  # Use 'S' for seconds, 'min' for minutes, 'H' for hours
+        )
+
+        # Convert the entire series to your string format
+        periods = time_indices.strftime("%Y-%m-%d %H:%M:%S").tolist()
+
+        print(periods)
+
+        for ctp in periods:
+            print ('Target check for time period around: ', ctp)
+
+            test_target (loc=obs_loc, # Observer Location
+                         event_search_center_time_utc=ctp,
+                         time_span=spn,
+                         target_id=t,              # asteroid target to check (Fortuna 19) 
+                         mag_lim = mag_min,        # star mag limit
+                         r_asteroid_km = 500.0)    # Asteroid radius in km
+
     # Unload kernels
     spice.kclear()
 
