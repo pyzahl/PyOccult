@@ -1,0 +1,2 @@
+# PyOccult
+Python Occultation Searcher
