@@ -1,16 +1,19 @@
+#!.venv/bin/python3
 import os
+import sys
 import numpy as np
 import requests
+import base64
+import json
 import subprocess
 from scipy.optimize import minimize_scalar
 import spiceypy as spice
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
 import astropy.units as u
-
+from astroquery.jplhorizons import Horizons
 
 force_cleanup = False
-
 
 
 # Wipe out old file/memory states completely
@@ -19,15 +22,143 @@ spice.clpool()
 
 
 if force_cleanup:
+    print ('Cleanup old files:')
     for filename in ["naif0012.tls", "de440.bsp", "pck00010.tpc"]:
         if os.path.exists(filename):
+            print ('removing: ', filename)
             os.remove(filename)
 
+
+
+# 1. Define the precise API parameters for 19 Fortuna (SPK-ID: 2000019)
+url = "https://ssd.jpl.nasa.gov/api/horizons.api"
+params = {
+    "format": "json",
+    "COMMAND": "'19;'",  # '19;' targets asteroid 19 Fortuna directly
+    "EPHEM_TYPE": "SPK",
+    "OBJ_DATA": "NO",
+    "START_TIME": "2026-01-01",
+    "STOP_TIME": "2027-01-01",
+}
+
+print("Fetching precise data stream from NASA JPL Horizons...")
+response = requests.get(url, params=params)
+result = response.json()
+
+# 2. Extract and decode the raw binary file payload
+if "spk" in result:
+    print("Decoding binary file payload...")
+    binary_data = base64.b64decode(result["spk"])
+
+    with open("19_fortuna.bsp", "wb") as f:
+        f.close_write = f.write(binary_data)
+    print("Success! File saved precisely as '19_fortuna.bsp'")
+else:
+    print("Error generating SPK. Server returned:")
+    print(json.dumps(result, indent=2))
+
+
+  
+# Configure the request for asteroid 200019
+
+# 1. Define the JPL Horizons API endpoint
+url = "https://nasa.gov"
+
+
+# 2. Configure parameters for a small-body SPK file
+params = {
+    "COMMAND": "'200019;'",       # Asteroid target body sequence
+    "OBJ_DATA": "NO",             # Turn off text metadata summaries
+    "MAKE_EPHEM": "YES",          # Request ephemeris generation
+    "EPHEM_TYPE": "SPK",          # Requests the raw binary BSP stream
+    "START_TIME": "2026-01-01",
+    "STOP_TIME": "2027-01-01",
+}
+
+print("Requesting SPK file from JPL Horizons...")
+
+# 3. Use stream=True to handle the binary file download safely
+response = requests.get(url, params=params, stream=True)
+
+# 4. Check for success and write the binary content directly to a file
+if response.status_code == 200:
+    output_filename = "asteroid_200019.bsp"
+    
+    with open(output_filename, "wb") as f:
+        # Read the raw binary content chunks and write to disk
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+            
+    if os.path.getsize(output_filename) > 500:  # Simple check to make sure it isn't an error message
+        print(f"Success! Saved SPK file to: {os.path.abspath(output_filename)}")
+    else:
+        # If the file is tiny, it means JPL returned a text error message instead of an SPK
+        with open(output_filename, "r") as f:
+            print("\nJPL Error Message:")
+            print(f.read())
+        os.remove(output_filename) # Clean up the broken text file
+else:
+    print(f"Server error: HTTP {response.status_code}")
+
+
+
+
+# 1. Official JPL Horizons API Endpoint
+url = "https://ssd.jpl.nasa.gov/api/horizons.api"
+
+# 2. Configure parameters
+# For a numbered asteroid, the ID must have a trailing semicolon inside the quotes
+params = {
+    'format': 'json',
+    'COMMAND': '200019;',
+    'EPHEM_TYPE': 'SPK',
+    'MAKE_EPHEM': 'YES',
+    'START_TIME': '2026-01-01',
+    'STOP_TIME': '2027-01-01',
+    "OBJ_DATA": "NO",
+}
+
+print("Querying JPL API...")
+response = requests.get(url, params=params)
+
+# 3. Handle response content-type safely
+if response.status_code == 200:
+    content_type = response.headers.get("Content-Type", "")
+    
+    if "application/json" in content_type:
+        data = response.json()
+        
+        if "spk" in data:
+            print("SPK data block found. Decoding Base64 stream...")
+            # JPL packages the binary BSP stream inside a base64-encoded string
+            spk_binary = base64.b64decode(data["spk"])
+            
+            output_filename = "asteroid_200019.bsp"
+            with open(output_filename, "wb") as f:
+                f.write(spk_binary)
+                
+            print(f"Success! Saved binary SPK to: {os.path.abspath(output_filename)}")
+        else:
+            print("❌ JPL returned JSON, but it didn't contain an SPK file.")
+            print("JPL Message:", data.get("result", "No details available."))
+            
+    else:
+        print("❌ Received non-JSON response (likely an HTML webpage or raw configuration text).")
+        print("First 300 characters of response:")
+        print(response.text[:300])
+       
+else:
+    print(f"❌ HTTP Error: Server responded with status code {response.status_code}")
+
+
+    
+    
 def download_kernels():
     urls = {
-        "naif0012.tls": "https://nasa.gov",
-        "de440.bsp": "https://nasa.gov",
-        "pck00010.tpc": "https://nasa.gov"
+        "naif0012.tls": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls",
+        "de440.bsp": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp",
+        "pck00010.tpc": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc",
+        "earth_latest_high_prec.bpc": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc",
     }
     
     # Complete browser headers to clear security checks
@@ -54,7 +185,7 @@ def download_kernels():
             try:
                 # -L follows redirects, -s hides progress bar, -f fails silently on server errors
                 subprocess.run(
-                    ["curl", "-L", "-s", "-f", "-A", "Mozilla/5.0", url, "-o", name],
+                    ["curl", "-L", "-A", "Mozilla/5.0", url, "-o", name],
                     check=True
                 )
             except subprocess.CalledProcessError as e:
@@ -65,27 +196,60 @@ def download_kernels():
     return True
 
 
-#curl -b "" -A "Mozilla/5.0" -O https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls
-#curl -b "" -A "Mozilla/5.0" -O https://nasa.gov
-#curl -b "" -A "Mozilla/5.0" -O https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc
-
-
 # ==========================================
 # 1. KERNEL DOWNLOADING UTILITY
 # ==========================================
 if download_kernels():
     try:
-        # Load verified binaries
-        spice.furnsh("naif0012.tls")
-        spice.furnsh("de440.bsp")
-        spice.furnsh("pck00010.tpc")
+        print ('* Loading Compute Kernels *')
+        # Load all required kernels
+        spice.furnsh("naif0012.tls")       # Leapseconds
+        spice.furnsh("pck00010.tpc")       # Planetary constants
+        spice.furnsh("de440.bsp")          # Major planets base
+        spice.furnsh("earth_latest_high_prec.bpc")
+        spice.furnsh("19_fortuna.bsp")     # specific asteroid data
+        spice.furnsh("asteroid_200019.bsp")
+        # 2. Force SPICE to map the name string "200019" to the internal NAIF ID 2200019
+        spice.boddef("200019", 2200019)
+        
+        print ('* Testing Compute Kernels *')
         
         et = spice.str2et("2026-09-28 UTC")
         print(f"🚀 Success! CSPICE Active. Target ET: {et}")
+
+
+
+        # 2. Extract the exact hidden NAIF ID code from your SPK file cover
+        # spkobj returns an array of all integer IDs present in the file
+        spk_ids = spice.spkobj("asteroid_200019.bsp")
+
+        if spk_ids:
+            actual_jpl_id = int(spk_ids[0])
+            print(f" Detected ID inside file: {actual_jpl_id}")
+
+            # 3. Explicitly alias all variations to this detected ID code
+            spice.boddef("200019", actual_jpl_id)
+            spice.boddef("2200019", actual_jpl_id)
+
+            # 4. Perform the evaluation safely using the mapped string name
+            et = spice.str2et("2026 SEP 28 00:01:09.182")
+            state, lt = spice.spkezr("200019",et, "J2000", "NONE", "0")
+            print("\n✅ Success! State Vector relative to SSB (0):")
+            print(state)
+        else:
+            print("❌ Critical: The asteroid_200019.bsp file appears empty or corrupted.")
+
+        
+        #state, lt = spice.spkezr("2200019", et, "J2000", "NONE", "SOLAR SYSTEM BARYCENTER")
+        #print (state, lt)
+        
     except Exception as e:
         print(f"CSPICE Error: {e}")
+        sys.exit('Exiting as of error.')
 
 
+print ('* Ready *')
+        
 
 # Note: For a real asteroid, you would also download its specific orbital .bsp kernel
 # from JPL Horizons and load it here: spice.furnsh("asteroid_name.bsp")

@@ -1,0 +1,6 @@
+numpy
+requests
+scipy
+spiceypy
+astropy
+astroquery
