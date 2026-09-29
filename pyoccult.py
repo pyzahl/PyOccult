@@ -83,65 +83,8 @@ def get_all_jpl_asteroids_with_spice():
 
 
 
-get_all_jpl_asteroids_with_spice()
+#get_all_jpl_asteroids_with_spice()
 
-
-
-
-
-
-def fetch_occultation_stars(ra_deg, dec_deg, radius_arcmin=10.0, mag_limit=16.0):
-    """
-    Fetches high-precision star data from Gaia DR3 for occultation calculations.
-    
-    Parameters:
-    ra_deg (float): Center Right Ascension in decimal degrees (ICRS)
-    dec_deg (float): Center Declination in decimal degrees (ICRS)
-    radius_arcmin (float): Cone search radius in arcminutes
-    mag_limit (float): Faintest G-band magnitude to include
-    """
-    print(f"Querying Gaia DR3 around RA={ra_deg}°, DEC={dec_deg}°...")
-    
-    # Convert arcminutes radius to degrees for ADQL
-    radius_deg = radius_arcmin / 60.0
-    
-    # Precise ADQL query targeting essential variables for occultation propagation:
-    # Position, Proper Motions, Parallax, Errors, and Quality Metrics (RUWE)
-    query = f"""
-    SELECT 
-        source_id, ra, ra_error, dec, dec_error, 
-        parallax, parallax_error, pmra, pmra_error, pmdec, pmdec_error,
-        phot_g_mean_mag, ruwe
-    FROM gaiadr3.gaia_source
-    WHERE 1=CONTAINS(
-        POINT('ICRS', ra, dec), 
-        CIRCLE('ICRS', {ra_deg}, {dec_deg}, {radius_deg})
-    )
-    AND phot_g_mean_mag <= {mag_limit}
-    AND ruwe < 1.4  -- Filter out problematic binaries or noisy astrometry solutions
-    """
-    
-    try:
-        # Launch synchronous job to Gaia archive
-        job = Gaia.launch_job(query)
-        astropy_table = job.get_results()
-        
-        # Convert to Pandas for clean analysis/saving
-        df = astropy_table.to_pandas()
-        
-        # Note the reference epoch information
-        print(f"Successfully retrieved {len(df)} reference stars.")
-        print("Note: Gaia DR3 base coordinates are tied to Epoch J2016.0.")
-        
-        # Export data matrix
-        output_file = "gaia_occultation_catalog.csv"
-        df.to_csv(output_file, index=False)
-        print(f"Table saved cleanly to '{output_file}'.")
-        return df
-
-    except Exception as e:
-        print(f"An error occurred during the registry lookup: {e}")
-        return None
 
 
     
@@ -150,10 +93,6 @@ def fetch_occultation_stars(ra_deg, dec_deg, radius_arcmin=10.0, mag_limit=16.0)
 target_ra = 150.0
 target_dec = 2.0
     
-star_table = fetch_occultation_stars(target_ra, target_dec, radius_arcmin=15.0, mag_limit=15.5)
-
-print (star_table)
-
 
 
 
@@ -182,6 +121,13 @@ def fetch_and_propagate_stars(
     target_time = Time(event_time_str, scale="utc")
     gaia_epoch = Time("2016-01-01T12:00:00", scale="tcb")  # Gaia DR3 J2016.0 reference
 
+    output_file = "/dev/shm/temp_PyOccult_propagated_occultation_catalog_ET_"+event_time_str+"_RAm"+str(round(60*ra_deg))+"_DEm"+str(round(60*ra_deg))+".csv"
+    fp = Path(output_file)
+    if fp.is_file():
+        df = pd.read_csv(output_file)
+        print(f"Found cached data for starfield {len(df)} stars in '{output_file}'.")
+        return df
+    
     print(
         f"Querying Gaia DR3 & propagating positions to: {target_time.iso} UTC..."
     )
@@ -231,7 +177,7 @@ def fetch_and_propagate_stars(
             stars_target_epoch.dec.deg
         )
 
-        output_file = "propagated_occultation_catalog.csv"
+        #output_file = "propagated_occultation_catalog.csv"
         df.to_csv(output_file, index=False)
         print(f"Successfully processed {len(df)} stars.")
         print(f"Saved computed coordinates cleanly to '{output_file}'.")
@@ -665,8 +611,8 @@ def test_star (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
         #r_asteroid_km = 50.0 
         if min_distance < r_asteroid_km:
             print(f"👉 SUCCESS: An occultation is PREDICTED at this site! Observer inside the shadow path.")
-            print(f"*** ", asteroid_id, ", with star RA=",star_ra, " DE=", star_de, " @ET=", best_et, ", UTC=", best_utc, " d=", min_distance, " km ", "***")
-            return { "best_utc": best_utc, "et": best_et, "min_distance": min_istance_pc }
+            print(f"*** Asterioid ", asteroid_id, ", with star RA=",star_ra, " DE=", star_dec, " @ET=", best_et, ", UTC=", best_utc, " min dist=", min_distance, " km ", "***")
+            return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance }
             
         else:
             print(f"❌ MISS: Shadow path misses observer by {min_distance - r_asteroid_km:.3f} km.")
@@ -686,13 +632,7 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
         
     # Define column shortcut headers based on your target date
     # (Assumes the column name dynamically created by the script, e.g., 'ra_20261105')
-    ra_col = "ra_20261105"
-    dec_col = "dec_20261105"
-
-    # fix me
-    ra_col = "ra_20261001"
-    dec_col = "dec_20261001"
-
+    
     epochs={'start': '2026-10-01', 'stop': '2027-10-01', 'step': '1d'}
 
     fetch_target_orbit (target_id, epochs)
@@ -712,6 +652,10 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
         target['ra'], target['dec'], event_time_str=event_search_center_time_utc, radius_arcmin=10.0
     )
  
+    #ra_col = "ra_20261001"
+    #dec_col = "dec_20261001"
+    ra_cols  = event_df.columns[event_df.columns.str.startswith('ra_')].tolist()
+    dec_cols = event_df.columns[event_df.columns.str.startswith('dec_')].tolist()
     
     print("\nIterating through propagated star positions:")
     for row in event_df.itertuples(index=False):
@@ -724,8 +668,8 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
         
         if mag <= mag_lim:
             # Retrieve the exact propagated coordinates for your event time
-            propagated_ra  = getattr(row, ra_col)
-            propagated_dec = getattr(row, dec_col)
+            propagated_ra  = getattr(row, ra_cols[0])
+            propagated_dec = getattr(row, dec_cols[0])
 
             print(f"Star ID: {star_id} | Mag: {mag:.2f} | Propagated RA: {propagated_ra:.6f}° | Dec: {propagated_dec:.6f}°")
             res = test_star (loc,
@@ -740,10 +684,11 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
                     'best_et': res['best_et'],
                     'min_distance': res['min_distance'],
                     'target_id': target_id,
-                    'star': start_id,
+                    'star': star_id,
                     'mag': mag,
                     }
-                df_new = pd.DataFrame(record)
+                print (record)
+                df_new = pd.DataFrame.from_records([record])
                 csv_file = "hits_log.csv"
                 file_exists = os.path.isfile(csv_file)
                 df_new.to_csv(csv_file, mode='a', index=False, header=not file_exists)
@@ -753,12 +698,14 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
     
 if __name__ == "__main__":
 
+    #40.9541175,-72.9261452,17.62z
+    
     mag_min = 20
-    obs_loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m)
-    ct = "2026-10-01T04:30:00"  # Center of search time interval UTC
-    spn = 3600                  # Search Time Interval in sec (1h)
+    obs_loc = EarthLocation(lat=40.9541175*u.deg, lon=-72.92614552*u.deg, height=40.0*u.m)
+    ct = "2026-10-03T00:00:00"  # Serach Start (center of 1h test interval) UTC
+    spn = 1*3600                # Search Time Interval in sec (1h)
 
-    targets = { "200018", "200019", "200026", "200041", } ## targets to search for events
+    targets = { "305580", "111287", "111286", "305580" } ## targets to search for events
 
     for t in targets:
         print ('Target: ',t)
@@ -766,7 +713,7 @@ if __name__ == "__main__":
         # Generate an array of incremental timestamps
         time_indices = pd.date_range(
             start=ct, 
-            periods=8, 
+            periods=24*7, 
             freq="60min"  # Use 'S' for seconds, 'min' for minutes, 'H' for hours
         )
 
