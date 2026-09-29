@@ -11,11 +11,15 @@ from pathlib import Path
 
 from scipy.optimize import minimize_scalar
 import spiceypy as spice
+from astropy import units as u
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
+from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astroquery.jplhorizons import Horizons
 from astroquery.gaia import Gaia
+
+
 
 
 force_cleanup = False
@@ -86,22 +90,6 @@ def get_all_jpl_asteroids_with_spice():
 #get_all_jpl_asteroids_with_spice()
 
 
-
-    
-# Example: Querying a field around a target location 
-# (e.g., RA: 10h 0m 0s -> 150.0°, DEC: +02° 00' 00" -> 2.0°)
-target_ra = 150.0
-target_dec = 2.0
-    
-
-
-
-import numpy as np
-import pandas as pd
-from astropy import units as u
-from astropy.coordinates import SkyCoord
-from astropy.time import Time
-from astroquery.gaia import Gaia
 
 
 def fetch_and_propagate_stars(
@@ -678,12 +666,11 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
                              target_id,
                              r_asteroid_km)
             if res != None:
-                # { "best_utc": best_utc, "et": best_et, "min_distance": min_istance_pc }
                 record = {
+                    'target_id': target_id,
                     'best_utc': res['best_utc'],
                     'best_et': res['best_et'],
                     'min_distance': res['min_distance'],
-                    'target_id': target_id,
                     'star': star_id,
                     'mag': mag,
                     }
@@ -694,16 +681,21 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
                 df_new.to_csv(csv_file, mode='a', index=False, header=not file_exists)
 
 
-## TEST MAIN
+###############################################################
+##                
+##  TEST
+### MAIN ###
     
 if __name__ == "__main__":
 
-    #40.9541175,-72.9261452,17.62z
+    #RP: 40.9541175,-72.9261452,17.62z
     
     mag_min = 20
     obs_loc = EarthLocation(lat=40.9541175*u.deg, lon=-72.92614552*u.deg, height=40.0*u.m)
-    ct = "2026-10-03T00:00:00"  # Serach Start (center of 1h test interval) UTC
-    spn = 1*3600                # Search Time Interval in sec (1h)
+    ct = "2026-10-03T00:00:00"  # Search Start (center of 1h test interval) UTC
+    days = 7                    # # days to search form start
+
+    spn = 1*3600                # Search Time Interval in sec (1h) -- must match peridos below!
 
     targets = { "305580", "111287", "111286", "305580" } ## targets to search for events
 
@@ -713,24 +705,24 @@ if __name__ == "__main__":
         # Generate an array of incremental timestamps
         time_indices = pd.date_range(
             start=ct, 
-            periods=24*7, 
+            periods=24*days, 
             freq="60min"  # Use 'S' for seconds, 'min' for minutes, 'H' for hours
         )
 
         # Convert the entire series to your string format
         periods = time_indices.strftime("%Y-%m-%d %H:%M:%S").tolist()
 
-        print(periods)
+        print ('Test Periods: ', periods)
 
         for ctp in periods:
-            print ('Target check for time period around: ', ctp)
-
-            test_target (loc=obs_loc, # Observer Location
-                         event_search_center_time_utc=ctp,
-                         time_span=spn,
-                         target_id=t,              # asteroid target to check (Fortuna 19) 
-                         mag_lim = mag_min,        # star mag limit
-                         r_asteroid_km = 500.0)    # Asteroid radius in km
+            if 1:
+                print ('Target check for time period around: ', ctp)
+                test_target (loc=obs_loc, # Observer Location
+                             event_search_center_time_utc=ctp,
+                             time_span=spn,
+                             target_id=t,              # asteroid target to check (Fortuna 19) 
+                             mag_lim = mag_min,        # star mag limit
+                             r_asteroid_km = 500.0)    # Asteroid radius in km
 
     # Unload kernels
     spice.kclear()
