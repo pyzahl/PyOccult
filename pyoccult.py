@@ -42,7 +42,9 @@ def get_all_jpl_asteroids_with_spice():
     fp = Path(output_file)
     if fp.is_file():
         print("JPL db already fetched!")
-        return
+        print(f"Found and reading cached asteroid list: '{output_file}'.")
+        df = pd.read_csv(output_file)
+        return df
     
     
     # Added 'spkid' to the requested fields parameter
@@ -79,17 +81,17 @@ def get_all_jpl_asteroids_with_spice():
 
         print(f"Success! Fetched {len(df):,} minor planets and asteroids.")
         print(f"Data saved cleanly to '{output_file}'.")
-
+        return df
+        
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while connecting to JPL: {e}")
     except json.JSONDecodeError:
         print("Failed to parse the response from JPL.")
 
 
-
-#get_all_jpl_asteroids_with_spice()
-
-
+asteroids_df = get_all_jpl_asteroids_with_spice()
+spice_ids = asteroids_df["SPICE ID"].to_numpy()
+names = asteroids_df["Full Name"].to_numpy()
 
 
 def fetch_and_propagate_stars(
@@ -329,9 +331,34 @@ if download_kernels():
 
 print ('* Ready *')
         
+# 20028119, 28119 (1998 SX71),28119
 
-# Note: For a real asteroid, you would also download its specific orbital .bsp kernel
-# from JPL Horizons and load it here: spice.furnsh("asteroid_name.bsp")
+#+20000000
+def get_asteroid_name(spk_id):
+    
+    spk_id = int(spk_id)
+    if spk_id < 20000000:
+        spk_id = spk_id + 20000000
+
+    idx = np.where(spice_ids == spk_id)[0]
+    if idx.size > 0:
+        return names[idx[0]]
+
+    try:
+        # Attempt native SPICE resolution
+        name = spice.bodc2n(spk_id)
+        return name
+    except spice.utils.support_types.SpiceyError as e:
+        print(f"\nSPICE Processing Error: {e}")
+        # If not in the loaded SPICE pool, fall back to calculating the IAU number
+        if 20000000 <= spk_id < 30000000:
+            iau_number = spk_id - 20000000
+            return f"Numbered Asteroid IAU: ({iau_number})"
+        else:
+            return f"Unnumbered / Provisional Asteroid SPK Target ID: {spk_id}"
+
+
+
 
 
 def fetch_target_orbit (target_id='99942', epochs={'start': '2026-10-01', 'stop': '2027-10-01', 'step': '1d'}):
@@ -599,7 +626,7 @@ def test_star (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
         #r_asteroid_km = 50.0 
         if min_distance < r_asteroid_km:
             print(f"👉 SUCCESS: An occultation is PREDICTED at this site! Observer inside the shadow path.")
-            print(f"*** Asterioid ", asteroid_id, ", with star RA=",star_ra, " DE=", star_dec, " @ET=", best_et, ", UTC=", best_utc, " min dist=", min_distance, " km ", "***")
+            print(f"*** Asterioid ", asteroid_id, " (", get_asteroid_name(asteroid_id), "), with star RA=",star_ra, " DE=", star_dec, " @ET=", best_et, ", UTC=", best_utc, " min dist=", min_distance, " km ", "***")
             return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance }
             
         else:
@@ -632,7 +659,7 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
                                  abcorr="LT+S",  # Critical light-time + stellar aberration for real sky coordinates
                                  )
 
-    print ('Target: ', target_id, target)
+    print ('** Test Target: ', target_id, target, ' Name: ', get_asteroid_name(target_id))
     
     # Example: A path center coordinate and a specific target event time
 
@@ -668,6 +695,7 @@ def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, heig
             if res != None:
                 record = {
                     'target_id': target_id,
+                    'target_name': get_asteroid_name(target_id),
                     'best_utc': res['best_utc'],
                     'best_et': res['best_et'],
                     'min_distance': res['min_distance'],
@@ -697,9 +725,13 @@ if __name__ == "__main__":
 
     spn = 1*3600                # Search Time Interval in sec (1h) -- must match peridos below!
 
-    targets = { "305580", "111287", "111286", "305580" } ## targets to search for events
+    targets = { "200019", "305580", "111287", "111286", "305580", "54653", "70141", "4272" } ## targets to search for events
+
+    #if spk_id < 20000000:
+    #    spk_id = spk_id + 20000000
 
     for t in targets:
+
         print ('Target: ',t)
 
         # Generate an array of incremental timestamps
@@ -720,7 +752,7 @@ if __name__ == "__main__":
                 test_target (loc=obs_loc, # Observer Location
                              event_search_center_time_utc=ctp,
                              time_span=spn,
-                             target_id=t,              # asteroid target to check (Fortuna 19) 
+                             target_id=t,              # asteroid target to check
                              mag_lim = mag_min,        # star mag limit
                              r_asteroid_km = 500.0)    # Asteroid radius in km
 
