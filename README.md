@@ -61,7 +61,7 @@ pip install -r requirements.txt
 
 
 ## Site Configuration and Run Setup:
-Currently need to adjust this script section at the beginning:
+Currently need to adjust the pyoccult_config.py file to setup a run.
 
 ```  
 ct, days, spn = "2026-10-01T00:00:00", 10, 3600
