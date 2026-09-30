@@ -18,9 +18,14 @@ from astroquery.jplhorizons import Horizons
 from astroquery.gaia import Gaia
 
 # to Silence Warnings:
-#import warnings, erfa
-#warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
+import warnings, erfa
+warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
+### SEARCH FOR
+
+ct, days, spn = "2026-10-01T00:00:00", 10, 3600
+targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
+max_shadow_dist = 200  ## km
 
 ### CONFIG
 
@@ -629,7 +634,8 @@ def star_test (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
                center_time_utc = "2026-10-01T04:30:00", time_span = 24*3600,
                star_ra=np.radians(68.98), star_dec=np.radians(16.50),
                asteroid_id = "200019",
-               r_asteroid_km = 50.0):
+               r_asteroid_km = 50.0,
+               r_search_km = 0.0):
     # Define Target Star Coordinates (ICRS / J2000)
     # Example: Aldebaran or target star of choice
     #star_ra = np.radians(68.98)   # RA in radians
@@ -702,7 +708,13 @@ def star_test (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
             return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance,  "observable": "yes" }
             
         else:
-            print(f"❌ MISS: Shadow path misses observer by {min_distance - r_asteroid_km:.3f} km.")
+            if min_distance < r_asteroid_km+r_search_km:
+                if not observable(best_et, star_direction, obs_geo):
+                    print(f" ** BUT NOT OBSERVABLE, BELOW HORIZON OR LIMITS **")
+                    return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance, "observable": "no, in serach range" }
+                return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance,  "observable": "yes, in serach range" }
+            else:
+                print(f"❌ MISS: Shadow path misses observer by {min_distance - r_asteroid_km:.3f} km.")
     else:
         print("Solver failed to converge on an event window.")
 
@@ -750,7 +762,7 @@ def is_new_hit(target_id, star_id, et, tol=300.0):
     ets.append(et)
     return True
 
-def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0):
+def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, max_shadow_distance=0.0):
     obs_geo = {'lon': loc.lon.to(u.rad).value, 'lat': loc.lat.to(u.rad).value,
                'alt': loc.height.to(u.km).value}
     r_search = size['r_max_km']
@@ -775,7 +787,7 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0):
     for row in event_df.iloc[idx].itertuples(index=False):
         print (row)
         ra, dec = np.radians(getattr(row, ra_col)), np.radians(getattr(row, dec_col))
-        res = star_test(loc, event_time_utc, time_span, ra, dec, target_id, r_search)
+        res = star_test(loc, event_time_utc, time_span, ra, dec, target_id, r_search, max_shadow_dist)
         if res is None:
             print (f" --- miss --- ")
             continue
@@ -806,7 +818,7 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0):
                       r_km=size['r_km'], r_search_km=r_search, size_source=size['source'],
                       star=row.source_id, mag=row.phot_g_mean_mag,
                       star_ra=np.degrees(ra), star_dec=np.degrees(dec),
-                      star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met)
+                      star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met, observable=res['observable'])
         print(record)
         pd.DataFrame([record]).to_csv(HITS_CSV, mode='a', index=False,
                                       header=not os.path.isfile(HITS_CSV))
@@ -816,8 +828,6 @@ if __name__ == "__main__":
     mag_min = MAG_MIN
     obs_loc = EarthLocation(lat=LAT*u.deg, lon=LON*u.deg, height=ELE*u.m)
 
-    ct, days, spn = "2026-10-01T00:00:00", 14, 3600
-    targets = ["200019", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
 
     t0 = pd.Timestamp(ct)
     epochs = {'start': (t0 - pd.Timedelta(days=1)).strftime('%Y-%m-%d'),
