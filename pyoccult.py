@@ -1,5 +1,6 @@
 #!.venv/bin/python3
 import sys, base64, functools, os, re
+from datetime import datetime
 import numpy as np
 import requests
 import json
@@ -28,7 +29,7 @@ import pyoccult_config as config
 
 if config.force_cleanup:
     print ('Cleanup old files:')
-    for filename in ["naif0012.tls", "de440.bsp", "pck00010.tpc"]:
+    for filename in ["naif0012.tls", "de440.bsp", "pck00010.tpc", "earth_latest_high_prec.bpc"]:
         if os.path.exists(filename):
             print ('removing: ', filename)
             os.remove(filename)
@@ -38,13 +39,43 @@ spice.clpool()
 
 
 
+def check_file_age(file_path_str, days=-1):
+    file_path = Path(file_path_str)
+    if not file_path.is_file(): ## does not exist => False
+        #print(f"Error: The file '{file_path_str}' does not exist.")
+        return False
+
+    if days < 0:  ## do not care (always good) => True
+        return True
+    
+    now = datetime.now()
+    
+    # Get last modification time and creation time (with fallback for Unix)
+    last_write_date = datetime.fromtimestamp(file_path.stat().st_mtime)
+    try:
+        ctime_timestamp = file_path.stat().st_birthtime
+    except AttributeError:
+        ctime_timestamp = file_path.stat().st_ctime
+    creation_date = datetime.fromtimestamp(ctime_timestamp)
+
+    # Calculate age in days
+    age_since_creation = (now - creation_date).days
+    age_since_write = (now - last_write_date).days
+
+    #print(f"File: {file_path.name}")
+    #print(f"Created: {creation_date} ({age_since_creation} days old)")
+    #print(f"Modified: {last_write_date} ({age_since_write} days old)")
+    return age_since_write <= days ## older than days => False
+    
+
 # Basic Kerenls and Data
 def download_kernels():
     urls = {
-        "naif0012.tls": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls",
-        "de440.bsp": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp",
-        "pck00010.tpc": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc",
-        "earth_latest_high_prec.bpc": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc",
+        # fname: [url, maxage]
+        "naif0012.tls": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls", -1],
+        "de440.bsp": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp", -1],
+        "pck00010.tpc": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc", -1],
+        "earth_latest_high_prec.bpc": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc", config.earth_pck_max_age],
     }
     
     # Complete browser headers to clear security checks
@@ -56,7 +87,9 @@ def download_kernels():
         "Upgrade-Insecure-Requests": "1"
     }
 
-    for name, url in urls.items():
+    for name, [url, maxage] in urls.items():
+        #print (f"{name}: {url} ** maxage: {maxage} d")
+        
         # Clean check: Delete the file if it somehow contains HTML text
         if os.path.exists(name):
             with open(name, 'r', errors='ignore') as f:
@@ -66,7 +99,7 @@ def download_kernels():
                     os.remove(name)
 
         # Download using the system curl pipeline if it doesn't exist
-        if not os.path.exists(name):
+        if not check_file_age (name, maxage):
             print(f"Downloading {name} via system curl...")
             try:
                 # -L follows redirects, -s hides progress bar, -f fails silently on server errors
@@ -79,6 +112,7 @@ def download_kernels():
                 return False
                 
     print("✅ All kernels verified and downloaded cleanly via curl.")
+
     return True
 
 
@@ -86,11 +120,7 @@ def download_kernels():
 # KERNEL DOWNLOADING UTILITY
 # ==========================================
 
-# *** The Earth PCK is never refreshed. Once downloaded, earth_latest_high_prec.bpc is reused forever. Its predicted coverage is finite and the predictions degrade, so either pxform fails or you use stale Earth orientation. Re-download if the file is older than a week, and print the coverage after loading:
 
-#cover = spice.stypes.SPICEDOUBLE_CELL(1000)
-#spice.pckcov("earth_latest_high_prec.bpc", 3000, cover)      # 3000 = ITRF93 segments, verify
-#print("Earth PCK covers to", spice.et2utc(spice.wnfetd(cover, spice.wncard(cover) - 1)[1], 'ISOC', 0))
 
 if download_kernels():
     try:
@@ -101,13 +131,24 @@ if download_kernels():
         spice.furnsh("de440.bsp")          # Major planets base
         spice.furnsh("earth_latest_high_prec.bpc")
         
+        cover = spice.stypes.SPICEDOUBLE_CELL(1000)
+        spice.pckcov("earth_latest_high_prec.bpc", 3000, cover)      # 3000 = ITRF93 segments, verify
+        print ('---------------------------------------------')
+        print ("* Earth PCK covers to", spice.et2utc(spice.wnfetd(cover, spice.wncard(cover) - 1)[1], 'ISOC', 0))
+        print ('---------------------------------------------')
+    
         print ('* Testing Compute Kernels *')
         
         et = spice.str2et("2026-09-28 UTC")
         print(f"🚀 Success! CSPICE Active. Target ET: {et}")
+        print ('---------------------------------------------')
+        print ('---------- COMPUTE SYSTEM READY -------------')
+        print ('---------------------------------------------')
             
     except Exception as e:
+        print ('---------------------------------------------')
         print(f"CSPICE Error: {e}")
+        print ('---------------------------------------------')
         sys.exit('Exiting as of error.')
 
 ########################## PROLOGUE KERNEL INIT SECTION END

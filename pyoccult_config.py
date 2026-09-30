@@ -22,5 +22,6 @@ ALT_MARGIN   = 3.0      # early gate is looser than the final one, so it never r
 hits_output_cvs_file = 'hits_log.csv'
 
 ### Init, Cleanups, ToDO clean SHM cache?
+earth_pck_max_age = 7 ## days for earth pck to expire/auto update
 force_cleanup = False
 
