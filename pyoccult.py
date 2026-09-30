@@ -1,9 +1,7 @@
 #!.venv/bin/python3
-import os
-import sys
+import sys, base64, functools, os, re
 import numpy as np
 import requests
-import base64
 import json
 import subprocess
 import pandas as pd
@@ -19,183 +17,28 @@ import astropy.units as u
 from astroquery.jplhorizons import Horizons
 from astroquery.gaia import Gaia
 
+# to Silence Warnings:
+#import warnings, erfa
+#warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
 
+### CONFIG
+
+LAT = 40.9541175
+LON = -72.92614552
+ELE = 40
+
+MAG_MIN = 20
+MIN_STAR_ALT = 10.0     # deg, use the same constants in both gates
+MAX_SUN_ALT  = -6.0     # deg, try -12 for faint stars
+ALT_MARGIN   = 3.0      # early gate is looser than the final one, so it never rejects a real event
+
+
+########################## PROLOGUE KERNEL INIT SECTION
+
+# Init, Cleanups, ToDO clean SHM cache?
 
 force_cleanup = False
-
-
-# The correct endpoint for querying the bulk database
-URL = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
-
-import json
-import pandas as pd
-import requests
-
-# The correct endpoint for querying the bulk database
-URL = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
-
-
-def get_all_jpl_asteroids_with_spice():
-    print("Querying JPL Database for entries and SPICE IDs... (This may take a moment)")
-    output_file = "jpl_asteroids_spice.csv"
-    fp = Path(output_file)
-    if fp.is_file():
-        print("JPL db already fetched!")
-        print(f"Found and reading cached asteroid list: '{output_file}'.")
-        df = pd.read_csv(output_file)
-        return df
-    
-    
-    # Added 'spkid' to the requested fields parameter
-    params = {
-        "sb-kind": "a",  # Limit search results to asteroids-only
-        "fields": "spkid,full_name,pdes",  # Fetch SPICE/SPK ID, full name, and primary designation
-    }
-
-    try:
-        response = requests.get(URL, params=params)
-        response.raise_for_status()
-        data = response.json()
-
-        # Check if data was returned
-        if "data" not in data:
-            print("No data returned from the API.")
-            return
-
-        # Extract fields and data rows
-        columns = data["fields"]
-        rows = data["data"]
-
-        # Build the DataFrame
-        df = pd.DataFrame(rows, columns=columns)
-
-        # Rename columns to clear human-readable names
-        df.columns = ["SPICE ID", "Full Name", "Primary Designation"]
-
-        # Ensure the SPICE IDs are stored clearly (they arrive as string representations of the integer codes)
-        df["SPICE ID"] = pd.to_numeric(df["SPICE ID"], errors="coerce")
-
-        # Save to CSV
-        df.to_csv(output_file, index=False)
-
-        print(f"Success! Fetched {len(df):,} minor planets and asteroids.")
-        print(f"Data saved cleanly to '{output_file}'.")
-        return df
-        
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while connecting to JPL: {e}")
-    except json.JSONDecodeError:
-        print("Failed to parse the response from JPL.")
-
-
-asteroids_df = get_all_jpl_asteroids_with_spice()
-spice_ids = asteroids_df["SPICE ID"].to_numpy()
-names = asteroids_df["Full Name"].to_numpy()
-
-
-def fetch_and_propagate_stars(
-    ra_deg, dec_deg, event_time_str, radius_arcmin=10.0, mag_limit=16.0
-):
-    """Fetches Gaia DR3 stars and propagates their RA/Dec to a specific event time.
-
-    Parameters:
-    ra_deg (float): Center RA in decimal degrees (ICRS)
-    dec_deg (float): Center Dec in decimal degrees (ICRS)
-    event_time_str (str): Target date/time in ISO format (e.g., '2026-11-05
-    12:00:00')
-    radius_arcmin (float): Cone search radius in arcminutes
-    mag_limit (float): Faintest G-band magnitude to include
-    """
-    # Parse target time and define reference epochs
-    target_time = Time(event_time_str, scale="utc")
-    gaia_epoch = Time("2016-01-01T12:00:00", scale="tcb")  # Gaia DR3 J2016.0 reference
-
-    output_file = "/dev/shm/temp_PyOccult_propagated_occultation_catalog_ET_"+event_time_str+"_RAm"+str(round(60*ra_deg))+"_DEm"+str(round(60*ra_deg))+".csv"
-    fp = Path(output_file)
-    if fp.is_file():
-        df = pd.read_csv(output_file)
-        print(f"Found cached data for starfield {len(df)} stars in '{output_file}'.")
-        return df
-    
-    print(
-        f"Querying Gaia DR3 & propagating positions to: {target_time.iso} UTC..."
-    )
-
-    radius_deg = radius_arcmin / 60.0
-    query = f"""
-    SELECT 
-        source_id, ra, dec, parallax, pmra, pmdec, phot_g_mean_mag, ruwe
-    FROM gaiadr3.gaia_source
-    WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', {ra_deg}, {dec_deg}, {radius_deg}))
-    AND phot_g_mean_mag <= {mag_limit}
-    AND pmra IS NOT NULL AND pmdec IS NOT NULL -- Required for propagation
-    AND ruwe < 1.4
-    """
-
-    try:
-        job = Gaia.launch_job(query)
-        df = job.get_results().to_pandas()
-
-        # Handle missing or negative parallaxes safely by clipping them to 0 (very distant stars)
-        safe_parallax = np.where(
-            df["parallax"].isna() | (df["parallax"] < 0), 0, df["parallax"]
-        )
-
-        # Initialize SkyCoord array at the native Gaia J2016.0 epoch
-        stars_j2016 = SkyCoord(
-            ra=df["ra"].values * u.deg,
-            dec=df["dec"].values * u.deg,
-            distance=CoordinateDistance(safe_parallax),
-            pm_ra_cosdec=df["pmra"].values * u.mas / u.yr,
-            pm_dec=df["pmdec"].values * u.mas / u.yr,
-            obstime=gaia_epoch,
-            frame="icrs",
-        )
-
-        # Apply 3D space motion propagation to the target event epoch
-        # This handles proper motion and positional changes accurately
-        stars_target_epoch = stars_j2016.apply_space_motion(
-            new_obstime=target_time
-        )
-
-        # Append the new highly precise computed coordinates back into the table
-        df[f"ra_{target_time.datetime.strftime('%Y%m%d')}"] = (
-            stars_target_epoch.ra.deg
-        )
-        df[f"dec_{target_time.datetime.strftime('%Y%m%d')}"] = (
-            stars_target_epoch.dec.deg
-        )
-
-        #output_file = "propagated_occultation_catalog.csv"
-        df.to_csv(output_file, index=False)
-        print(f"Successfully processed {len(df)} stars.")
-        print(f"Saved computed coordinates cleanly to '{output_file}'.")
-        return df
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
-
-
-def CoordinateDistance(parallax_mas):
-    """Helper to convert parallax safely to distance."""
-    # Where parallax is 0, place the star effectively at infinity (100,000 parsecs)
-
-    # Create a mask for where the parallax is safe
-    condition = parallax_mas > 0
-
-    # Compute safely: out fills the fallback value, where restricts execution
-    distance_pc = np.divide(1000.0, parallax_mas, out=np.full_like(parallax_mas, 100000.0), where=condition)
-    return distance_pc * u.pc
-
-
-
-
-# Wipe out old file/memory states completely
-spice.clpool()
-
-
 
 if force_cleanup:
     print ('Cleanup old files:')
@@ -204,10 +47,12 @@ if force_cleanup:
             print ('removing: ', filename)
             os.remove(filename)
 
+# Wipe out old file/memory states completely
+spice.clpool()
 
 
-    
-    
+
+# Basic Kerenls and Data
 def download_kernels():
     urls = {
         "naif0012.tls": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls",
@@ -251,6 +96,250 @@ def download_kernels():
     return True
 
 
+# ==========================================
+# KERNEL DOWNLOADING UTILITY
+# ==========================================
+
+# *** The Earth PCK is never refreshed. Once downloaded, earth_latest_high_prec.bpc is reused forever. Its predicted coverage is finite and the predictions degrade, so either pxform fails or you use stale Earth orientation. Re-download if the file is older than a week, and print the coverage after loading:
+
+#cover = spice.stypes.SPICEDOUBLE_CELL(1000)
+#spice.pckcov("earth_latest_high_prec.bpc", 3000, cover)      # 3000 = ITRF93 segments, verify
+#print("Earth PCK covers to", spice.et2utc(spice.wnfetd(cover, spice.wncard(cover) - 1)[1], 'ISOC', 0))
+
+if download_kernels():
+    try:
+        print ('* Loading Compute Kernels *')
+        # Load all required kernels
+        spice.furnsh("naif0012.tls")       # Leapseconds
+        spice.furnsh("pck00010.tpc")       # Planetary constants
+        spice.furnsh("de440.bsp")          # Major planets base
+        spice.furnsh("earth_latest_high_prec.bpc")
+        
+        print ('* Testing Compute Kernels *')
+        
+        et = spice.str2et("2026-09-28 UTC")
+        print(f"🚀 Success! CSPICE Active. Target ET: {et}")
+            
+    except Exception as e:
+        print(f"CSPICE Error: {e}")
+        sys.exit('Exiting as of error.')
+
+########################## PROLOGUE KERNEL INIT SECTION END
+
+
+## GET DATA FOR INFO AND NAME LOOKUPS, download once!
+
+# The endpoint for querying the bulk database
+URL_JPL_SBDBQ = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
+
+def get_all_jpl_asteroids_with_spice():
+    print("Querying JPL Database for entries and SPICE IDs... (This may take a moment)")
+    output_file = "jpl_asteroids_spice.csv"
+    fp = Path(output_file)
+    if fp.is_file():
+        print("JPL db already fetched!")
+        print(f"Found and reading cached asteroid list: '{output_file}'.")
+        df = pd.read_csv(output_file)
+        return df
+    
+    
+    # Added 'spkid' to the requested fields parameter
+    params = {
+        "sb-kind": "a",  # Limit search results to asteroids-only
+        "fields": "spkid,full_name,pdes",  # Fetch SPICE/SPK ID, full name, and primary designation
+    }
+
+    try:
+        response = requests.get(URL_JPL_SBDBQ, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        # Check if data was returned
+        if "data" not in data:
+            print("No data returned from the API.")
+            return
+
+        # Extract fields and data rows
+        columns = data["fields"]
+        rows = data["data"]
+
+        # Build the DataFrame
+        df = pd.DataFrame(rows, columns=columns)
+
+        # Rename columns to clear human-readable names
+        df.columns = ["SPICE ID", "Full Name", "Primary Designation"]
+
+        # Ensure the SPICE IDs are stored clearly (they arrive as string representations of the integer codes)
+        df["SPICE ID"] = pd.to_numeric(df["SPICE ID"], errors="coerce")
+
+        # Save to CSV
+        df.to_csv(output_file, index=False)
+
+        print(f"Success! Fetched {len(df):,} minor planets and asteroids.")
+        print(f"Data saved cleanly to '{output_file}'.")
+        return df
+        
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while connecting to JPL: {e}")
+    except json.JSONDecodeError:
+        print("Failed to parse the response from JPL.")
+
+# Fetch to numpy
+asteroids_df = get_all_jpl_asteroids_with_spice()
+spice_ids = asteroids_df["SPICE ID"].to_numpy()
+names = asteroids_df["Full Name"].to_numpy()
+
+
+### NOW OCCULT CALC AND STAR+ASTEROID EPH MANAGEMENT
+
+
+#3. Possible silent row truncation. As far as I know, Gaia.launch_job (synchronous) is capped at about 2,000 rows, but check the current astroquery docs. At G≤20 a 10′ cone in a dense field can exceed that, and you'd lose stars with no error. Use launch_job_async, and warn if len(df) hits a suspicious round number.
+
+#4. Parallax handling. Clipping to 0 means infinite distance. Depending on your astropy version that gives NaN or an odd code path. Use a floor instead, such as np.clip(parallax, 0.01, None) (100 kpc), build the distance with Distance(parallax=... * u.mas) (I assume CoordinateDistance is that alias), and assert the output is finite.
+
+#5. Barycentric vs geocentric direction. apply_space_motion returns the barycentric position, but the shadow axis is parallel to the star direction as seen from Earth. At an asteroid distance of about 1.4 AU, 1 mas of parallax shifts the shadow by about 1 km. That is small for a 100 km body but matters for a 5 km one. Fix it once per window:
+
+PC_KM = 3.0856775814913673e13
+def geocentric_star_dir(ra_deg, dec_deg, plx_mas, et):
+    ra, dec = np.radians(ra_deg), np.radians(dec_deg)
+    u_bary = np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+    earth, _ = spice.spkpos('399', et, 'J2000', 'NONE', 'SSB')
+    v = u_bary * (1000.0 / max(plx_mas, 0.01)) * PC_KM - earth
+    return v / np.linalg.norm(v)
+
+
+#6. Failure handling. On any error you print and return None, so the caller's event_df.columns raises AttributeError and kills the whole 7-day batch. The blanket except Exception would also hide code bugs, such as the Distance issue above, as "an error occurred". Catch only network and TAP errors, retry with backoff, and return an empty DataFrame (with the expected columns) if there are no stars. In a run of over a thousand queries, one hiccup will happen.
+
+#7. Columns to add to the SELECT.
+
+#ra_error, dec_error, pmra_error, pmdec_error for the position uncertainty at the event epoch (propagated as sqrt(σ² + (Δt·σ_pm)²)).
+#bp_rp, which you need for the G→V or G→R conversion in the magnitude-drop estimate.
+#ruwe is already there. Consider flagging RUWE > 1.4 instead of excluding it, since those are often unresolved doubles, which are interesting occultation targets, though their positions are less certain.
+
+#Once you add ra_error, dec_error and similar, my earlier startswith('ra_') warning becomes a real bug, so use the exact regexes ^ra_\d{8}$ and ^dec_\d{8}$ in the driver.
+
+#Minor.
+
+#The inline -- Required for propagation comment sits in the middle of a multi-line ADQL string. If a server collapses newlines, it will comment out AND ruwe < 1.4, so remove it.
+#Colons and spaces in filenames are legal on Linux but awkward. Build keys from rounded numbers, not raw time strings.
+
+
+
+def tile_center(ra_deg, dec_deg, tile_arcmin=5.0):
+    t = tile_arcmin / 60.0
+    dec_c = round(dec_deg / t) * t
+    step = t / max(np.cos(np.radians(dec_c)), 0.05)
+    return (round(ra_deg / step) * step) % 360.0, dec_c
+
+def gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit):
+    ra_c, dec_c = tile_center(ra_deg, dec_deg)
+    fp = Path(f"/dev/shm/PyOccult_gaia_{ra_c:.4f}_{dec_c:.4f}_{radius_arcmin:g}_{mag_limit:g}.csv")
+    if fp.is_file():
+        return pd.read_csv(fp)
+    # ADQL query centered on (ra_c, dec_c), radius = radius_arcmin + 5 (tile size), via Gaia.launch_job_async
+
+    radius_deg = radius_arcmin / 60.0
+    query = f"""
+    SELECT 
+        source_id, ra, dec, parallax, pmra, pmdec, phot_g_mean_mag, ruwe
+    FROM gaiadr3.gaia_source
+    WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', {ra_c}, {dec_c}, {radius_deg}))
+    AND phot_g_mean_mag <= {mag_limit}
+    AND pmra IS NOT NULL AND pmdec IS NOT NULL -- Required for propagation
+    AND ruwe < 1.4
+    """
+
+    try:
+        job = Gaia.launch_job(query)
+        df = job.get_results().to_pandas()
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+    df.to_csv(fp, index=False)
+    return df
+
+# fetch_and_propagate_stars(): df = gaia_cone(...).copy(); then your existing SkyCoord /
+# apply_space_motion block, unchanged. Never cache that part.
+
+def fetch_and_propagate_stars(
+    ra_deg, dec_deg, event_time_str, radius_arcmin=10.0, mag_limit=16.0
+):
+    """Fetches Gaia DR3 stars and propagates their RA/Dec to a specific event time.
+
+    Parameters:
+    ra_deg (float): Center RA in decimal degrees (ICRS)
+    dec_deg (float): Center Dec in decimal degrees (ICRS)
+    event_time_str (str): Target date/time in ISO format (e.g., '2026-11-05
+    12:00:00')
+    radius_arcmin (float): Cone search radius in arcminutes
+    mag_limit (float): Faintest G-band magnitude to include
+    """
+    # Parse target time and define reference epochs
+    target_time = Time(event_time_str, scale="utc")
+    gaia_epoch = Time("2016-01-01T12:00:00", scale="tcb")  # Gaia DR3 J2016.0 reference
+    # gaia_cone(...)      -> cached raw Gaia table (epoch 2016.0)
+    # propagate(df, time) -> adds ra_YYYYMMDD / dec_YYYYMMDD, never cached
+    
+    print(
+        f"Querying Gaia DR3 & propagating positions to: {target_time.iso} UTC..."
+    )
+
+    df = gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit).copy(); 
+        
+    # Handle missing or negative parallaxes safely by clipping them to 0 (very distant stars)
+    #safe_parallax = np.where(
+    #    df["parallax"].isna() | (df["parallax"] < 0), 0, df["parallax"]
+    #)
+    safe_parallax = np.clip(df["parallax"].fillna(0.0).to_numpy(), 0.01, None)   # mas, i.e. 100 kpc max
+    
+    # Initialize SkyCoord array at the native Gaia J2016.0 epoch
+    stars_j2016 = SkyCoord(
+        ra=df["ra"].values * u.deg,
+        dec=df["dec"].values * u.deg,
+        distance=CoordinateDistance(safe_parallax),
+        pm_ra_cosdec=df["pmra"].values * u.mas / u.yr,
+        pm_dec=df["pmdec"].values * u.mas / u.yr,
+        obstime=gaia_epoch,
+        frame="icrs",
+    )
+    
+    # Apply 3D space motion propagation to the target event epoch
+    # This handles proper motion and positional changes accurately
+    stars_target_epoch = stars_j2016.apply_space_motion(
+        new_obstime=target_time
+    )
+    
+    # Append the new highly precise computed coordinates back into the table
+    df[f"ra_{target_time.datetime.strftime('%Y%m%d')}"] = (
+        stars_target_epoch.ra.deg
+    )
+    df[f"dec_{target_time.datetime.strftime('%Y%m%d')}"] = (
+        stars_target_epoch.dec.deg
+    )
+
+    print(f"Successfully processed {len(df)} stars.")
+    return df
+
+
+
+def CoordinateDistance(parallax_mas):
+    """Helper to convert parallax safely to distance."""
+    # Where parallax is 0, place the star effectively at infinity (100,000 parsecs)
+
+    # Create a mask for where the parallax is safe
+    condition = parallax_mas > 0
+
+    # Compute safely: out fills the fallback value, where restricts execution
+    distance_pc = np.divide(1000.0, parallax_mas, out=np.full_like(parallax_mas, 100000.0), where=condition)
+    return distance_pc * u.pc
+
+
+    
+    
+
+
 def list_spk_contents(kernel_path):
     # Find all unique object IDs tracked in the BSP file
     objects = spice.spkobj(kernel_path)
@@ -275,61 +364,7 @@ def list_spk_contents(kernel_path):
             print(f"{obj_id:<15} | {start_et:<20.3f} | {end_et:<20.3f}")
 
 
-# ==========================================
-# 1. KERNEL DOWNLOADING UTILITY
-# ==========================================
-if download_kernels():
-    try:
-        print ('* Loading Compute Kernels *')
-        # Load all required kernels
-        spice.furnsh("naif0012.tls")       # Leapseconds
-        spice.furnsh("pck00010.tpc")       # Planetary constants
-        spice.furnsh("de440.bsp")          # Major planets base
-        spice.furnsh("earth_latest_high_prec.bpc")
-        
-        print ('* Testing Compute Kernels *')
-        
-        et = spice.str2et("2026-09-28 UTC")
-        print(f"🚀 Success! CSPICE Active. Target ET: {et}")
 
-        if 0:
-            #spice.furnsh("19_fortuna.bsp")     # specific asteroid data
-            #spice.furnsh("asteroid_200019.bsp")
-            # 2. Force SPICE to map the name string "200019" to the internal NAIF ID 2200019
-            #spice.boddef("200019", 2200019)
-            # 2. Extract the exact hidden NAIF ID code from your SPK file cover
-            # spkobj returns an array of all integer IDs present in the file
-            spk_ids = spice.spkobj("asteroid_200019.bsp")
-
-            if spk_ids:
-                actual_jpl_id = int(spk_ids[0])
-                print(f" Detected ID inside file: {actual_jpl_id}")
-
-                # 3. Explicitly alias all variations to this detected ID code
-                spice.boddef("200019", actual_jpl_id)
-                spice.boddef("2200019", actual_jpl_id)
-
-                # 4. Perform the evaluation safely using the mapped string name
-                et = spice.str2et("2026 SEP 28 00:01:09.182")
-                state, lt = spice.spkezr("200019",et, "J2000", "NONE", "0")
-                print("\n✅ Success! State Vector relative to SSB (0):")
-                print(state)
-            else:
-                print("❌ Critical: The asteroid_200019.bsp file appears empty or corrupted.")
-
-
-            print ('List of Asterioids:')
-            # Execute the iteration
-            list_spk_contents("asteroid_200019.bsp")
-
-
-            
-    except Exception as e:
-        print(f"CSPICE Error: {e}")
-        sys.exit('Exiting as of error.')
-
-
-print ('* Ready *')
         
 # 20028119, 28119 (1998 SX71),28119
 
@@ -359,76 +394,83 @@ def get_asteroid_name(spk_id):
 
 
 
+_loaded = {}    # asteroid number -> NAIF id
+
+def fetch_target_orbit(target_id, epochs, cache_dir="/dev/shm"):
+    target_id = str(target_id)
+    fn = Path(cache_dir) / f"PyOccult_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
+    if not fn.is_file():
+        resp = requests.get(
+            "https://ssd.jpl.nasa.gov/api/horizons.api",
+            params={'format': 'json', 'COMMAND': target_id + ';', 'EPHEM_TYPE': 'SPK',
+                    'MAKE_EPHEM': 'YES', 'START_TIME': epochs['start'],
+                    'STOP_TIME': epochs['stop'], 'OBJ_DATA': 'NO'},
+            timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        if 'spk' not in data:
+            raise RuntimeError(f"Horizons gave no SPK for {target_id}: {str(data.get('result', data))[:300]}")
+        fn.write_bytes(base64.b64decode(data['spk']))
+    if target_id not in _loaded:
+        spice.furnsh(str(fn))
+        _loaded[target_id] = int(spice.spkobj(str(fn))[0])
+        spice.boddef(target_id, _loaded[target_id])     # keep alias if callers still pass the number
+    return _loaded[target_id]                           # NAIF id, safe to use directly in spkpos
+
+SIZE_OVERRIDES = {}   # curate best values here: {"19": (r_km, r_sigma_km, "source note")}
 
 
-def fetch_target_orbit (target_id='99942', epochs={'start': '2026-10-01', 'stop': '2027-10-01', 'step': '1d'}):
-    
-    output_filename = "/dev/shm/temp_PyOccult_asteroid_"+target_id+"_kernel.bsp"
 
-    fp = Path(output_filename)
-    if fp.is_file():
-        print ('Already fetched: ', output_filename)
-    else:
-        # 1. Official JPL Horizons API Endpoint
-        url = "https://ssd.jpl.nasa.gov/api/horizons.api"
+#Things to check:
 
-        # 2. Configure parameters
-        # For a numbered asteroid, the ID must have a trailing semicolon inside the quotes
-        params = {
-            'format': 'json',
-            'COMMAND': target_id+';',
-            'EPHEM_TYPE': 'SPK',
-            'MAKE_EPHEM': 'YES',
-            'START_TIME': epochs['start'],
-            'STOP_TIME': epochs['stop'],
-            "OBJ_DATA": "NO",
-        }
+#SBDB field names. I'm going from memory of the phys_par layout (name, value, sigma, ref). Print resp.json() for one target to confirm, and adjust num() if needed. extent should be the full dimensions in km.
+#Source labels. The ref string tells you which survey the diameter came from. Where you have better values (occultation chords, DAMIT shape models), put them in SIZE_OVERRIDES and they take priority.
+#What the bounds mean. r_km is the nominal radius. r_min_km and r_max_km are approximately ±3σ, or the albedo range for H-only objects, and are wider if the triaxial extents are bigger. The bounds reflect size uncertainty only, not ephemeris uncertainty.
 
-        print("Querying JPL API...", params)
+@functools.lru_cache(maxsize=None)
+def get_asteroid_size(target_id, timeout=30):
+    """Return dict(r_km, r_min_km, r_max_km, source), or None if nothing usable."""
+    n = str(target_id).strip()
+    if n in SIZE_OVERRIDES:
+        r, s, src = SIZE_OVERRIDES[n]
+        return dict(r_km=r, r_min_km=r - 3*s, r_max_km=r + 3*s, source=src)
 
-        response = requests.get(url, params=params)
+    try:
+        resp = requests.get("https://ssd-api.jpl.nasa.gov/sbdb.api",
+                            params={"sstr": n, "phys-par": 1}, timeout=timeout)
+        resp.raise_for_status()
+        pp = {p["name"]: p for p in resp.json().get("phys_par", [])}
+    except (requests.RequestException, ValueError) as e:
+        print(f"SBDB lookup failed for {n}: {e}")
+        return None
 
-        # 3. Handle response content-type safely
-        if response.status_code == 200:
-            content_type = response.headers.get("Content-Type", "")
+    def num(name, key="value"):
+        try:
+            return float(pp[name][key])
+        except (KeyError, TypeError, ValueError):
+            return None
 
-            if "application/json" in content_type:
-                data = response.json()
+    D = num("diameter")
+    if D:
+        s = num("diameter", "sigma") or num("diameter_sigma") or 0.15 * D   # assume 15% if absent
+        out = dict(r_km=D/2, r_min_km=(D - 3*s)/2, r_max_km=(D + 3*s)/2,
+                   source=f"SBDB diameter (ref {pp['diameter'].get('ref', '?')})")
+        ext = [float(x) for x in re.findall(r"[\d.]+", str(pp.get("extent", {}).get("value", "")))]
+        if len(ext) >= 2:                      # tri-axial full dimensions -> semi-axes
+            out["r_min_km"] = min(out["r_min_km"], min(ext)/2)
+            out["r_max_km"] = max(out["r_max_km"], max(ext)/2)
+        return out
 
-                if "spk" in data:
-                    print("SPK data block found. Decoding Base64 stream...")
-                    # JPL packages the binary BSP stream inside a base64-encoded string
-                    spk_binary = base64.b64decode(data["spk"])
+    H = num("H")
+    if H is None:
+        return None
+    Dp = lambda p: 1329.0 / np.sqrt(p) * 10**(-H/5)
+    p = num("albedo")
+    if p:
+        return dict(r_km=Dp(p)/2, r_min_km=Dp(min(p*1.5, 1))/2, r_max_km=Dp(p/1.5)/2, source="H + SBDB albedo")
+    return dict(r_km=Dp(0.14)/2, r_min_km=Dp(0.30)/2, r_max_km=Dp(0.05)/2, source="H only, albedo assumed")
 
-                    with open(output_filename, "wb") as f:
-                        f.write(spk_binary)
 
-                    print(f"Success! Saved binary SPK to: {os.path.abspath(output_filename)}")
-                else:
-                    print("❌ JPL returned JSON, but it didn't contain an SPK file.")
-                    print("JPL Message:", data.get("result", "No details available."))
-
-            else:
-                print("❌ Received non-JSON response (likely an HTML webpage or raw configuration text).")
-                print("First 300 characters of response:")
-                print(response.text[:300])
-
-        else:
-            print(f"❌ HTTP Error: Server responded with status code {response.status_code}")
-
-    print ('Loading orbit for: ', target_id)
-    spice.furnsh(output_filename)
-    spk_ids = spice.spkobj(output_filename)
-    actual_jpl_id = int(spk_ids[0])
-    spice.boddef(target_id, actual_jpl_id)
-
-    # You can now query the asteroid's position relative to Earth or the Sun
-    # (Replace 'ASTEROID_ID' with the actual SPICE ID or name string in the kernel)
-    et = spice.str2et(epochs['start']+" 22:00:00 UTC")
-    state, ltt = spice.spkezr(target_id, et, "ECLIPJ2000", "NONE", "EARTH")
-    print("\n✅ Success! State Vector relative to SSB (0):")
-    print(state)
-            
 
 def get_asteroid_ra_dec(target_id, utc_time, observer="EARTH", ref_frame="J2000", abcorr="LT+S"):
     """Calculates the high-precision RA and Dec of an asteroid using SPICE.
@@ -493,71 +535,97 @@ def get_asteroid_ra_dec(target_id, utc_time, observer="EARTH", ref_frame="J2000"
         sys.exit('Exiting as of error.')
 
 
-    #finally:
-    #    # Always clear loaded files to prevent pool contamination on repeated execution loops
-    #    spice.unload("de440.bsp")
-    #    spice.unload("naif0012.tls")
 
 
+AU_KM = 149597870.7
+
+def apparent_mag_HG(et, target, H, G=0.15):
+    ast_from_earth, _ = spice.spkpos(target, et, 'J2000', 'LT', '399')
+    ast_from_sun, _   = spice.spkpos(target, et, 'J2000', 'LT', 'SUN')
+    delta = np.linalg.norm(ast_from_earth) / AU_KM
+    r     = np.linalg.norm(ast_from_sun) / AU_KM
+    alpha = spice.vsep(ast_from_sun, ast_from_earth)      # phase angle at the asteroid, rad
+    t = np.tan(alpha / 2)
+    phi1, phi2 = np.exp(-3.33 * t**0.63), np.exp(-1.87 * t**1.22)
+    return H + 5*np.log10(r * delta) - 2.5*np.log10((1 - G)*phi1 + G*phi2)
 
 
-    
-# ==========================================
-# 2. BESSELIAN PLANE SOLVER ENGINE
-# ==========================================
-def get_besselian_miss_distance(et, star_vector, observer_geo, asteroid_target):
-    """
-    Calculates the distance between the observer and the center of the asteroid's
-    shadow axis on the Besselian Fundamental Plane at Ephemeris Time (et).
-    """
-    # 1. Direction vector from Earth center to the Star (z-axis of Besselian plane)
+def besselian_offsets(et, star_vector, observer_geo, asteroid_target):
+    """Offsets (km) of the shadow axis from the observer on the fundamental plane.
+    x points east, y points celestial north; the value is asteroid axis minus observer."""
+    # Plane basis: z toward the star, x east, y north
     z_axis = star_vector / np.linalg.norm(star_vector)
-
-    # 2. Construct the rest of the fundamental plane coordinate system (x and y axes)
-    # Define a temporary vector to cross with to get equatorial perpendiculars
-    temp_vec = np.array([0.0, 0.0, 1.0]) if abs(z_axis[2]) < 0.99 else np.array([0.0, 1.0, 0.0])
-    x_axis = np.cross(temp_vec, z_axis)
+    x_axis = np.cross([0.0, 0.0, 1.0], z_axis)
+    if np.linalg.norm(x_axis) < 1e-12:          # star at a celestial pole
+        x_axis = np.array([1.0, 0.0, 0.0])
     x_axis /= np.linalg.norm(x_axis)
     y_axis = np.cross(z_axis, x_axis)
+    M = np.vstack((x_axis, y_axis, z_axis))
 
-    # Transform matrix from J2000 to Besselian Plane
-    M_bessel = np.vstack((x_axis, y_axis, z_axis))
+    # Asteroid relative to Earth's center (399), light time only, no stellar aberration
+    ast_pos, _ = spice.spkpos(str(asteroid_target), et, 'J2000', 'CN', '399')
 
-    # 3. Position of Asteroid relative to Earth Center (J2000), corrected for light time
-    # (Using '3' for Earth Center, 'CN+S' for converged Newtonian light time + stellar aberration)
-    try:
-        ast_pos, _ = spice.spkpos(asteroid_target, et, 'J2000', 'CN+S', '3')
-    except spice.stypes.SpiceException:
-        # Fallback to an available body (e.g., Moon '301') if running this as a test mock
-        ast_pos, _ = spice.spkpos('301', et, 'J2000', 'CN+S', '3')
+    # Observer, geocentric J2000 (lon/lat in radians, alt in km)
+    radii = spice.bodvrd('EARTH', 'RADII', 3)[1]
+    flat = (radii[0] - radii[2]) / radii[0]
+    obs_itrf = spice.georec(observer_geo['lon'], observer_geo['lat'],
+                            observer_geo['alt'], radii[0], flat)
+    obs_j2000 = spice.pxform('ITRF93', 'J2000', et) @ obs_itrf
 
-    # 4. Position of Observer relative to Earth Center (ITRF93 converted to J2000 at time et)
-    # Convert geodetic to body-fixed XYZ
-    r_earth = 6378.137  # Earth equatorial radius
-    f_earth = 1.0 / 298.257223563  # Flattening factor
-    obs_itrf = spice.georec(observer_geo['lon'], observer_geo['lat'], observer_geo['alt'], r_earth, f_earth)
-    
-    # Get rotation matrix from Earth-fixed frame to J2000 inertial frame
-    m_rot = spice.pxform('ITRF93', 'J2000', et)
-    obs_j2000 = spice.mxv(m_rot, obs_itrf)
+    d = M @ (ast_pos - obs_j2000)
+    return d[0], d[1]
 
-    # 5. Project both vectors onto the Besselian Plane
-    ast_bessel = spice.mxv(M_bessel, ast_pos)
-    obs_bessel = spice.mxv(M_bessel, obs_j2000)
 
-    # On the Fundamental Plane, we only care about the x and y coordinates
-    # The shadow axis passes through the asteroid's x, y coordinates
-    dx = ast_bessel[0] - obs_bessel[0]
-    dy = ast_bessel[1] - obs_bessel[1]
-    
-    # Return the scalar distance (miss distance of shadow center to observer)
-    return np.sqrt(dx**2 + dy**2)
+def get_besselian_miss_distance(*args):
+    return np.hypot(*besselian_offsets(*args))
+
+def event_metrics(et, star_dir, obs_geo, target, r_km, m_star, m_ast, dt=1.0):
+    dx0, dy0 = besselian_offsets(et - dt, star_dir, obs_geo, target)
+    dx1, dy1 = besselian_offsets(et + dt, star_dir, obs_geo, target)
+    dx,  dy  = besselian_offsets(et,      star_dir, obs_geo, target)
+    v     = np.hypot(dx1 - dx0, dy1 - dy0) / (2*dt)       # shadow speed vs observer, km/s
+    b     = np.hypot(dx, dy)                               # impact parameter, km
+    chord = 2*np.sqrt(max(r_km**2 - b**2, 0.0))
+    drop  = 2.5*np.log10(1 + 10**(0.4*(m_ast - m_star)))
+    return dict(speed_kms=v, chord_km=chord, duration_s=chord/v, mag_drop=drop)
+
+
+
+
+
+def _up_j2000(et, obs_geo):
+    lon, lat = obs_geo['lon'], obs_geo['lat']
+    up_itrf = np.array([np.cos(lat)*np.cos(lon), np.cos(lat)*np.sin(lon), np.sin(lat)])
+    return spice.pxform('ITRF93', 'J2000', et) @ up_itrf
+
+def sun_alt_deg(et, obs_geo):
+    sun, _ = spice.spkpos('SUN', et, 'J2000', 'LT+S', '399')
+    return np.degrees(np.arcsin(_up_j2000(et, obs_geo) @ (sun / np.linalg.norm(sun))))
+
+def alt_deg(et, direction, obs_geo):
+    return np.degrees(np.arcsin(_up_j2000(et, obs_geo) @ (direction / np.linalg.norm(direction))))
+
+
+def observable(et, star_dir, obs_geo, min_star_alt=MIN_STAR_ALT, max_sun_alt=MAX_SUN_ALT):
+    star_alt = alt_deg(et, star_dir, obs_geo)
+    sun_alt = sun_alt_deg(et, obs_geo)
+    return bool(star_alt > min_star_alt and sun_alt < max_sun_alt), star_alt, sun_alt
+
+def window_is_observable(et0, span, obs_geo, target_id, min_star_alt=MIN_STAR_ALT, max_sun_alt=MAX_SUN_ALT, alt_margin=ALT_MARGIN):
+    for e in (et0 - span/2, et0, et0 + span/2):
+        ast, _ = spice.spkpos(target_id, e, 'J2000', 'CN', '399')
+        if (sun_alt_deg(e, obs_geo) < max_sun_alt and
+                alt_deg(e, ast, obs_geo) > min_star_alt - alt_margin):
+            return True
+    return False
+
+
 
 
 # ==========================================
 # 3. EXECUTION AND TEST HARNESS
 # ==========================================
-def test_star (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m),
+def star_test (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m),
                center_time_utc = "2026-10-01T04:30:00", time_span = 24*3600,
                star_ra=np.radians(68.98), star_dec=np.radians(16.50),
                asteroid_id = "200019",
@@ -625,9 +693,13 @@ def test_star (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
         # Assuming an asteroid radius R_ast (e.g., 50 km)
         #r_asteroid_km = 50.0 
         if min_distance < r_asteroid_km:
+
             print(f"👉 SUCCESS: An occultation is PREDICTED at this site! Observer inside the shadow path.")
             print(f"*** Asterioid ", asteroid_id, " (", get_asteroid_name(asteroid_id), "), with star RA=",star_ra, " DE=", star_dec, " @ET=", best_et, ", UTC=", best_utc, " min dist=", min_distance, " km ", "***")
-            return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance }
+            if not observable(best_et, star_direction, obs_geo):
+                print(f" ** BUT NOT OBSERVABLE, BELOW HORIZON OR LIMITS **")
+                return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance, "observable": "no" }
+            return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance,  "observable": "yes" }
             
         else:
             print(f"❌ MISS: Shadow path misses observer by {min_distance - r_asteroid_km:.3f} km.")
@@ -638,127 +710,133 @@ def test_star (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
 
 
 
+def screen_stars(ra_deg, dec_deg, target, et0, span, margin_km, step=60.0):
+    ets = np.arange(et0 - span/2, et0 + span/2 + step, step)
+    ast, _ = spice.spkpos(target, ets, 'J2000', 'CN', '399')      # astrometric, matches Gaia
+    dist = np.linalg.norm(ast, axis=1)
+    u_ast = ast / dist[:, None]
+    ra, dec = np.radians(ra_deg), np.radians(dec_deg)
+    s = np.column_stack((np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)))
+    chord = np.linalg.norm(s[:, None, :] - u_ast[None, :, :], axis=2)   # (stars, times)
+    return np.where((chord * dist).min(axis=1) < margin_km)[0]          # ~plane distance, km
 
-def test_target (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height=10*u.m),
-                 event_search_center_time_utc = "2026-10-01T04:30:00", time_span=24*3600,
-                 target_id="200019",
-                 mag_lim = 20.0,
-                 r_asteroid_km = 50.0):
+
+
+
+
+#Written but not wired in
+
+#observable, event_metrics and apparent_mag_HG are never called. apparent_mag_HG needs H and G, so make get_asteroid_size return them: compute H, G = num("H"), num("G") after num is defined, and add H=H, G=G to every returned dict (None in the override branch). For m_star, Gaia G is fine as a proxy. Add bp_rp to the SELECT if you want a proper V or R conversion. observable's default max_sun_alt=-6 is civil twilight, so use -12 or lower for faint stars.
+
+#Still open from earlier notes
+#targets is still a set with a duplicate.
+#epochs is hardcoded, and fetch_target_orbit still runs per window.
+#There's no retry or backoff on the network calls.
+#sys.exit inside get_asteroid_ra_dec kills the whole batch, so raise or return None instead.
+#spice.utils.support_types.SpiceyError is only evaluated when an exception fires, so if that attribute doesn't exist in your spiceypy you'd get an AttributeError hiding the real SPICE error. Check it in a REPL, or use from spiceypy.utils.exceptions import SpiceyError.
+#The inline -- comment in the ADQL is still there.
+
+#Housekeeping. get_besselian_miss_distance is defined three times (the last wins). Delete Xget_besselian_miss_distance and Xfetch_target_orbit, the unused Horizons import and headers dict, and add -f to the curl call so a 404 doesn't save an HTML page.
+
+
+
+HITS_CSV = "hits_log_v2.csv"
+_seen = {}
+
+def is_new_hit(target_id, star_id, et, tol=300.0):
+    ets = _seen.setdefault((target_id, star_id), [])
+    if any(abs(et - e) < tol for e in ets):
+        return False
+    ets.append(et)
+    return True
+
+def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0):
+    obs_geo = {'lon': loc.lon.to(u.rad).value, 'lat': loc.lat.to(u.rad).value,
+               'alt': loc.height.to(u.km).value}
+    r_search = size['r_max_km']
+    et0 = spice.str2et(event_time_utc)
+
+    assert target_id in _loaded, f"fetch_target_orbit({target_id}) must run first"
+    
+    if not window_is_observable(et0, time_span, obs_geo, target_id):
+        return          # skips Horizons position, Gaia query, screening, solver
+    
+    target = get_asteroid_ra_dec(target_id, utc_time=event_time_utc)     # cone centre only
+
+    event_df = fetch_and_propagate_stars(target['ra'], target['dec'], event_time_utc, 10.0, mag_lim)
+    if event_df is None or event_df.empty:
+        return
+    ra_col  = event_df.filter(regex=r'^ra_\d{8}$').columns[0]
+    dec_col = event_df.filter(regex=r'^dec_\d{8}$').columns[0]
+
+    idx = screen_stars(event_df[ra_col].to_numpy(), event_df[dec_col].to_numpy(),
+                       target_id, et0, time_span, margin_km=6378 + r_search) 
+    print (f"Pre-Screening: {idx}")
+    for row in event_df.iloc[idx].itertuples(index=False):
+        print (row)
+        ra, dec = np.radians(getattr(row, ra_col)), np.radians(getattr(row, dec_col))
+        res = star_test(loc, event_time_utc, time_span, ra, dec, target_id, r_search)
+        if res is None:
+            print (f" --- miss --- ")
+            continue
+        # minimum on the window edge is not a real minimum; the overlapping neighbour finds it
+        if min(res['best_et'] - (et0 - time_span/2), (et0 + time_span/2) - res['best_et']) < 1.0:
+            print (f" --- not real --- ")
+            continue
+        if not is_new_hit(target_id, row.source_id, res['best_et']):
+            print (f" --- not a hit --- ")
+            continue
+        star_dir = np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+        ok, star_alt, sun_alt = observable(res['best_et'], star_dir, obs_geo)
+        if not ok:
+            print (f" --- not visible --- ")
+            continue                                   # drop this line to log invisible events too
+        m_ast = (apparent_mag_HG(res['best_et'], target_id, size['H'], size.get('G') or 0.15)
+                 if size.get('H') is not None else np.nan)
+        met = event_metrics(res['best_et'], star_dir, obs_geo, target_id, size['r_km'],
+                            row.phot_g_mean_mag, m_ast)
+
+        if np.isfinite(met['mag_drop']) and met['mag_drop'] < 0.1:
+            print (f" --- too low mag drop dM = {met['mag_drop']} --- ")
+            continue
         
-    # Define column shortcut headers based on your target date
-    # (Assumes the column name dynamically created by the script, e.g., 'ra_20261105')
-    
-    epochs={'start': '2026-10-01', 'stop': '2027-10-01', 'step': '1d'}
-
-    fetch_target_orbit (target_id, epochs)
-    
-    target = get_asteroid_ra_dec(target_id,
-                                 utc_time=event_search_center_time_utc, #"2026-11-05 04:15:30",
-                                 observer="EARTH",
-                                 ref_frame="J2000",
-                                 abcorr="LT+S",  # Critical light-time + stellar aberration for real sky coordinates
-                                 )
-
-    print ('** Test Target: ', target_id, target, ' Name: ', get_asteroid_name(target_id))
-    
-    # Example: A path center coordinate and a specific target event time
-
-    event_df = fetch_and_propagate_stars(
-        target['ra'], target['dec'], event_time_str=event_search_center_time_utc, radius_arcmin=10.0
-    )
- 
-    #ra_col = "ra_20261001"
-    #dec_col = "dec_20261001"
-    ra_cols  = event_df.columns[event_df.columns.str.startswith('ra_')].tolist()
-    dec_cols = event_df.columns[event_df.columns.str.startswith('dec_')].tolist()
-    
-    print("\nIterating through propagated star positions:")
-    for row in event_df.itertuples(index=False):
-        # Access attributes cleanly by column header names
-        star_id = row.source_id
-        mag = row.phot_g_mean_mag
-
-        #print (row, star_id)
-        print ('---')
-        
-        if mag <= mag_lim:
-            # Retrieve the exact propagated coordinates for your event time
-            propagated_ra  = getattr(row, ra_cols[0])
-            propagated_dec = getattr(row, dec_cols[0])
-
-            print(f"Star ID: {star_id} | Mag: {mag:.2f} | Propagated RA: {propagated_ra:.6f}° | Dec: {propagated_dec:.6f}°")
-            res = test_star (loc,
-                             event_search_center_time_utc, time_span,
-                             np.radians (propagated_ra), np.radians (propagated_dec),
-                             target_id,
-                             r_asteroid_km)
-            if res != None:
-                record = {
-                    'target_id': target_id,
-                    'target_name': get_asteroid_name(target_id),
-                    'best_utc': res['best_utc'],
-                    'best_et': res['best_et'],
-                    'min_distance': res['min_distance'],
-                    'star': star_id,
-                    'mag': mag,
-                    }
-                print (record)
-                df_new = pd.DataFrame.from_records([record])
-                csv_file = "hits_log.csv"
-                file_exists = os.path.isfile(csv_file)
-                df_new.to_csv(csv_file, mode='a', index=False, header=not file_exists)
+        record = dict(target_id=target_id, target_name=get_asteroid_name(target_id),
+                      best_utc=res['best_utc'], best_et=res['best_et'],
+                      min_distance=res['min_distance'], margin_km=res['min_distance'] - size['r_km'],
+                      r_km=size['r_km'], r_search_km=r_search, size_source=size['source'],
+                      star=row.source_id, mag=row.phot_g_mean_mag,
+                      star_ra=np.degrees(ra), star_dec=np.degrees(dec),
+                      star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met)
+        print(record)
+        pd.DataFrame([record]).to_csv(HITS_CSV, mode='a', index=False,
+                                      header=not os.path.isfile(HITS_CSV))
 
 
-###############################################################
-##                
-##  TEST
-### MAIN ###
-    
 if __name__ == "__main__":
+    mag_min = MAG_MIN
+    obs_loc = EarthLocation(lat=LAT*u.deg, lon=LON*u.deg, height=ELE*u.m)
 
-    #RP: 40.9541175,-72.9261452,17.62z
-    
-    mag_min = 20
-    obs_loc = EarthLocation(lat=40.9541175*u.deg, lon=-72.92614552*u.deg, height=40.0*u.m)
-    ct = "2026-10-03T00:00:00"  # Search Start (center of 1h test interval) UTC
-    days = 7                    # # days to search form start
+    ct, days, spn = "2026-10-01T00:00:00", 14, 3600
+    targets = ["200019", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
 
-    spn = 1*3600                # Search Time Interval in sec (1h) -- must match peridos below!
-
-    targets = { "200019", "305580", "111287", "111286", "305580", "54653", "70141", "4272" } ## targets to search for events
-
-    #if spk_id < 20000000:
-    #    spk_id = spk_id + 20000000
+    t0 = pd.Timestamp(ct)
+    epochs = {'start': (t0 - pd.Timedelta(days=1)).strftime('%Y-%m-%d'),
+              'stop':  (t0 + pd.Timedelta(days=days + 1)).strftime('%Y-%m-%d')}
+    periods = (pd.date_range(start=ct, periods=int(days*86400/spn), freq=f"{spn}s")
+                 .strftime("%Y-%m-%d %H:%M:%S").tolist())
 
     for t in targets:
+        size = get_asteroid_size(t)
+        if size is None:
+            print(f"No size data for {t}, skipping")
+            continue
 
-        print ('Target: ',t)
+        #If you'd rather use a fallback radius than skip targets with no size, build a complete dict (r_km, r_max_km, source, H=None, G=None) so the downstream code doesn't break.
+        ## Estimated/known target 200019 size: {'r_km': 1.9965, 'r_min_km': -0.052500000000000435, 'r_max_km': 4.0455000000000005, 'source': 'SBDB diameter (ref urn:nasa:pds:neowise_diameters_albedos::2.0[mainbelt] (http://adsabs.harvard.edu/abs/2011ApJ...741...68M))'}
 
-        # Generate an array of incremental timestamps
-        time_indices = pd.date_range(
-            start=ct, 
-            periods=24*days, 
-            freq="60min"  # Use 'S' for seconds, 'min' for minutes, 'H' for hours
-        )
-
-        # Convert the entire series to your string format
-        periods = time_indices.strftime("%Y-%m-%d %H:%M:%S").tolist()
-
-        print ('Test Periods: ', periods)
-
+        print(f"Estimated/known target {t} size data: {size}")
+        
+        fetch_target_orbit(t, epochs)                          # once per target
         for ctp in periods:
-            if 1:
-                print ('Target check for time period around: ', ctp)
-                test_target (loc=obs_loc, # Observer Location
-                             event_search_center_time_utc=ctp,
-                             time_span=spn,
-                             target_id=t,              # asteroid target to check
-                             mag_lim = mag_min,        # star mag limit
-                             r_asteroid_km = 500.0)    # Asteroid radius in km
-
-    # Unload kernels
+            target_test(obs_loc, ctp, spn + 600, t, size, mag_min)   # +10 min so windows overlap
     spice.kclear()
-
-            
-
-    
