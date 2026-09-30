@@ -21,31 +21,12 @@ from astroquery.gaia import Gaia
 import warnings, erfa
 warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
-### SEARCH FOR
-
-ct, days, spn = "2026-10-01T00:00:00", 10, 3600
-targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
-max_shadow_dist = 200  ## km
-
-### CONFIG
-
-LAT = 40.9541175
-LON = -72.92614552
-ELE = 40
-
-MAG_MIN = 20
-MIN_STAR_ALT = 10.0     # deg, use the same constants in both gates
-MAX_SUN_ALT  = -6.0     # deg, try -12 for faint stars
-ALT_MARGIN   = 3.0      # early gate is looser than the final one, so it never rejects a real event
-
+import pyoccult_config as config
 
 ########################## PROLOGUE KERNEL INIT SECTION
 
-# Init, Cleanups, ToDO clean SHM cache?
 
-force_cleanup = False
-
-if force_cleanup:
+if config.force_cleanup:
     print ('Cleanup old files:')
     for filename in ["naif0012.tls", "de440.bsp", "pck00010.tpc"]:
         if os.path.exists(filename):
@@ -611,12 +592,12 @@ def alt_deg(et, direction, obs_geo):
     return np.degrees(np.arcsin(_up_j2000(et, obs_geo) @ (direction / np.linalg.norm(direction))))
 
 
-def observable(et, star_dir, obs_geo, min_star_alt=MIN_STAR_ALT, max_sun_alt=MAX_SUN_ALT):
+def observable(et, star_dir, obs_geo, min_star_alt=config.MIN_STAR_ALT, max_sun_alt=config.MAX_SUN_ALT):
     star_alt = alt_deg(et, star_dir, obs_geo)
     sun_alt = sun_alt_deg(et, obs_geo)
     return bool(star_alt > min_star_alt and sun_alt < max_sun_alt), star_alt, sun_alt
 
-def window_is_observable(et0, span, obs_geo, target_id, min_star_alt=MIN_STAR_ALT, max_sun_alt=MAX_SUN_ALT, alt_margin=ALT_MARGIN):
+def window_is_observable(et0, span, obs_geo, target_id, min_star_alt=config.MIN_STAR_ALT, max_sun_alt=config.MAX_SUN_ALT, alt_margin=config.ALT_MARGIN):
     for e in (et0 - span/2, et0, et0 + span/2):
         ast, _ = spice.spkpos(target_id, e, 'J2000', 'CN', '399')
         if (sun_alt_deg(e, obs_geo) < max_sun_alt and
@@ -735,24 +716,6 @@ def screen_stars(ra_deg, dec_deg, target, et0, span, margin_km, step=60.0):
 
 
 
-
-#Written but not wired in
-
-#observable, event_metrics and apparent_mag_HG are never called. apparent_mag_HG needs H and G, so make get_asteroid_size return them: compute H, G = num("H"), num("G") after num is defined, and add H=H, G=G to every returned dict (None in the override branch). For m_star, Gaia G is fine as a proxy. Add bp_rp to the SELECT if you want a proper V or R conversion. observable's default max_sun_alt=-6 is civil twilight, so use -12 or lower for faint stars.
-
-#Still open from earlier notes
-#targets is still a set with a duplicate.
-#epochs is hardcoded, and fetch_target_orbit still runs per window.
-#There's no retry or backoff on the network calls.
-#sys.exit inside get_asteroid_ra_dec kills the whole batch, so raise or return None instead.
-#spice.utils.support_types.SpiceyError is only evaluated when an exception fires, so if that attribute doesn't exist in your spiceypy you'd get an AttributeError hiding the real SPICE error. Check it in a REPL, or use from spiceypy.utils.exceptions import SpiceyError.
-#The inline -- comment in the ADQL is still there.
-
-#Housekeeping. get_besselian_miss_distance is defined three times (the last wins). Delete Xget_besselian_miss_distance and Xfetch_target_orbit, the unused Horizons import and headers dict, and add -f to the curl call so a 404 doesn't save an HTML page.
-
-
-
-HITS_CSV = "hits_log.csv"
 _seen = {}
 
 def is_new_hit(target_id, star_id, et, tol=300.0):
@@ -787,7 +750,7 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
     for row in event_df.iloc[idx].itertuples(index=False):
         print (row)
         ra, dec = np.radians(getattr(row, ra_col)), np.radians(getattr(row, dec_col))
-        res = star_test(loc, event_time_utc, time_span, ra, dec, target_id, r_search, max_shadow_dist)
+        res = star_test(loc, event_time_utc, time_span, ra, dec, target_id, r_search, config.max_shadow_dist)
         if res is None:
             print (f" --- miss --- ")
             continue
@@ -820,22 +783,22 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
                       star_ra=np.degrees(ra), star_dec=np.degrees(dec),
                       star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met, observable=res['observable'])
         print(record)
-        pd.DataFrame([record]).to_csv(HITS_CSV, mode='a', index=False,
-                                      header=not os.path.isfile(HITS_CSV))
+        pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
+                                      header=not os.path.isfile(config.hits_output_cvs_file))
 
 
 if __name__ == "__main__":
-    mag_min = MAG_MIN
-    obs_loc = EarthLocation(lat=LAT*u.deg, lon=LON*u.deg, height=ELE*u.m)
+    mag_min = config.MAG_MIN
+    obs_loc = EarthLocation(lat=config.LAT*u.deg, lon=config.LON*u.deg, height=config.ELE*u.m)
 
 
-    t0 = pd.Timestamp(ct)
+    t0 = pd.Timestamp(config.ct)
     epochs = {'start': (t0 - pd.Timedelta(days=1)).strftime('%Y-%m-%d'),
-              'stop':  (t0 + pd.Timedelta(days=days + 1)).strftime('%Y-%m-%d')}
-    periods = (pd.date_range(start=ct, periods=int(days*86400/spn), freq=f"{spn}s")
+              'stop':  (t0 + pd.Timedelta(days=config.days + 1)).strftime('%Y-%m-%d')}
+    periods = (pd.date_range(start=config.ct, periods=int(config.days*86400/config.spn), freq=f"{config.spn}s")
                  .strftime("%Y-%m-%d %H:%M:%S").tolist())
 
-    for t in targets:
+    for t in config.targets:
         size = get_asteroid_size(t)
         if size is None:
             print(f"No size data for {t}, skipping")
@@ -848,5 +811,5 @@ if __name__ == "__main__":
         
         fetch_target_orbit(t, epochs)                          # once per target
         for ctp in periods:
-            target_test(obs_loc, ctp, spn + 600, t, size, mag_min)   # +10 min so windows overlap
+            target_test(obs_loc, ctp, config.spn + 600, t, size, mag_min)   # +10 min so windows overlap
     spice.kclear()

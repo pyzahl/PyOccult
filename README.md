@@ -103,3 +103,8 @@ ALT_MARGIN: may adjust, early pre screening gate only
 
 
 Results are appended (if existing) to hits_log.csv
+
+
+### Notes:
+
+The Earth PCK is never refreshed. Once downloaded, earth_latest_high_prec.bpc is reused forever. Its predicted coverage is finite and the predictions degrade, so either pxform fails or you use stale Earth orientation. Delete manually to force a re-download if the file is older than a week!
