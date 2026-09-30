@@ -752,7 +752,7 @@ def screen_stars(ra_deg, dec_deg, target, et0, span, margin_km, step=60.0):
 
 
 
-HITS_CSV = "hits_log_v2.csv"
+HITS_CSV = "hits_log.csv"
 _seen = {}
 
 def is_new_hit(target_id, star_id, et, tol=300.0):
