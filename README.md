@@ -82,12 +82,17 @@ ALT_MARGIN   = 3.0      # early gate is looser than the final one, so it never r
 
 
 ct: Start Date-Time, i.e. first search interval
+
 days: #days to search from start
+
 spn: search interval length in sec (1 hour default, ma yuse up to 3 hours -- this is the window the star motion is assumed to be negligible vs. asteroid's motion)
 
 LAT, LON, ELE: Observer's 3d location in deg, meters
+
 MAG_MIN: minimum magnitude of potential star
+
 MIN_STAR_ALT: minimum star altitude to be observable
+
 MAX_SUN_ALT: max sun altitude to be observable, lower for fainter stars i.e -12 deg
 
 ALT_MARGIN: may adjust, early pre screening gate only
