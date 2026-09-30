@@ -87,6 +87,10 @@ days: #days to search from start
 
 spn: search interval length in sec (1 hour default, ma yuse up to 3 hours -- this is the window the star motion is assumed to be negligible vs. asteroid's motion)
 
+targets: List of Asteroids (use ID number), must be in JPL's Horizon catalog.
+
+max_shadow_dist: allowable distance from observer's location (set to 0 for no travel is anticipated) (in km). May be used to add extra allowance margin as of shadow's (size, as of max rad from Horizons query) uncertainty.
+
 LAT, LON, ELE: Observer's 3d location in deg, meters
 
 MAG_MIN: minimum magnitude of potential star
