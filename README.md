@@ -57,3 +57,40 @@ pip install -r requirements.txt
   echo 'EDIT IT, RUN IT:'
   ./pyoccult.py
   ```
+
+
+
+## Site Configuration and Run Setup:
+Currently need to adjust this script section at the beginning:
+
+```  
+ct, days, spn = "2026-10-01T00:00:00", 10, 3600
+targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
+max_shadow_dist = 200  ## km
+
+### CONFIG
+
+LAT = 40.9541175
+LON = -72.92614552
+ELE = 40
+
+MAG_MIN = 20
+MIN_STAR_ALT = 10.0     # deg, use the same constants in both gates
+MAX_SUN_ALT  = -6.0     # deg, try -12 for faint stars
+ALT_MARGIN   = 3.0      # early gate is looser than the final one, so it never rejects a real event
+```
+
+
+ct: Start Date-Time, i.e. first search interval
+days: #days to search from start
+spn: search interval length in sec (1 hour default, ma yuse up to 3 hours -- this is the window the star motion is assumed to be negligible vs. asteroid's motion)
+
+LAT, LON, ELE: Observer's 3d location in deg, meters
+MAG_MIN: minimum magnitude of potential star
+MIN_STAR_ALT: minimum star altitude to be observable
+MAX_SUN_ALT: max sun altitude to be observable, lower for fainter stars i.e -12 deg
+
+ALT_MARGIN: may adjust, early pre screening gate only
+
+
+Results are appended (if existing) to hits_log.csv
