@@ -1,13 +1,13 @@
 # PyOccult: stored memory and computation reference
 
-Two parts: what is stored in memory (verbatim), and a reference of the computations and data used, compiled from your code and our discussion. Memory only holds short project-status lines. The formulas and sources in part 2 come from the code and the conversation, not from memory.
+Part 1 is what is stored in memory (verbatim). The other parts are a reference of the computations, data, open points and validation, compiled from your code and our discussion. Memory only holds short project-status lines. The formulas, sources and findings in the later parts come from the code and the conversation, not from memory. Updated 2026-10-01.
 
 ---
 
 ## Part 1: Stored memory
 
 **Profile:** not yet written.
-**Memory files:** one, `/areas/occultation-predictor.md` (about 3 KB). `[stated]` means you told me directly.
+**Memory files:** one, `/areas/occultation-predictor.md` (about 3.5 KB). `[stated]` means you told me directly.
 
 1. [stated] writing a Python asteroid-occultation predictor using SpiceyPy and Astropy: Besselian fundamental-plane miss distance minimized with scipy minimize_scalar; shared code for review
 2. [stated] test case: asteroid 19 Fortuna, star near RA 68.98 deg / Dec 16.50 deg, observer at New York City coordinates, center time 2026-10-01T04:30:00 UTC, 24 h search span
@@ -21,6 +21,8 @@ Two parts: what is stored in memory (verbatim), and a reference of the computati
 10. [stated] code lives at github.com/pyzahl/PyOccult (main); a few test predictions matched the reference Occult program (occult.exe) and OWC cloud data. Wants Moon-to-target distance and Moon phase added to the hits log; reports the magnitude drop always comes out zero
 11. [stated] added moon_info (Moon separation, altitude, illumination, phase age) to the hits log; hits log now also has an "observable" text column
 12. [stated] moved run configuration into pyoccult_config.py (search start 2026-10-01, 10 days, 1 h steps, targets 218001/305580/111287/115181/229912/111286/54653/70141/4272, max_shadow_dist 200 km, star mag limit 20, Earth PCK max age 7 days). Wants max magnitude drop and center-line duration, plus shadow center/edge line coordinates and a 3-sigma edge line to map in Google Maps; unsure about the H/G patch idea
+13. [stated] motivation: occult.exe (the reference Windows tool behind OWC) is old and outdated but precise; the goal is a more modern, portable Python-based replacement
+14. [stated] next planned piece: a tool plus metrics to build the list of asteroid ids for the targets config; has an extensive asteroid list jpl_asteroids_spice.csv (columns SPICE ID, Full Name, Primary Designation) used for name lookup. Also turns hits_log.csv into an HTML report with map links, viewed via local nginx
 
 ---
 
@@ -36,6 +38,7 @@ Two parts: what is stored in memory (verbatim), and a reference of the computati
 6. Exact solve per surviving star: `star_test` (bounded minimization of the miss distance).
 7. Window-edge rejection, dedupe (`is_new_hit`), final gate (`observable` at `best_et`).
 8. Metrics: magnitude drop, speed, chord, duration, Moon info. Append to the hits CSV. Optionally write the shadow-path KML.
+9. Outside the search: `pyoccult_report.py` turns the CSV into the HTML list (2.11); `pyoccult_pick.py` chooses the targets beforehand (2.12).
 
 ### 2.1 Fundamental (Besselian) plane: `besselian_offsets`
 
@@ -67,12 +70,13 @@ Two parts: what is stored in memory (verbatim), and a reference of the computati
 ### 2.5 Magnitude drop: `event_metrics`, `apparent_mag_HG`
 
 - Drop (star fully covered): `dm = 2.5 * log10(1 + 10^(0.4 * (m_ast - m_star)))`. Near zero when the asteroid is much brighter than the star.
+- **`mag_drop` is the change in combined brightness, not the magnitude you drop to.** The brightness before the event is `m_before = -2.5 * log10(10^(-0.4*m_star) + 10^(-0.4*m_ast))`, during the event it is `m_ast`, and `mag_drop = m_ast - m_before`. It is therefore never smaller than `m_ast - m_star`, and it can be smaller than the star magnitude itself (this is how OWC lists it too).
 - `m_star`: Gaia G (a proxy; convert with `bp_rp` for V or R if you compare with Occult or OWC).
 - `m_ast` from H, G: `V = H + 5*log10(r*Delta) - 2.5*log10((1-G)*Phi1 + G*Phi2)`
   - `Phi1 = exp(-3.33 * tan(alpha/2)^0.63)`, `Phi2 = exp(-1.87 * tan(alpha/2)^1.22)`
   - `r` = Sun-asteroid and `Delta` = Earth-asteroid distance in AU (SPICE `LT` positions); `alpha = vsep(ast_from_sun, ast_from_earth)` is the phase angle at the asteroid. Default `G = 0.15`.
 - Model accuracy is about +/-0.2 to 0.3 mag, plus the rotational lightcurve amplitude.
-- If `size['H']` is missing, `m_ast` and `mag_drop` come out NaN (blank in the CSV), not 0.
+- If `size['H']` is missing, `m_ast` and `mag_drop` come out NaN (blank in the CSV), not 0. You confirmed the values now flow after `get_asteroid_size` returns H and G in every branch.
 
 ### 2.6 Visibility gates: `observable`, `window_is_observable`
 
@@ -92,7 +96,7 @@ Two parts: what is stored in memory (verbatim), and a reference of the computati
 
 - Gaia DR3, `gaiadr3.gaia_source`: `source_id, ra, dec, parallax, pmra, pmdec, phot_g_mean_mag, ruwe`. Filters: `G <= mag_limit`, proper motion not null, `RUWE < 1.4`. Cone radius 10 arcmin around a 5-arcmin tile center. The raw table is cached in `/dev/shm`.
 - Reference epoch J2016.0 = 2016-01-01 12:00 TCB. Distance `= 1000 / parallax` pc with the parallax floored at 0.01 mas (avoids the ERFA "distance overridden" warning). `apply_space_motion` brings positions to the event time (UTC) and adds `ra_YYYYMMDD` and `dec_YYYYMMDD`.
-- Not applied: the geocentric parallax correction (`geocentric_star_dir` exists; roughly 1 km on the plane per mas at 1.4 AU), the star's angular diameter, and diffraction. These matter for bright stars and kilometre-size bodies.
+- Not applied: the geocentric parallax correction (`geocentric_star_dir` exists; roughly 1 km on the plane per mas at 1.4 AU), the star's angular diameter (see Part 5), and diffraction. These matter for bright stars and kilometre-size bodies.
 
 ### 2.9 Asteroid size: `get_asteroid_size`
 
@@ -102,15 +106,39 @@ Order of precedence:
 3. H plus SBDB albedo `p`.
 4. H only, albedo 0.14 (range 0.05 to 0.30).
 
-`D = 1329 / sqrt(p) * 10^(-H/5)` km; radius = D/2. Bounds `r_min_km` and `r_max_km` describe size uncertainty only, not ephemeris uncertainty. Clamp `r_min_km` at 0.
+`D = 1329 / sqrt(p) * 10^(-H/5)` km; radius = D/2. Bounds `r_min_km` and `r_max_km` describe size uncertainty only, not ephemeris uncertainty. Clamp `r_min_km` at 0. Every branch must also return `H` and `G`.
 
-### 2.10 Shadow ground track for Google My Maps: `pyoccult_paths.py`
+### 2.10 Shadow ground track for Google My Maps: `pyoccult_paths.py` (v2)
 
-- Every 30 s over +/-30 min around `best_et`: axis point on the plane, shadow velocity from a 1 s finite difference, an in-plane unit vector across the track.
+- Time span and step are derived from the shadow speed: about 1.3 Earth radii of along-track motion on each side of `best_et` (a slow shadow, e.g. 70141, gets a longer span) and about 100 km of track per step (1 to 60 s). Axis point on the plane, shadow velocity from a 1 s finite difference, an in-plane unit vector across the track.
 - Five lines: center, +/-r (shadow limits), +/-(r + 3 sigma). Each offset point is projected along -z onto the Earth ellipsoid with `surfpt`, then `recgeo` gives longitude and latitude.
+- SpiceyPy's `surfpt` returns only the point and raises `NotFoundError` when the ray misses the Earth. v2 catches it and skips that sample, so lines can differ in length and may be empty (the first version unpacked a `(point, found)` tuple and crashed near the ends of the window).
 - Center-line duration at each point: `2r / |v_axis - v_ground|`.
-- 3 sigma: Horizons observer table `RSS_3sigma` (arcsec) times the geocentric distance, converted to km. Falls back to a config default when no covariance exists.
-- Output is KML with UTC time ticks, an observer pin, and the five lines. Import into Google My Maps.
+- 3 sigma: `path_sigma3_km` takes the Horizons observer-table RSS 3-sigma position uncertainty (arcsec) times the geocentric distance, in km. The column is found by name (`RSS`, then `3SIGMA`/`POS`); the exact Horizons column names are unverified. Falls back to a config default when no covariance exists.
+- Output is KML (colours are `aabbggrr`): center green (width 3), shadow limits red, 3-sigma limits yellow, UTC time ticks with the center-line duration every 10 samples, optional observer pin. Import into Google My Maps.
+- Tested against a stand-in `spiceypy` that follows the real contract (exact ellipsoid and rotation geometry, synthetic ephemerides): points lie on the offset shadow axis to 1e-6 km, on the star-facing side, center-line duration matches an independent calculation. Not yet run against real SPICE and Horizons.
+
+### 2.11 Report: `pyoccult_report.py`
+
+- Reads `hits_log.csv` (tolerates repeated headers and short rows), drops duplicates, and optionally filters by `--max-miss` and `--min-drop`. Output is HTML (default) or Markdown.
+- Columns, as in OWC: asteroid (number and name), event time (UT), star mag, mag drop, max duration, altitude with compass direction, Moon distance (Moon icon only when it is above the horizon), offset (miss distance, "inside shadow" or "N km outside"), map.
+- Compass azimuth at the event time uses only the standard library: J2000 star position precessed to the date (Meeus, IAU 1976) and Greenwich mean sidereal time. Checked against the logged altitude to 0.002 deg.
+- KML for each event is found by `<asteroid>_<YYYYMMDDTHHMM>*.kml` in the maps folder (`--kml-dir`, else `map_dir` from the config, else `./maps`), converted to compact JSON and embedded in the page.
+- Map viewer: Leaflet 1.9.4 from cdnjs; basemaps Carto light (default), Esri satellite, OpenStreetMap, with a layer switcher; `--tile-url` replaces them with one template. The initial view fits the observer and the nearest point of the center line (equirectangular segment projection), with "Zoom to observer" and "Whole path" buttons and a Google Maps link to that nearest point (`https://www.google.com/maps/search/?api=1&query=lat,lon`).
+- Line styles: center `#15803d` (width 3), shadow limit `#dc2626` (2), 3-sigma `#d97706` (dashed).
+- A banner appears if tiles fail to load, and a message if Leaflet itself cannot load (offline).
+- Why a web server: OpenStreetMap's tile policy expects a Referer, which pages opened from `file://` do not send. You confirmed the map renders when the report is served by a local nginx from `/var/www/html`.
+
+### 2.12 Target picker: `pyoccult_pick.py`
+
+- Names come from `jpl_asteroids_spice.csv`; properties (H, G, diameter, albedo, orbit elements, condition code, NEO flag, class) come from one SBDB bulk query (`sbdb_query.api`, numbered asteroids with H below `--hmax`), cached as `sbdb_cache.json`.
+- Sky path: two-body Kepler propagation from the osculating elements, daily samples over the window; Earth position from low-precision Sun elements (corrected to J2000). Accuracy is a fraction of a degree, enough for a statistical screen.
+- Usable star: drop of at least `--min-drop` requires `m_star <= m_ast + dm_cut` with `dm_cut = -2.5*log10(10^(0.4*min_drop) - 1)` (1.25 mag for 0.3), and the star must also be brighter than `--cam-limit`.
+- Star density: analytic Gaia-like average cumulative counts per deg^2 (log-log interpolation, G 8 to 20) times a galactic-latitude factor `0.3 + 4 exp(-|b|/10)` normalized to a sky mean of 1. Approximate, for ranking only.
+- Expected events per day = `density * sky motion (deg/day) * corridor width (deg)`, with corridor `= 2*max_shadow_dist + diameter` divided by the geocentric distance. Each day is weighted by the fraction of the day with the Sun below `MAX_SUN_ALT` and the asteroid above `MIN_STAR_ALT` (events then occur while the star is up), and zeroed when the central chord `D / shadow speed` is shorter than `--min-dur`.
+- Score: events per year times weights: 1.5 for a diameter estimated only from H, 1.3 for condition code of 3 or more, 1.5 for NEOs (`WEIGHTS` at the top of the file).
+- Outputs: ranked table, `pick_candidates.csv`, and `targets.py` (`targets` list of strings, best first, plus a `target_names` dict).
+- Tested with synthetic data: galactic frame, equinox Sun longitude (J2000 frame), Kepler period, radius bounds and speed, H-G brightness, diameter formula, star-density sky mean, day/night fraction against the analytic result, and a 12,000-object run in about 5 s. The SBDB query (including the `sb-cdata` constraint syntax) has not been run against the live service.
 
 ---
 
@@ -124,21 +152,25 @@ Order of precedence:
 | `earth_latest_high_prec.bpc` | NAIF generic kernels (binary PCK) | ITRF93 Earth orientation; refreshed after `earth_pck_max_age` (7 days) |
 | Asteroid SPK | Horizons API, `ssd.jpl.nasa.gov/api/horizons.api` (`COMMAND=<number>;`, `EPHEM_TYPE=SPK`), cached in `/dev/shm` | Asteroid position |
 | Size, H, G, albedo, extent | SBDB API, `ssd-api.jpl.nasa.gov/sbdb.api?sstr=<n>&phys-par=1` | `get_asteroid_size` |
-| Names and SPK ids | SBDB Query API (`sbdb_query.api`), cached in `jpl_asteroids_spice.csv` | `get_asteroid_name` |
+| Names and SPK ids | SBDB Query API (`sbdb_query.api`), cached in `jpl_asteroids_spice.csv` (`SPICE ID` = 20000000 + number, `Full Name`, `Primary Designation`) | `get_asteroid_name`, `pyoccult_pick.py` |
+| Bulk properties and orbits | SBDB Query API, `sb-kind=a`, `sb-ns=n`, fields `spkid, full_name, H, G, diameter, diameter_sigma, albedo, a, e, i, om, w, ma, epoch, condition_code, neo, class` | `pyoccult_pick.py` (cache `sbdb_cache.json`) |
 | Stars | Gaia DR3 via astroquery TAP | Star positions, G magnitude |
-| Path uncertainty | Horizons observer table (`RSS_3sigma`) | 3-sigma limit lines |
+| Path uncertainty | Horizons observer table (RSS 3-sigma position) | 3-sigma limit lines |
+| Map library and tiles | Leaflet 1.9.4 (cdnjs); Carto light, Esri World Imagery, OpenStreetMap tiles | Embedded map in the report |
+| Reference results | Occult (occult.exe) and OWC cloud predictions | Accuracy comparison, Part 5 |
 
 ### Config (`pyoccult_config.py`)
 
 | Setting | Value |
 |---|---|
 | Search start / length / step | 2026-10-01T00:00:00, 10 days, 3600 s |
-| Targets | 218001, 305580, 111287, 115181, 229912, 111286, 54653, 70141, 4272 |
+| Targets | 218001, 305580, 111287, 115181, 229912, 111286, 54653, 70141, 4272 (or `from targets import targets`, see the README) |
 | `max_shadow_dist` | 200 km |
 | Observer | lat 40.9541175, lon -72.92614552, 40 m |
 | Star magnitude limit | 20 |
 | Altitude thresholds | `MIN_STAR_ALT` 10, `MAX_SUN_ALT` -6, `ALT_MARGIN` 3 |
 | Output | `hits_log.csv` |
+| Optional | `map_dir` (KML folder, default `maps`), used by the report |
 
 ### Hits log columns
 
@@ -146,13 +178,30 @@ Order of precedence:
 
 ---
 
-## Part 4: Open items and unverified points (as of the last review)
+## Part 4: Open items and unverified points
 
-- `target_test` record had literal `...` placeholders for `r_min_km`, `r_max_km`, `source`, which become `Ellipsis` in the CSV. Replace with `size['r_min_km']` and `size['r_max_km']`, and drop `source`.
-- `get_asteroid_size` must return `H` and `G` in every branch (the diameter branch returns before they are read), otherwise `m_ast` and `mag_drop` stay NaN.
-- `star_test` uses `if not observable(...)`, but `observable` returns a tuple (always truthy). Use `observable(...)[0]`.
-- `screen_stars` margin does not yet include `max_shadow_dist`.
-- `gaia_cone` still uses `launch_job` (synchronous, possibly capped at about 2000 rows; unverified), queries `radius_arcmin` without the `+5` tile padding its comment mentions, and returns `None` on failure (the caller then crashes on `.copy()`).
-- The ADQL string still has an inline `--` comment.
-- Unverified (written from memory of the APIs, not run against the real services): SBDB `phys_par` field names; Horizons `RSS_3sigma` and `delta` column names; `surfpt` and `recgeo` argument handling in `pyoccult_paths.py` (tested only against a mock spherical Earth); the Earth-PCK body id (3000) for `pckcov`.
-- Validation: a few predictions matched Occult (occult.exe) and OWC cloud data, as stated by you. The magnitude-drop, Moon and shadow-path outputs have not yet been compared against them.
+- **Star angular diameter.** Not modelled. For event 218001 OWC lists a drop of 1.56 mag and about twice our duration, against our 12.97 mag and 0.25 s. Hypothesis (unverified): the star's angular size is comparable to the shadow, which reduces the drop and stretches the event. Proposed: Gaia `radius_gspphot` and `distance_gspphot` (angle in mas about 9.305 * R / d_pc), a partial-coverage drop, and a flag when the star diameter exceeds about 30% of the shadow.
+- Regression test using the OWC list as fixtures (time within 10 s, drop within 0.25 mag, duration within 10%, 218001 marked as a known gap): offered, not built.
+- Optional `m_before` and `m_during` columns in the log: offered.
+- `pyoccult_paths.py` has not been run against real SPICE and Horizons; the Horizons RSS 3-sigma and `delta` column names are written from memory.
+- `pyoccult_pick.py` has not been run against the live SBDB API; the `sb-cdata` constraint syntax is from memory. The star-density model is analytic, and the Keplerian paths ignore planetary perturbations.
+- The report's embedded map was tested only against a Leaflet stand-in in a headless browser, and the Carto and Esri basemaps have not been tried from `file://`. It works through nginx.
+- Suggested fixes in your own code whose status I do not know (apply if not yet done):
+  - `target_test` record had literal `...` placeholders for `r_min_km`, `r_max_km`, `source`, which become `Ellipsis` in the CSV: use `size['r_min_km']` and `size['r_max_km']`, and drop `source`.
+  - `star_test` uses `if not observable(...)`, but `observable` returns a tuple (always truthy): use `observable(...)[0]`.
+  - `screen_stars` margin does not yet include `max_shadow_dist`.
+  - `gaia_cone` uses `launch_job` (synchronous, possibly capped at about 2000 rows; unverified), queries `radius_arcmin` without the `+5` tile padding its comment mentions, and returns `None` on failure (the caller then crashes on `.copy()`).
+  - The ADQL string has an inline `--` comment.
+  - Unverified: SBDB `phys_par` field names, and the Earth-PCK body id (3000) for `pckcov`.
+
+---
+
+## Part 5: Validation against OWC and Occult
+
+Compared against the OWC list you gave as reference data (OWC uses occult.exe):
+
+- Star magnitude, altitude, compass direction and Moon distance agree.
+- Event times agree within 9 s.
+- Maximum durations agree within about +/-8%.
+- 218001 is the outlier (drop and duration, see Part 4).
+- Moon, shadow-path and magnitude-drop outputs have so far been compared only through this list; a systematic comparison has not been done.
