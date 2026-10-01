@@ -1,5 +1,8 @@
 # PyOccult
-Python Occultation Searcher
+Python Occultation Searcher by PyZahl (C) 2026.
+
+Experimental Python, Astropy, Spiceypy based Asteroid Occultation Search Tool.
+
 
 # Install
 
