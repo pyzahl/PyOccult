@@ -105,3 +105,12 @@ ALT_MARGIN: may adjust, early pre screening gate only
 Results are appended (if existing) to hits_log.csv
 
 
+
+### MAPS
+
+To import a KML file into Google Maps, you must use the Google My Maps platform on a web browser. Standard Google Maps allows you to view these custom maps, but the actual file upload has to take place through the My Maps editor.
+
+- Open the Tool: Navigate directly to Google My Maps in your web browser and ensure you are signed into your Google Account. Or go here: https://www.google.com/maps/d
+- Create a Map: Click the Create a New Map button in the top left corner.
+- Locate the Import Panel: In the left-hand legend window, find the box labeled Untitled layer and click the Import link directly underneath it.
+- Upload Your File: Drag and drop your KML files (maps folder) into the box.
