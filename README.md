@@ -117,3 +117,6 @@ To import a KML file into Google Maps, you must use the Google My Maps platform 
 - Create a Map: Click the Create a New Map button in the top left corner.
 - Locate the Import Panel: In the left-hand legend window, find the box labeled Untitled layer and click the Import link directly underneath it.
 - Upload Your File: Drag and drop your KML files (maps folder) into the box.
+
+
+<img width="1087" height="643" alt="image" src="https://github.com/user-attachments/assets/64a4ea87-9296-4fff-bbf7-e45a472a4231" />
