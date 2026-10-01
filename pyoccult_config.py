@@ -21,6 +21,11 @@ ALT_MARGIN   = 3.0      # early gate is looser than the final one, so it never r
 
 hits_output_cvs_file = 'hits_log.csv'
 
+write_maps = True
+map_dir = "maps"
+default_sigma3_km = 10.0
+
+
 ### Init, Cleanups, ToDO clean SHM cache?
 earth_pck_max_age = 7 ## days for earth pck to expire/auto update
 force_cleanup = False

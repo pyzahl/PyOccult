@@ -23,6 +23,7 @@ import warnings, erfa
 warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
 import pyoccult_config as config
+from pyoccult_paths import shadow_path, path_sigma3_km, write_shadow_kml
 
 ########################## PROLOGUE KERNEL INIT SECTION
 
@@ -477,36 +478,29 @@ def get_asteroid_size(target_id, timeout=30):
             return None
 
     D = num("diameter")
+    H, G = num("H"), num("G")            # read once, before the `if D:` branch
+    # then add H=H, G=G to all three returned dicts (override branch: H=None, G=None)
+    # and clamp: r_min_km=max((D - 3*s)/2, 0.0)   (your 229912 run showed a negative r_min_km)
+    
     if D:
         s = num("diameter", "sigma") or num("diameter_sigma") or 0.15 * D   # assume 15% if absent
         out = dict(r_km=D/2, r_min_km=(D - 3*s)/2, r_max_km=(D + 3*s)/2,
-                   source=f"SBDB diameter (ref {pp['diameter'].get('ref', '?')})")
+                   source=f"SBDB diameter (ref {pp['diameter'].get('ref', '?')})",
+                   H=H, G=G)
         ext = [float(x) for x in re.findall(r"[\d.]+", str(pp.get("extent", {}).get("value", "")))]
         if len(ext) >= 2:                      # tri-axial full dimensions -> semi-axes
             out["r_min_km"] = min(out["r_min_km"], min(ext)/2)
             out["r_max_km"] = max(out["r_max_km"], max(ext)/2)
         return out
-
-    """
-    In your row m_ast and mag_drop are both empty, which means NaN. The asteroid's magnitude is missing, so the drop can't be computed. The size source is "H only, albedo assumed", so H was known when the size was derived. It just isn't in the returned dict, so size.get('H') is None and m_ast becomes NaN. Fix get_asteroid_size so every return path carries H and G:
-    H, G = num("H"), num("G")      # right after num() is defined
-    # every return dict, including the overrides (H=None, G=None there):
-    return dict(r_km=..., r_min_km=..., r_max_km=..., source=..., H=H, G=G)
-    """
-    
-    H, G = num("H"), num("G")
-
-    #print(size['H'], size.get('G'), apparent_mag_HG(best_et, target_id, size['H'], size.get('G') or 0.15),
-    #      row.phot_g_mean_mag)
-
     
     if H is None:
-        return None
+        return dict(H=H, G=G)
+    
     Dp = lambda p: 1329.0 / np.sqrt(p) * 10**(-H/5)
     p = num("albedo")
     if p:
-        return dict(r_km=Dp(p)/2, r_min_km=Dp(min(p*1.5, 1))/2, r_max_km=Dp(p/1.5)/2, source="H + SBDB albedo")
-    return dict(r_km=Dp(0.14)/2, r_min_km=Dp(0.30)/2, r_max_km=Dp(0.05)/2, source="H only, albedo assumed")
+        return dict(r_km=Dp(p)/2, r_min_km=Dp(min(p*1.5, 1))/2, r_max_km=Dp(p/1.5)/2, source="H + SBDB albedo", H=H, G=G)
+    return dict(r_km=Dp(0.14)/2, r_min_km=Dp(0.30)/2, r_max_km=Dp(0.05)/2, source="H only, albedo assumed", H=H, G=G)
 
 
 
@@ -795,7 +789,7 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
     dec_col = event_df.filter(regex=r'^dec_\d{8}$').columns[0]
 
     idx = screen_stars(event_df[ra_col].to_numpy(), event_df[dec_col].to_numpy(),
-                       target_id, et0, time_span, margin_km=6378 + r_search) 
+                       target_id, et0, time_span, margin_km=6378 + r_search + config.max_shadow_dist) 
     print (f"Pre-Screening: {idx}")
     for row in event_df.iloc[idx].itertuples(index=False):
         print (row)
@@ -830,7 +824,7 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
         record = dict(target_id=target_id, target_name=get_asteroid_name(target_id),
                       best_utc=res['best_utc'], best_et=res['best_et'],
                       min_distance=res['min_distance'], margin_km=res['min_distance'] - size['r_km'],
-                      r_km=size['r_km'], r_min_km=..., r_max_km=..., source=...,
+                      r_km=size['r_km'], r_min_km=size['r_min_km'], r_max_km=size['r_max_km'],
                       r_search_km=r_search, size_source=size['source'],
                       star=row.source_id, mag=row.phot_g_mean_mag,
                       star_ra=np.degrees(ra), star_dec=np.degrees(dec),
@@ -840,11 +834,20 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
         dx, dy = besselian_offsets(res['best_et'], star_dir, obs_geo, target_id)
         record.update(offset_east_km=dx, offset_north_km=dy,
                       max_duration_s=2*size['r_km']/met['speed_kms'])
-
+       
         print(record)
         pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
                                       header=not os.path.isfile(config.hits_output_cvs_file))
 
+        sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
+        record.update(sigma3_km=sigma3,
+                      margin_in_sigma=(res['min_distance'] - size['r_km']) / (sigma3 / 3.0))
+        if config.write_maps and res['min_distance'] < size['r_km'] + sigma3:   # only hits worth mapping
+            os.makedirs(config.map_dir, exist_ok=True)
+            paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
+            write_shadow_kml(paths, f"{config.map_dir}/{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}.kml",
+                             f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
+        
 
 if __name__ == "__main__":
     mag_min = config.MAG_MIN
