@@ -258,9 +258,9 @@ def tile_center(ra_deg, dec_deg, tile_arcmin=5.0):
     step = t / max(np.cos(np.radians(dec_c)), 0.05)
     return (round(ra_deg / step) * step) % 360.0, dec_c
 
-def gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit):
+def gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit, cache_dir=config.cache_path):
     ra_c, dec_c = tile_center(ra_deg, dec_deg)
-    fp = Path(f"/dev/shm/PyOccult_gaia_{ra_c:.4f}_{dec_c:.4f}_{radius_arcmin:g}_{mag_limit:g}.csv")
+    fp = Path(f"{cache_dir}/PyOccult_gaia_{ra_c:.4f}_{dec_c:.4f}_{radius_arcmin:g}_{mag_limit:g}.csv")
     if fp.is_file():
         return pd.read_csv(fp)
     # ADQL query centered on (ra_c, dec_c), radius = radius_arcmin + 5 (tile size), via Gaia.launch_job_async
@@ -423,7 +423,7 @@ def get_asteroid_name(spk_id):
 
 _loaded = {}    # asteroid number -> NAIF id
 
-def fetch_target_orbit(target_id, epochs, cache_dir="/dev/shm"):
+def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
     target_id = str(target_id)
     fn = Path(cache_dir) / f"PyOccult_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
     if not fn.is_file():
@@ -847,7 +847,9 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
             paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
             write_shadow_kml(paths, f"{config.map_dir}/{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}.kml",
                              f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
-        
+
+
+            
 
 if __name__ == "__main__":
     mag_min = config.MAG_MIN

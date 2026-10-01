@@ -25,6 +25,7 @@ write_maps = True
 map_dir = "maps"
 default_sigma3_km = 10.0
 
+cache_path = "/dev/shm"  ## good for Linux, but volatile after reboot
 
 ### Init, Cleanups, ToDO clean SHM cache?
 earth_pck_max_age = 7 ## days for earth pck to expire/auto update
