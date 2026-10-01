@@ -1,9 +1,14 @@
 ### CONFIGURATION AND RUN SETUP FOR PYOCCULT ###
-
+    
 ### SEARCH SETUP
 
 ct, days, spn = "2026-10-01T00:00:00", 10, 3600
-targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
+try:
+    from targets import targets, target_names
+except ImportError:
+    targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
+    target_names = {}
+    
 max_shadow_dist = 200  ## km
 
 ### CONFIG OBSERVER
