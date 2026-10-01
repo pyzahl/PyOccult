@@ -219,13 +219,6 @@ names = asteroids_df["Full Name"].to_numpy()
 
 ### NOW OCCULT CALC AND STAR+ASTEROID EPH MANAGEMENT
 
-
-#3. Possible silent row truncation. As far as I know, Gaia.launch_job (synchronous) is capped at about 2,000 rows, but check the current astroquery docs. At G≤20 a 10′ cone in a dense field can exceed that, and you'd lose stars with no error. Use launch_job_async, and warn if len(df) hits a suspicious round number.
-
-#4. Parallax handling. Clipping to 0 means infinite distance. Depending on your astropy version that gives NaN or an odd code path. Use a floor instead, such as np.clip(parallax, 0.01, None) (100 kpc), build the distance with Distance(parallax=... * u.mas) (I assume CoordinateDistance is that alias), and assert the output is finite.
-
-#5. Barycentric vs geocentric direction. apply_space_motion returns the barycentric position, but the shadow axis is parallel to the star direction as seen from Earth. At an asteroid distance of about 1.4 AU, 1 mas of parallax shifts the shadow by about 1 km. That is small for a 100 km body but matters for a 5 km one. Fix it once per window:
-
 PC_KM = 3.0856775814913673e13
 def geocentric_star_dir(ra_deg, dec_deg, plx_mas, et):
     ra, dec = np.radians(ra_deg), np.radians(dec_deg)
@@ -235,22 +228,28 @@ def geocentric_star_dir(ra_deg, dec_deg, plx_mas, et):
     return v / np.linalg.norm(v)
 
 
-#6. Failure handling. On any error you print and return None, so the caller's event_df.columns raises AttributeError and kills the whole 7-day batch. The blanket except Exception would also hide code bugs, such as the Distance issue above, as "an error occurred". Catch only network and TAP errors, retry with backoff, and return an empty DataFrame (with the expected columns) if there are no stars. In a run of over a thousand queries, one hiccup will happen.
+def observer_j2000(et, obs_geo):
+    radii = spice.bodvrd('EARTH', 'RADII', 3)[1]
+    f = (radii[0] - radii[2]) / radii[0]
+    itrf = spice.georec(obs_geo['lon'], obs_geo['lat'], obs_geo['alt'], radii[0], f)
+    return spice.pxform('ITRF93', 'J2000', et) @ itrf
 
-#7. Columns to add to the SELECT.
+def moon_info(et, star_dir, obs_geo):
+    moon_geo, _ = spice.spkpos('MOON', et, 'J2000', 'LT+S', '399')
+    moon_topo = moon_geo - observer_j2000(et, obs_geo)
+    sep = np.degrees(spice.vsep(moon_topo, star_dir))
 
-#ra_error, dec_error, pmra_error, pmdec_error for the position uncertainty at the event epoch (propagated as sqrt(σ² + (Δt·σ_pm)²)).
-#bp_rp, which you need for the G→V or G→R conversion in the magnitude-drop estimate.
-#ruwe is already there. Consider flagging RUWE > 1.4 instead of excluding it, since those are often unresolved doubles, which are interesting occultation targets, though their positions are less certain.
+    moon_from_sun, _ = spice.spkpos('MOON', et, 'J2000', 'LT+S', 'SUN')
+    alpha = spice.vsep(moon_from_sun, moon_geo)              # phase angle at the Moon
+    illum = 100.0 * (1 + np.cos(alpha)) / 2
 
-#Once you add ra_error, dec_error and similar, my earlier startswith('ra_') warning becomes a real bug, so use the exact regexes ^ra_\d{8}$ and ^dec_\d{8}$ in the driver.
+    sun_geo, _ = spice.spkpos('SUN', et, 'J2000', 'LT+S', '399')
+    R = spice.pxform('J2000', 'ECLIPJ2000', et)
+    mv, sv = R @ moon_geo, R @ sun_geo
+    age = np.degrees(np.arctan2(mv[1], mv[0]) - np.arctan2(sv[1], sv[0])) % 360.0
 
-#Minor.
-
-#The inline -- Required for propagation comment sits in the middle of a multi-line ADQL string. If a server collapses newlines, it will comment out AND ruwe < 1.4, so remove it.
-#Colons and spaces in filenames are legal on Linux but awkward. Build keys from rounded numbers, not raw time strings.
-
-
+    return dict(moon_sep_deg=sep, moon_alt_deg=alt_deg(et, moon_topo, obs_geo),
+                moon_illum_pct=illum, moon_age_deg=age)
 
 def tile_center(ra_deg, dec_deg, tile_arcmin=5.0):
     t = tile_arcmin / 60.0
@@ -488,7 +487,19 @@ def get_asteroid_size(target_id, timeout=30):
             out["r_max_km"] = max(out["r_max_km"], max(ext)/2)
         return out
 
-    H = num("H")
+    """
+    In your row m_ast and mag_drop are both empty, which means NaN. The asteroid's magnitude is missing, so the drop can't be computed. The size source is "H only, albedo assumed", so H was known when the size was derived. It just isn't in the returned dict, so size.get('H') is None and m_ast becomes NaN. Fix get_asteroid_size so every return path carries H and G:
+    H, G = num("H"), num("G")      # right after num() is defined
+    # every return dict, including the overrides (H=None, G=None there):
+    return dict(r_km=..., r_min_km=..., r_max_km=..., source=..., H=H, G=G)
+    """
+    
+    H, G = num("H"), num("G")
+
+    #print(size['H'], size.get('G'), apparent_mag_HG(best_et, target_id, size['H'], size.get('G') or 0.15),
+    #      row.phot_g_mean_mag)
+
+    
     if H is None:
         return None
     Dp = lambda p: 1329.0 / np.sqrt(p) * 10**(-H/5)
@@ -618,8 +629,6 @@ def event_metrics(et, star_dir, obs_geo, target, r_km, m_star, m_ast, dt=1.0):
 
 
 
-
-
 def _up_j2000(et, obs_geo):
     lon, lat = obs_geo['lon'], obs_geo['lat']
     up_itrf = np.array([np.cos(lat)*np.cos(lon), np.cos(lat)*np.sin(lon), np.sin(lat)])
@@ -733,8 +742,8 @@ def star_test (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
             if min_distance < r_asteroid_km+r_search_km:
                 if not observable(best_et, star_direction, obs_geo):
                     print(f" ** BUT NOT OBSERVABLE, BELOW HORIZON OR LIMITS **")
-                    return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance, "observable": "no, in serach range" }
-                return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance,  "observable": "yes, in serach range" }
+                    return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance, "observable": "no, in search range" }
+                return { "best_utc": best_utc, "best_et": best_et, "min_distance": min_distance,  "observable": "yes, in search range" }
             else:
                 print(f"❌ MISS: Shadow path misses observer by {min_distance - r_asteroid_km:.3f} km.")
     else:
@@ -809,20 +818,29 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
             continue                                   # drop this line to log invisible events too
         m_ast = (apparent_mag_HG(res['best_et'], target_id, size['H'], size.get('G') or 0.15)
                  if size.get('H') is not None else np.nan)
-        met = event_metrics(res['best_et'], star_dir, obs_geo, target_id, size['r_km'],
-                            row.phot_g_mean_mag, m_ast)
+        met = event_metrics(res['best_et'], star_dir, obs_geo, target_id, size['r_km'], row.phot_g_mean_mag, m_ast)
+
+        moon = moon_info(res['best_et'], star_dir, obs_geo)
+
 
         if np.isfinite(met['mag_drop']) and met['mag_drop'] < 0.1:
             print (f" --- too low mag drop dM = {met['mag_drop']} --- ")
             continue
-        
+
         record = dict(target_id=target_id, target_name=get_asteroid_name(target_id),
                       best_utc=res['best_utc'], best_et=res['best_et'],
                       min_distance=res['min_distance'], margin_km=res['min_distance'] - size['r_km'],
-                      r_km=size['r_km'], r_search_km=r_search, size_source=size['source'],
+                      r_km=size['r_km'], r_min_km=..., r_max_km=..., source=...,
+                      r_search_km=r_search, size_source=size['source'],
                       star=row.source_id, mag=row.phot_g_mean_mag,
                       star_ra=np.degrees(ra), star_dec=np.degrees(dec),
-                      star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met, observable=res['observable'])
+                      star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met, **moon,
+                      observable=res['observable'])
+
+        dx, dy = besselian_offsets(res['best_et'], star_dir, obs_geo, target_id)
+        record.update(offset_east_km=dx, offset_north_km=dy,
+                      max_duration_s=2*size['r_km']/met['speed_kms'])
+
         print(record)
         pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
                                       header=not os.path.isfile(config.hits_output_cvs_file))
