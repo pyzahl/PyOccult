@@ -35,6 +35,8 @@ Before installing packages, you must activate the environment. The command depen
   ```
 *Once activated, your terminal prompt will show `(.venv)` at the beginning of the line.*
 
+NOTE: to run on non Linux platforms you need to adjust the cache the path from /dev/shm/... to what ever work fastest on your platform.
+
 ## 3. Install from requirements.txt
 With the environment active, run `pip` to download and install all the listed packages into your isolated environment:
 
