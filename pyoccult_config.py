@@ -10,7 +10,7 @@ max_shadow_dist = 200  ## km
 
 LAT = 40.9541175
 LON = -72.92614552
-ELE = 40
+ELE = 69
 
 MAG_MIN = 20
 MIN_STAR_ALT = 10.0     # deg, use the same constants in both gates
