@@ -139,7 +139,7 @@ p4 = run_case("complete miss", xi0=-30000.0, eta0=20000.0, vxi=6.0, veta=0.0, ex
 
 # KML for the grazing case: well-formed, and lines with <2 points are dropped
 m = load_module()
-m.write_shadow_kml(p3, '/tmp/graze.kml', 'Graze & <test>', observer=(-72.926, 40.954))
+m.write_shadow_kml(p3, '/tmp/graze.kml', 'Graze & <test>', observer=(-74.006, 40.713))
 import xml.etree.ElementTree as ET
 root = ET.parse('/tmp/graze.kml').getroot()
 ns = {'k': 'http://www.opengis.net/kml/2.2'}

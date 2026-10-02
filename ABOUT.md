@@ -198,7 +198,7 @@ asteroids of the best events; their size data goes to the shared size cache.
 | Asteroid orbit files | JPL Horizons API (`EPHEM_TYPE=SPK`), cached in `cache_path` | `pyoccult.py` positions |
 | Asteroid size, H, G | SBDB API (`sbdb.api`, `phys-par=1`), cached per asteroid | `get_asteroid_size` |
 | Elements, sizes for all asteroids | SBDB Query API (`sbdb_query.api`, numbered, full precision), cached | `pyoccult_pick.py` |
-| Asteroid names | `jpl_asteroids_spice.csv` (SBDB query, `SPICE ID` = 20000000 + number) | `get_asteroid_name` |
+| Asteroid names | SBDB full name, from the same per-asteroid cache as the size | `get_asteroid_name` |
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
 | Map | Leaflet 1.9.4 (cdnjs); Carto, Esri, OpenStreetMap tiles | report |

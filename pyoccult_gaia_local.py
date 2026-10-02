@@ -260,6 +260,12 @@ class LocalGaia:
         return df.drop_duplicates("source_id").reset_index(drop=True)
 
 
+def index_gmax(mag_limit):
+    """Limit of the bright-star index serving a magnitude limit: whole magnitudes, at least 15, so changing the
+    aperture does not build a new index every time."""
+    return max(15.0, float(math.ceil(mag_limit - 1e-9)))
+
+
 class BrightIndex:
     """Stars with G <= gmax (default 15, ~32 M stars, 1.3 GB) from the local catalog, sorted by a fine sky cell and,
     within a cell, by magnitude (so a lookup with a bright cap reads only the bright end of each cell). For screening many

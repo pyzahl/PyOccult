@@ -69,15 +69,17 @@ def limiting_star_mag(H, G, ast_from_sun_au, ast_from_earth_au, mag_limit, min_d
 # ----------------------------------------------------------------------------------------------- the path
 def asteroid_path(target_id, et0, et1, step_s=600.0):
     """Sample the asteroid with SPICE (needs the kernels and the target SPK loaded; call serially).
-    Returns dict(ets, u, delta_km, sun_au, earth_au): u = astrometric ('CN') unit vectors from Earth's centre."""
+    Returns dict(ets, u, delta_km, earth_au, sun_au, sun_idx): u = astrometric ('CN') unit vectors from Earth's centre
+    at every step; sun_au (Sun -> asteroid, for the brightness only) every 6 h, at the sample indices sun_idx."""
     import spiceypy as spice
     ets = np.arange(et0, et1 + step_s, step_s)
     tid = str(target_id)
-    ast, _ = spice.spkpos(tid, ets, "J2000", "CN", "399")
-    sun, _ = spice.spkpos(tid, ets, "J2000", "LT", "10")                # Sun -> asteroid, for the phase angle only
-    ast, sun = np.asarray(ast), np.asarray(sun)
+    ast = np.asarray(spice.spkpos(tid, ets, "J2000", "CN", "399")[0])
+    sun_idx = np.unique(np.append(np.arange(0, len(ets), max(1, int(round(6 * 3600 / step_s)))), len(ets) - 1))
+    sun = np.asarray(spice.spkpos(tid, ets[sun_idx], "J2000", "LT", "10")[0])
     delta = np.linalg.norm(ast, axis=1)
-    return dict(ets=ets, u=ast / delta[:, None], delta_km=delta, sun_au=sun / AU_KM, earth_au=ast / AU_KM, step_s=step_s)
+    return dict(ets=ets, u=ast / delta[:, None], delta_km=delta, sun_au=sun / AU_KM, earth_au=ast / AU_KM,
+                sun_idx=sun_idx, step_s=step_s)
 
 
 # ----------------------------------------------------------------------------------------------- the plan
@@ -92,7 +94,8 @@ def plan_corridor(target_id, et0, et1, size, mag_lim, max_shadow_dist, min_drop=
     """Everything that needs SPICE. size needs r_max_km and optional H, G. Strip half-width per path sample:
     margin_km / distance + pad_arcsec (stars faster than pm_pad_mas/yr are added separately, see LocalGaia.high_pm)."""
     path = path or asteroid_path(target_id, et0, et1, step_s)
-    cap, m_faint = limiting_star_mag(size.get("H"), size.get("G"), path["sun_au"], path["earth_au"], mag_lim, min_drop)
+    k = path.get("sun_idx", slice(None))                                # samples that have the Sun vector
+    cap, m_faint = limiting_star_mag(size.get("H"), size.get("G"), path["sun_au"], path["earth_au"][k], mag_lim, min_drop)
     margin_km = EARTH_R_KM + float(size["r_max_km"]) + float(max_shadow_dist)
     pad = pad_for_pm(pm_pad_mas, path["ets"])
     U = path["u"]

@@ -2,19 +2,24 @@ import os, sys, json, math, time, types, tempfile, numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import pyoccult_pick as P, pyoccult_screen as SC
 
-# ---------- 1. exposure rule: exposure(m) and the faintest useful star are inverse; aperture scales flux
-opt = dict(ref_mag=12.5, ref_exp=0.08, ref_aperture=25.0, aperture=25.0, frames=4)
-assert abs(SC.exposure_s(12.5, opt) - 0.08) < 1e-12 and abs(SC.exposure_s(15.0, opt) / SC.exposure_s(12.5, opt) - 10) < 1e-9
-for dur in (0.2, 0.5, 2.0, 5.0):
-    m = SC.faintest_useful_star(dur, opt)
-    assert abs(opt["frames"] * SC.exposure_s(m, opt) - dur) < 1e-9, (dur, m)
-big = dict(opt, aperture=50.0); assert abs(SC.faintest_useful_star(1.0, big) - SC.faintest_useful_star(1.0, opt) - 2.5 * math.log10(4)) < 1e-9
-assert abs(SC.drop_cut(0.1) - 2.5388) < 1e-3
-# the OWC reference events that define the default calibration are detectable: (G, OWC duration)
-for g, dur in ((12.28, 0.48), (14.09, 1.55), (12.78, 0.51), (14.06, 4.33)):
-    assert dur >= 4 * SC.exposure_s(g, opt), (g, dur)
-print("exposure: G 12.5 ->", SC.exposure_s(12.5, opt), "s, G 15 ->", round(float(SC.exposure_s(15, opt)), 2), "s;",
-      "faintest star for a 0.5 s event:", round(float(SC.faintest_useful_star(0.5, opt)), 2))
+# ---------- 1. OWC General Observability Criterion: StarMag < 5 log10(ap_cm) + 2.5 log10(dur/frames) + 8.5 + adj
+opt = dict(aperture=25.0, frames=4, mag_adjust=0.0)
+assert abs(SC.owc_limit(4.0, opt) - (5 * math.log10(25) + 8.5)) < 1e-12              # dur/frames = 1 s
+assert abs(SC.owc_limit(1.0, dict(opt, aperture=50.0)) - SC.owc_limit(1.0, opt) - 5 * math.log10(2)) < 1e-12
+assert abs(SC.owc_limit(1.0, dict(opt, mag_adjust=0.7)) - SC.owc_limit(1.0, opt) - 0.7) < 1e-12
+assert abs(SC.owc_limit(2.0, opt) - SC.owc_limit(1.0, opt) - 2.5 * math.log10(2)) < 1e-12
+# every OWC reference event (G, max duration) passes at 25 cm / 4 frames; with the aperture in inches several would not
+ref = [(5.61, 0.51), (8.10, 0.95), (10.42, 0.86), (12.08, 1.10), (12.11, 0.54), (12.28, 0.48), (12.78, 0.51),
+       (12.90, 0.84), (12.97, 0.74), (13.13, 1.83), (13.37, 2.07), (14.06, 4.33), (14.09, 1.55), (14.20, 2.34)]
+assert all(g < SC.owc_limit(d, opt) for g, d in ref)
+assert sum(g < SC.owc_limit(d, dict(opt, aperture=25 / 2.54)) for g, d in ref) < len(ref)
+# extinction: none when off, none at the zenith, ~k at 30 deg (airmass ~2), grows towards the horizon
+assert SC.extinction_loss(20.0, opt) == 0.0
+k = dict(opt, extinction=0.2)
+assert abs(SC.extinction_loss(90.0, k)) < 1e-3 and abs(SC.extinction_loss(30.0, k) - 0.2) < 0.01
+assert SC.extinction_loss(10.0, k) > SC.extinction_loss(30.0, k) > SC.extinction_loss(60.0, k)
+print("OWC limit 25 cm, 4 frames: 0.5 s event ->", round(float(SC.owc_limit(0.5, opt)), 2), " 2 s ->",
+      round(float(SC.owc_limit(2.0, opt)), 2), "; extinction 0.2 at 15 deg:", round(float(SC.extinction_loss(15.0, k)), 2))
 
 # ---------- 2. asteroid table: sizes like pyoccult.get_asteroid_size, bad orbits skipped, H limit
 F = P.SBDB_FIELDS

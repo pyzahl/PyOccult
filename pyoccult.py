@@ -83,67 +83,6 @@ if download_kernels(config.earth_pck_max_age):
 ########################## PROLOGUE KERNEL INIT SECTION END
 
 
-## GET DATA FOR INFO AND NAME LOOKUPS, download once!
-
-# The endpoint for querying the bulk database
-URL_JPL_SBDBQ = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
-
-def get_all_jpl_asteroids_with_spice():
-    print("Querying JPL Database for entries and SPICE IDs... (This may take a moment)")
-    output_file = "jpl_asteroids_spice.csv"
-    fp = Path(output_file)
-    if fp.is_file():
-        print("JPL db already fetched!")
-        print(f"Found and reading cached asteroid list: '{output_file}'.")
-        df = pd.read_csv(output_file)
-        return df
-    
-    
-    # Added 'spkid' to the requested fields parameter
-    params = {
-        "sb-kind": "a",  # Limit search results to asteroids-only
-        "fields": "spkid,full_name,pdes",  # Fetch SPICE/SPK ID, full name, and primary designation
-    }
-
-    try:
-        response = requests.get(URL_JPL_SBDBQ, params=params)
-        response.raise_for_status()
-        data = response.json()
-
-        # Check if data was returned
-        if "data" not in data:
-            print("No data returned from the API.")
-            return
-
-        # Extract fields and data rows
-        columns = data["fields"]
-        rows = data["data"]
-
-        # Build the DataFrame
-        df = pd.DataFrame(rows, columns=columns)
-
-        # Rename columns to clear human-readable names
-        df.columns = ["SPICE ID", "Full Name", "Primary Designation"]
-
-        # Ensure the SPICE IDs are stored clearly (they arrive as string representations of the integer codes)
-        df["SPICE ID"] = pd.to_numeric(df["SPICE ID"], errors="coerce")
-
-        # Save to CSV
-        df.to_csv(output_file, index=False)
-
-        print(f"Success! Fetched {len(df):,} minor planets and asteroids.")
-        print(f"Data saved cleanly to '{output_file}'.")
-        return df
-        
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while connecting to JPL: {e}")
-    except json.JSONDecodeError:
-        print("Failed to parse the response from JPL.")
-
-# Fetch to numpy
-asteroids_df = get_all_jpl_asteroids_with_spice()
-spice_ids = asteroids_df["SPICE ID"].to_numpy()
-names = asteroids_df["Full Name"].to_numpy()
 
 
 ### NOW OCCULT CALC AND STAR+ASTEROID EPH MANAGEMENT
@@ -310,27 +249,12 @@ def list_spk_contents(kernel_path):
 
 #+20000000
 def get_asteroid_name(spk_id):
-    
-    spk_id = int(spk_id)
-    if spk_id < 20000000:
-        spk_id = spk_id + 20000000
-
-    idx = np.where(spice_ids == spk_id)[0]
-    if idx.size > 0:
-        return names[idx[0]]
-
-    try:
-        # Attempt native SPICE resolution
-        name = spice.bodc2n(spk_id)
-        return name
-    except spice.utils.support_types.SpiceyError as e:
-        print(f"\nSPICE Processing Error: {e}")
-        # If not in the loaded SPICE pool, fall back to calculating the IAU number
-        if 20000000 <= spk_id < 30000000:
-            iau_number = spk_id - 20000000
-            return f"Numbered Asteroid IAU: ({iau_number})"
-        else:
-            return f"Unnumbered / Provisional Asteroid SPK Target ID: {spk_id}"
+    """Full name ("218001 (2001 XQ72)") from the SBDB size cache (fetched and cached if missing); the number if SBDB
+    cannot be reached. Accepts the asteroid number or its SPK id (20000000 + number)."""
+    n = int(spk_id)
+    n = n - 20000000 if n >= 20000000 else n
+    phys = sbdb_phys(n)
+    return ((phys or {}).get("_fullname") or "").strip() or f"({n})"
 
 
 

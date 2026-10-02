@@ -5,7 +5,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 
 ## Files
 - `pyoccult.py`: main search script. Kernel setup runs at import time (not import-safe). Driver is the `__main__` block.
-- `pyoccult_config.py`: run and site config (targets, window, site, thresholds). Optional: `map_dir`, `min_mag_drop`, `search_mode` (`corridor`/`windows`), `corridor_step_s`,
+- `sites.py` (private, not in git; layout `sites_example.py`): named observing sites; `pyoccult_config.py` sets
+  `LAT`, `LON`, `ELE` from `default_site` or env `PYOCCULT_SITE`. Never put real coordinates in tracked files.
+- `pyoccult_config.py`: run config (targets, window, site, thresholds). Optional: `map_dir`, `min_mag_drop`, `search_mode` (`corridor`/`windows`), `corridor_step_s`,
   `gaia_local_dir` (required by corridor mode), `gaia_local_gmax`.
 - `pyoccult_paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.
 - `pyoccult_report.py`: `hits_log.csv` to HTML/Markdown with an embedded Leaflet map. Standard library only.
@@ -22,7 +24,6 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `pyoccult.sbdb_phys()` (per-object API) and by `pyoccult_pick.py` for its top targets (bulk rows); standard library only.
 - `pyoccult_owc_check.py` + `owc_reference.csv`: regression run against an OWC search (own settings, config untouched).
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).
-- `jpl_asteroids_spice.csv`: names only (`SPICE ID` = 20000000 + number, `Full Name`, `Primary Designation`).
 
 ## Conventions that matter
 - Asteroid position: `spkpos(id, et, 'J2000', 'CN', '399')`. Earth centre is 399, not 3. `CN` is astrometric (matches Gaia).

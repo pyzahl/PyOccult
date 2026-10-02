@@ -3,10 +3,10 @@
 For every asteroid (SBDB full-precision elements):
   1. positions every step_s over the window, integrated with the planets (pyoccult_orbits, ~0.01" vs Horizons),
   2. only times when the asteroid is above min_alt at the site and the Sun is below max_sun_alt are searched,
-  3. the brightest useful star is set per asteroid: the drop rule (min_drop) and the exposure rule (a star of
-     magnitude m needs exposures of exp(m); the event must last frames x exp(m) and min_dur) give a magnitude cap,
-     so small/fast asteroids only search bright stars. Durations for these rules use the upper size bound (an
-     H-only size is uncertain by ~1.7x), i.e. an event is kept if it CAN be detectable,
+  3. the faintest useful star is set per asteroid by the drop rule (min_drop) and OWC's observability criterion
+     (owc_limit: aperture, detection frames, MagAdjust), so small/fast asteroids only search bright stars.
+     Durations for these rules use the upper size bound (an H-only size is uncertain by ~1.7x), i.e. an event is
+     kept if it CAN be observable,
   4. stars along the visible path come from the bright-star index (pyoccult_gaia_local.BrightIndex),
   5. the corridor candidate scan finds closest approaches to the Earth's centre; each is then solved for the site
      (fundamental plane, observer on the rotating Earth), and kept if the shadow passes within r_max + reach.
@@ -36,15 +36,23 @@ def load_kernels(spice, folder="."):
 
 
 # ----------------------------------------------------------------------------------------------- detection model
-def exposure_s(m_star, opt):
-    """Exposure needed for a star of G magnitude m_star: ref_exp at ref_mag for a ref_aperture, scaling with flux."""
-    return opt["ref_exp"] * 10 ** (0.4 * (np.asarray(m_star, float) - opt["ref_mag"])) * (opt["ref_aperture"] / opt["aperture"]) ** 2
+def owc_limit(dur_s, opt):
+    """OWC's General Observability Criterion: an event is observable if
+    StarMag < 5 log10(Aperture_cm) + 2.5 log10(MaxDuration / DetectionFrames) + 8.5 + MagAdjust."""
+    return (5 * math.log10(opt["aperture"]) + 2.5 * np.log10(np.maximum(dur_s, 1e-9) / opt["frames"]) + 8.5
+            + opt.get("mag_adjust", 0.0))
 
 
-def faintest_useful_star(dur_s, opt):
-    """Faintest star magnitude whose exposure still fits frames times into an event of dur_s seconds."""
-    return opt["ref_mag"] + 2.5 * np.log10(np.maximum(dur_s, 1e-9) / opt["frames"] / opt["ref_exp"]
-                                           * (opt["aperture"] / opt["ref_aperture"]) ** 2)
+def airmass(alt_deg):
+    """Kasten & Young (1989)."""
+    h = np.asarray(alt_deg, float)
+    return 1.0 / (np.sin(np.radians(h)) + 0.50572 * (h + 6.07995) ** -1.6364)
+
+
+def extinction_loss(alt_deg, opt):
+    """Extra magnitudes lost to the atmosphere at this altitude, relative to the zenith (0 when extinction is off)."""
+    k = opt.get("extinction", 0.0)
+    return k * (airmass(alt_deg) - 1.0) if k else 0.0
 
 
 def drop_cut(min_drop):
@@ -119,8 +127,7 @@ def solve_site(spice, site, g_of_t, sdir, t0, half_bracket, iters=6, dt=5.0):
 # ----------------------------------------------------------------------------------------------- the screen
 def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, progress=None):
     """rows: list of dicts with number, name, H, G, D_km, D_max_km, a, e, i, om, w, ma, epoch (JD TDB).
-    opt: reach_km, min_alt, max_sun_alt, min_drop, min_dur, cam_limit, aperture, ref_aperture, ref_mag, ref_exp,
-    frames. Returns a list of event dicts (one per asteroid/star/time)."""
+    opt: reach_km, min_alt, max_sun_alt, min_drop, min_dur, cam_limit, aperture, frames, mag_adjust, extinction. Returns a list of event dicts (one per asteroid/star/time)."""
     ets = np.arange(et0, et1 + step_s, step_s)
     obs, up = site.at(ets)
     sun = np.asarray(spice.spkpos("10", ets, "J2000", "LT+S", "399")[0])
@@ -158,7 +165,7 @@ def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, pr
             dur_max = row["D_max_km"] / np.maximum(speed[k][vis] - 0.5, 0.3)
             if dur_max.max() < opt["min_dur"]:
                 continue
-            cap = min(opt["cam_limit"], float(m_ast[vis].max()) + dm_drop, float(faintest_useful_star(dur_max.max(), opt)))
+            cap = min(opt["cam_limit"], float(m_ast[vis].max()) + dm_drop, float(owc_limit(dur_max.max(), opt)))
             if cap < 0:
                 continue
             margin = EARTH_R_KM + row["D_max_km"] / 2 + opt["reach_km"]
@@ -197,8 +204,8 @@ def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, pr
                 drop = 2.5 * math.log10(1 + 10 ** (0.4 * (m_a - m_s)))
                 dur = row["D_km"] / max(vrel[q], 1e-6)                                # nominal size
                 dur_hi = row["D_max_km"] / max(vrel[q], 1e-6)                         # upper size bound
-                exp_s = float(exposure_s(m_s, opt))
-                if drop < opt["min_drop"] or dur_hi < opt["min_dur"] or dur_hi < opt["frames"] * exp_s:
+                margin = float(owc_limit(dur_hi, opt)) - m_s - float(extinction_loss(star_alt, opt))
+                if drop < opt["min_drop"] or dur_hi < opt["min_dur"] or margin <= 0:
                     continue
                 events.append(dict(number=row["number"], spkid=row.get("spkid"), name=row["name"], et=float(t[q]),
                                    star=int(sdf.source_id.iloc[cands.star.iloc[q]]), star_mag=m_s, star_ra=float(ra[q]),
@@ -206,7 +213,7 @@ def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, pr
                                    D_km=row["D_km"],
                                    D_est=row.get("D_est", False), speed_kms=float(vrel[q]), miss_km=float(miss[q]),
                                    inside=bool(miss[q] <= row["D_km"] / 2), star_alt=star_alt, sun_alt=sun_alt,
-                                   exposure_s=exp_s, n_frames=dur_hi / exp_s, cc=row.get("cc")))
+                                   mag_margin=margin, cc=row.get("cc")))
         if progress:
             progress(min(c0 + chunk, len(rows)), len(rows), len(events), n_searched)
     return events

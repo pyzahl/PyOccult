@@ -30,8 +30,8 @@ def show_status():
     st = gaia.status(d)
     print(f"  local Gaia catalog {d:12s}  {st['done']}/{st['total'] or '?'} files, {st['gb']:.1f} GB"
           + (" (complete)" if st["complete"] else ""))
-    gmax = getattr(config, "pick_cam_limit", 15.0)
-    have = os.path.isfile(os.path.join(d, f"bright_G{float(gmax):.1f}.v2.npy"))
+    gmax = gaia.index_gmax(getattr(config, "pick_cam_limit", 15.0))
+    have = os.path.isfile(os.path.join(d, f"bright_G{gmax:.1f}.v2.npy"))
     print(f"  bright-star index G <= {gmax:<5g}  {'ok' if have else 'missing'}")
 
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         else:
             gaia.build(d, gmax, a.workers)
         print("3. bright-star index")
-        gaia.BrightIndex(d, getattr(config, "pick_cam_limit", 15.0))
+        gaia.BrightIndex(d, gaia.index_gmax(getattr(config, "pick_cam_limit", 15.0)))
         print("   ok")
     print()
     show_status()

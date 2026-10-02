@@ -109,6 +109,21 @@ Set your site and search window in `pyoccult_config.py` (see "Site Configuration
 python pyoccult_report.py hits_log.csv    # HTML event list with maps
 ```
 
+A small script does a fresh run and publishes the report on a local web server (here nginx; the map tiles need a
+web server, see the report section). Save it as `run.sh` (it is in `.gitignore`, adjust the paths) and make it
+executable with `chmod +x run.sh`:
+
+```bash
+#!/bin/sh
+rm -f hits_log.csv                    # start a fresh log (the search appends)
+clear
+./pyoccult.py
+./pyoccult_report.py hits_log.csv
+sudo cp hits_report.html /var/www/html/hits_report.html
+```
+
+To include the maps' KML links in the published page, also copy the `maps` folder (`sudo cp -r maps /var/www/html/`).
+
 ---
 
 ## Quick Tips
@@ -136,6 +151,27 @@ python pyoccult_report.py hits_log.csv    # HTML event list with maps
 All settings live in `pyoccult_config.py` (a Python file: edit it, keep the names). The search, the pick tool and the
 report read it from the project folder.
 
+**Observing sites** are kept apart from the settings, in `sites.py` (yours, not in git). Copy `sites_example.py` to
+`sites.py` and enter your sites; without `sites.py` the example site (New York City Hall) is used:
+
+```python
+# sites.py
+sites = {
+    "home":  dict(lat=51.4769, lon=-0.0005, ele=46, name="Home"),             # example: Royal Observatory Greenwich
+    "field": dict(lat=51.7600, lon=-1.2600, ele=60, name="Dark-sky field"),
+}
+default_site = "home"
+```
+
+Latitude and longitude are geodetic degrees, longitude east-positive (west is negative); `ele` is in metres.
+`default_site` is used unless the environment variable `PYOCCULT_SITE` names another one, so one site can be run
+without editing anything, or several in a batch:
+
+```bash
+PYOCCULT_SITE=field ./pyoccult.py
+for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv --targets-file ""; done
+```
+
 **Search window and targets**
 
 | Setting | Example | Meaning |
@@ -152,7 +188,7 @@ report read it from the project folder.
 
 | Setting | Example | Meaning |
 |---|---|---|
-| `LAT`, `LON`, `ELE` | `40.9541, -72.9261, 69` | site: geodetic latitude and longitude in degrees (east positive, west negative), height in m |
+| `LAT`, `LON`, `ELE` | from `sites.py` | the chosen site (see "Observing sites" above); `site_name` holds its name |
 | `MAG_MIN` | `15` | faintest star (Gaia G) the search considers; cannot exceed `gaia_local_gmax` |
 | `MIN_STAR_ALT` | `10.0` | minimum star altitude, deg |
 | `MAX_SUN_ALT` | `-6.0` | the Sun must be below this, deg (try -12 for faint stars) |
