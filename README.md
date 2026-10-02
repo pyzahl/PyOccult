@@ -92,7 +92,13 @@ Gaia star catalog. `pyoccult_setup.py` installs all of it.
 
 Also needed: `curl` (for the kernels) and a few GB of free RAM while the index is built.
 
-**Before you start**, check these in `pyoccult_config.py`:
+**Before you start**: your observing site goes into `sites.py` (see "Observing sites" below). If it does not exist
+yet, `pyoccult_setup.py` helps you create it: it guesses your position from your IP address (ipinfo.io; city level,
+off by 10-100 km, wrong behind a VPN; `--no-geoip` skips it), and you can accept that, look up a city or place name
+(Open-Meteo, with elevation), or type latitude, longitude and elevation. A guessed or looked-up position is marked
+APPROXIMATE in `sites.py`, and `--status` keeps warning until you replace it with your exact position (GPS or a map;
+a shadow can be only a few km wide). Without a terminal, setup copies `sites_example.py` instead. Also check these in
+`pyoccult_config.py`:
 
 * `sites.py`: before running any script, please setup your site, copy sites_example.py to sites.py and adjust your site info! See below for details.
 * `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free.
