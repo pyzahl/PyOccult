@@ -250,3 +250,33 @@ asteroids of the best events; their size data goes to the shared size cache.
 - **Report**: the map uses OpenStreetMap tiles, which need the page served by a web server (a `file://` page sends no
   Referer, so the tiles are refused); `--tile-url` selects another tile server.
 - **Ideas**: `m_before` / `m_during` columns in the log; process-level parallelism by target in `pyoccult.py`.
+
+---
+
+## Part 7: Future plans
+
+### Major solar-system bodies as targets (not started)
+
+Can the Moon, the planets and the major moons be targets, as an option? Partly: the Moon is close to straightforward,
+planets and their moons are doable but each needs a few real additions.
+
+**What already fits.** The solver is the standard fundamental-plane method, which works for any occulting body: a star,
+a body position from SPICE and a radius. The corridor scan, the local Gaia catalog, the visibility checks, metrics,
+maps and the report do not care what the occulting body is.
+
+| Body | Orbit data | Effort and caveats |
+|---|---|---|
+| **Moon** | already in `de440.bsp` | Small: SPICE knows "MOON", its radius is in the kernels. Lunar occultations are IOTA's most common events. Caveats: hundreds of events per month at G <= 10 (needs its own magnitude limit); grazes need the lunar limb profile, which we do not have; bright-limb and daylight events need filtering. |
+| **Planets** (Mars to Neptune) and **Pluto** | `de440` has only the barycentres; planet centres come from NAIF's satellite kernels (mar097, jup365, sat441, ura111, nep097, plu058; tens of MB up to about 1 GB for Jupiter; sizes unverified) | Medium: download these kernels as an option in setup. The giant planets are flattened (Jupiter ~7 %), so the shadow edge should come from the real limb ellipse (SPICE `edlimb`), not a circle. Rings and atmospheres (gradual drops, central flashes) are not modelled. The planet's glare limits detection, so the drop and observability rules need care. |
+| **Major moons** (Galilean moons, Titan, Triton, Charon, ...) | the same satellite kernels | Like asteroids once the kernels are there: nearly spherical, radii from the kernels. They need a brightness table (their H is not in SBDB) for the drop, and handling of the nearby planet's glare. |
+
+**Target names.** Asteroids are plain numbers, and NAIF moon ids collide with them (Io is 501, so is asteroid (501)).
+Major bodies would be given by name in `targets`, e.g. `["218001", "Moon", "Io", "Titan"]`; SPICE resolves the names.
+
+**Suggested order.**
+1. The Moon as an optional target: about half a day; no new data; many events to cross-check against Occult.
+2. Planets and major moons by name: optional kernel downloads in setup, ellipsoid limbs, a brightness table; a day or
+   two, with clear caveats about rings, atmospheres and glare.
+
+The pick tool would not need to change: there are only a handful of major bodies, so they would simply be listed as
+targets.
