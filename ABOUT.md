@@ -1,9 +1,10 @@
 # PyOccult: computation reference
 
-How PyOccult computes its predictions, where its data comes from, how it was validated and what is still open.
+How PyOccult computes its predictions, where its data comes from, how it was validated and what is still under active development.
+Currently Gaia and Horizons are used.
 Usage is in `README.md`. Updated 2026-10-01.
 
-PyOccult is a portable Python replacement for the Windows occultation predictor Occult (occult.exe, the engine behind
+PyOccult is intended as a future and portable Python replacement for the Windows occultation predictor Occult (occult.exe, the engine behind
 Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one observer site.
 
 ---
