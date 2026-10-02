@@ -5,14 +5,15 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 
 ## Files
 - `pyoccult.py`: main search script. Kernel setup runs at import time (not import-safe). Driver is the `__main__` block.
-- `sites.py` (private, not in git; layout `sites_example.py`): named observing sites; `pyoccult_config.py` sets
-  `LAT`, `LON`, `ELE` from `default_site` or env `PYOCCULT_SITE`. Never put real coordinates in tracked files.
+- `sites.py` (private, not in git; layout `sites_example.py`): named observing sites with view (min_alt, max_sun_alt,
+  reach_km) and equipment (aperture_cm, frames, mag_adjust, extinction, ...); `pyoccult_config.py` derives `LAT`, `LON`,
+  `ELE`, `MIN_STAR_ALT`, `MAX_SUN_ALT`, `MAG_MIN`, `pick_*` from `default_site` or env `PYOCCULT_SITE`. Never put real coordinates in tracked files.
 - `pyoccult_config.py`: run config (targets, window, site, thresholds). Optional: `map_dir`, `min_mag_drop`, `search_mode` (`corridor`/`windows`), `corridor_step_s`,
   `gaia_local_dir` (required by corridor mode), `gaia_local_gmax`.
 - `pyoccult_paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.
 - `pyoccult_report.py`: `hits_log.csv` to HTML/Markdown with an embedded Leaflet map. Standard library only.
 - `pyoccult_pick.py`: event finder over all asteroids (OWC-style) for a window; writes `pick_events.csv` and
-  `targets.py`. Engine `pyoccult_screen.py` (site solve, exposure rule), orbits `pyoccult_orbits.py` (SBDB full-precision
+  `targets.py`. Engine `pyoccult_screen.py` (site solve, OWC observability formula), orbits `pyoccult_orbits.py` (SBDB full-precision
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= 15, cells sorted by G). Worker processes.
 - `pyoccult_corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).

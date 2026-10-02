@@ -157,13 +157,37 @@ report read it from the project folder.
 ```python
 # sites.py
 sites = {
-    "home":  dict(lat=51.4769, lon=-0.0005, ele=46, name="Home"),             # example: Royal Observatory Greenwich
-    "field": dict(lat=51.7600, lon=-1.2600, ele=60, name="Dark-sky field"),
+    "home":  dict(lat=51.4769, lon=-0.0005, ele=46, name="Home",             # example: Royal Observatory Greenwich
+                  aperture_cm=25, min_alt=20),
+    "field": dict(lat=51.7600, lon=-1.2600, ele=60, name="Dark-sky field",
+                  aperture_cm=35, min_alt=10, max_sun_alt=-12, reach_km=50, mag_adjust=0.5),
 }
 default_site = "home"
 ```
 
-Latitude and longitude are geodetic degrees, longitude east-positive (west is negative); `ele` is in metres.
+`lat`, `lon` (geodetic degrees, longitude east-positive, west is negative) and `ele` (metres) are required. Each site
+can also describe its view and its equipment; keys it leaves out take the defaults from `pyoccult_config.py`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `min_alt` | 10 | lowest usable star altitude, deg (trees, houses, haze) |
+| `max_sun_alt` | -6 | the Sun must be below this, deg (try -12 for faint stars) |
+| `reach_km` | `max_shadow_dist` | how far you can travel from this site, km |
+| `aperture_cm` | 25 | telescope aperture, cm |
+| `frames` | 4 | detection frames: video frames the event must cover |
+| `mag_adjust` | 0 | OWC's MagAdjust: + for better conditions (dark sky, sensitive camera), - for worse |
+| `extinction` | 0 (off) | atmospheric extinction, mag per airmass (~0.2): low stars count as fainter |
+| `min_dur_s` | 0.4 | hard limit: shortest event, s |
+| `max_exp_s` | 0.64 | longest usable exposure, s; sets the faintest star searched |
+| `mag_limit` | from the above | faintest star searched (Gaia G), if you want to set it directly |
+
+Events are judged with OWC's General Observability Criterion: an event is kept if
+
+    StarMag < 5 log10(aperture_cm) + 2.5 log10(MaxDuration / frames) + 8.5 + mag_adjust
+
+(minus the extinction loss at the star's altitude, if enabled). The faintest star searched is the one that passes at the
+longest usable exposure, `MaxDuration / frames = max_exp_s`: G 15.0 at 25 cm, G 16.5 at 50 cm.
+
 `default_site` is used unless the environment variable `PYOCCULT_SITE` names another one, so one site can be run
 without editing anything, or several in a batch:
 
@@ -178,7 +202,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 |---|---|---|
 | `ct, days, spn` | `"2026-10-01T00:00:00", 20, 3600` | search start (UTC) and number of days; `spn` (window length, s) is used only by the old `"windows"` mode |
 | `targets` | `["218001", "305580"]` | asteroid numbers as strings. Taken from `targets.py` when it exists (written by `pyoccult_pick.py`), else the list in the `except ImportError:` branch |
-| `max_shadow_dist` | `20` | km you can travel: an event is logged if the shadow edge passes within this of your site (0 = only from home) |
+| `max_shadow_dist` | `20` | km you can travel: an event is logged if the shadow edge passes within this of your site (0 = only from home); a site's `reach_km` overrides it |
 | `search_mode` | `"corridor"` | `"corridor"` (default, fast, needs the local Gaia catalog) or `"windows"` (old per-hour archive queries) |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
 | `corridor_step_s` | `600` | path step of the corridor candidate scan, s |
@@ -188,10 +212,10 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 
 | Setting | Example | Meaning |
 |---|---|---|
-| `LAT`, `LON`, `ELE` | from `sites.py` | the chosen site (see "Observing sites" above); `site_name` holds its name |
-| `MAG_MIN` | `15` | faintest star (Gaia G) the search considers; cannot exceed `gaia_local_gmax` |
-| `MIN_STAR_ALT` | `10.0` | minimum star altitude, deg |
-| `MAX_SUN_ALT` | `-6.0` | the Sun must be below this, deg (try -12 for faint stars) |
+| `LAT`, `LON`, `ELE` | from the site | the chosen site (see "Observing sites" above); `site_name` holds its name |
+| `MIN_STAR_ALT`, `MAX_SUN_ALT` | from the site | the site's `min_alt` and `max_sun_alt` |
+| `MAG_MIN` | from the site | faintest star (Gaia G) searched: the site's `mag_limit`, else from its aperture; at most `gaia_local_gmax` |
+| `pick_aperture_cm`, `pick_frames`, `pick_mag_adjust`, `pick_extinction`, `pick_min_dur_s` | from the site | the site's equipment (used by the pick tool) |
 | `ALT_MARGIN` | `3.0` | the early visibility gate is this much looser than the final test, so it never rejects a real event |
 
 **Pick tool** (`pyoccult_pick.py`, see below)
@@ -199,10 +223,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | Setting | Example | Meaning |
 |---|---|---|
 | `pick_hmax` | `17.0` | asteroids with H below this (`--all` ignores it) |
-| `pick_cam_limit` | `15.0` | faintest star, Gaia G |
-| `pick_aperture_cm` | `25.0` | telescope aperture, cm |
-| `pick_ref_mag`, `pick_ref_exp_s` | `12.5`, `0.08` | exposure calibration: a star of this G needs this exposure at 25 cm |
-| `pick_frames`, `pick_min_dur_s` | `4`, `0.4` | an event must last this many exposures and at least this long (s) |
+| (equipment) | from the site | aperture, frames, MagAdjust, extinction and limits come from the chosen site |
 
 **Output and caches**
 
@@ -251,7 +272,7 @@ search, and writes the asteroids of the best events to `targets.py` for `pyoccul
 python pyoccult_pick.py                          # window, site and camera from pyoccult_config.py, H < 17
 python pyoccult_pick.py --start 2026-10-01 --days 14 --top 30
 python pyoccult_pick.py --all                    # exhaustive: every numbered asteroid (~900k)
-python pyoccult_pick.py --sort date              # ranking: mag (default, brightest star first), date, frames, drop
+python pyoccult_pick.py --sort date              # ranking: mag (default, brightest star first), date, margin, drop
 ```
 
 How it works:
@@ -262,27 +283,26 @@ How it works:
 * The stars are the actual Gaia stars along each path, from the bright-star index of the local catalog
   (`python pyoccult_setup.py` builds it). Only times when the asteroid is up and the Sun is down are searched.
 * Each event is solved for your site and kept if the shadow passes within the asteroid radius + `max_shadow_dist`.
-* Detection follows your camera, like OWC's aperture and detection-frames filter: a star of magnitude G needs an
-  exposure of `pick_ref_exp_s * 10^(0.4 (G - pick_ref_mag))` at 25 cm (scaled by aperture squared); the event must
-  last `pick_frames` exposures and `pick_min_dur_s` seconds, and drop at least `min_mag_drop`. Bright stars therefore
-  allow short events (a G 5.6 star with a 0.25 s event counts), faint stars need long ones. For asteroids whose size is
-  only estimated from H, the duration test uses the upper size bound, so they are not dismissed too early.
+* Detection follows OWC's General Observability Criterion with the site's equipment (see "Observing sites"):
+  `StarMag < 5 log10(aperture_cm) + 2.5 log10(MaxDuration / frames) + 8.5 + mag_adjust`, optionally less the extinction
+  at the star's altitude, plus the hard limits `min_dur_s` and `min_mag_drop`. Bright stars therefore allow short
+  events (a G 5.6 star with a 0.25 s event counts), faint stars need long ones. For asteroids whose size is only
+  estimated from H, the duration uses the upper size bound, so they are not dismissed too early.
 
 Speed: 465k asteroids (H < 17) over 8 days in about 5 minutes with 4 worker processes (`--workers`).
 
 Output:
 
 * a ranked table of the events, and `pick_events.csv` with all of them (time, star, magnitude, drop, duration,
-  frames, distance from the centre line, altitudes, size)
+  `mag_margin` = magnitudes below the observability limit, distance from the centre line, altitudes, size)
 * `targets.py`: the asteroids of the best `--top` events, best first, importable; each line shows its event
 * their size data goes to the shared size cache, so the following `pyoccult.py` run needs no SBDB lookups for them
 
 `pyoccult.py` then computes these events exactly (JPL Horizons orbit, exact solver, maps). Run it over the same window
 (`ct`, `days` in `pyoccult_config.py`; the pick tool uses them as its defaults).
 
-Calibrate the exposure rule for your camera: if your setup records a G 12.5 star well in 0.08 s at 25 cm, keep the
-defaults; otherwise set `pick_ref_mag` / `pick_ref_exp_s` to one star magnitude and exposure you know works, and
-`pick_aperture_cm` to your aperture.
+Tune it like OWC: with the same aperture, frames and MagAdjust as in OWC you get OWC's selection. Raise `mag_adjust`
+for a dark site or a sensitive camera, lower it for light pollution or a less sensitive one.
 
 Use the result in `pyoccult_config.py`:
 

@@ -155,8 +155,9 @@ An OWC-style event search over all asteroids (numbered, H < `pick_hmax`, or all 
 ### 3.2 The screen: `pyoccult_screen.py`
 
 Per chunk of asteroids, positions every 600 s over the window, then per asteroid:
-1. Only samples when the asteroid is above `MIN_STAR_ALT - 3` at the site and the Sun below `MAX_SUN_ALT` are searched.
-2. The faintest useful star follows from the drop rule (2.3) and the exposure rule (3.3), so small or fast asteroids
+1. Only samples when the asteroid is above `MIN_STAR_ALT - 3` at the site and the Sun below `MAX_SUN_ALT` (both from the
+   site) are searched.
+2. The faintest useful star follows from the drop rule (2.3) and the observability rule (3.3), so small or fast asteroids
    search only bright stars.
 3. Stars along the visible path from the bright-star index (3.4), then the candidate scan (2.5).
 4. Each candidate is solved for the site: Newton iteration on the plane offset of the shadow axis from the observer on
@@ -169,11 +170,15 @@ Stars are moved linearly by proper motion (no parallax), and stars faster than 1
 
 ### 3.3 Detection rule
 
-Like OWC's aperture and detection-frames filter: a star of magnitude G needs an exposure
-`exp(G) = pick_ref_exp_s * 10^(0.4 (G - pick_ref_mag)) * (25 / aperture_cm)^2`; the event must last `pick_frames`
-exposures and `pick_min_dur_s`, and drop at least `min_mag_drop`. The default calibration (G 12.5 in 0.08 s at 25 cm,
-4 frames, 0.4 s) follows from the OWC reference events. For sizes estimated from H (uncertain by ~1.7x) the duration
-test uses the upper size bound, so an event is kept if it *can* be detectable; the reported duration is nominal.
+OWC's General Observability Criterion (video recording, aperture and detection frames): an event is observable if
+`StarMag < 5 log10(aperture_cm) + 2.5 log10(MaxDuration / frames) + 8.5 + MagAdjust`. With extinction enabled (site
+key `extinction`, mag per airmass), the star counts as fainter by `extinction x (airmass - 1)` at its altitude (Kasten &
+Young airmass). Hard limits: `min_dur_s` and `min_mag_drop`; OWC also found the drop itself has no significant effect.
+All OWC reference events pass at 25 cm, 4 frames, MagAdjust 0 (and some would not if the aperture were in inches).
+The site's star limit `MAG_MIN` is the magnitude that passes at the longest usable exposure `max_exp_s` (0.64 s gives
+G 15.0 at 25 cm, as in the OWC search). For sizes estimated from H (uncertain by ~1.7x) the duration test uses the
+upper size bound, so an event is kept if it *can* be observable; the reported duration is nominal. `mag_margin`
+reports how far below the limit the star is.
 
 ### 3.4 Bright-star index: `BrightIndex`
 
