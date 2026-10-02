@@ -26,6 +26,7 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 |---|---|
 | `pyoccult.py` | the search: finds star occultations by your targets for your site, appends to `hits_log.csv` |
 | `pyoccult_config.py` | run and site configuration |
+| `sites.py` | configures observer site(s), use the example_sites as a template and copy to sites.py |
 | `pyoccult_paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
 | `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py` |
@@ -93,7 +94,7 @@ Also needed: `curl` (for the kernels) and a few GB of free RAM while the index i
 
 **Before you start**, check these in `pyoccult_config.py`:
 
-* 'sites.py': before running any scrip, please setup your site, copy sites_example.py to sites.py and adjust your site info! See below for details.
+* `sites.py`: before running any script, please setup your site, copy sites_example.py to sites.py and adjust your site info! See below for details.
 * `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free.
 * `gaia_local_gmax`: faintest star kept (default 18). Fainter stars are never searched; 18 suits most small telescopes.
   A different value needs a new folder.
