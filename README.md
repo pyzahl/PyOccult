@@ -93,6 +93,7 @@ Also needed: `curl` (for the kernels) and a few GB of free RAM while the index i
 
 **Before you start**, check these in `pyoccult_config.py`:
 
+* 'sites.py': before running any scrip, please setup your site, copy sites_example.py to sites.py and adjust your site info! See below for details.
 * `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free.
 * `gaia_local_gmax`: faintest star kept (default 18). Fainter stars are never searched; 18 suits most small telescopes.
   A different value needs a new folder.
