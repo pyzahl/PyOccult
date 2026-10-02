@@ -6,6 +6,8 @@ an interrupted Gaia build continues where it stopped.
     python pyoccult_setup.py --no-gaia    # SPICE kernels only
     python pyoccult_setup.py --status     # show what is there
     python pyoccult_setup.py --no-geoip   # do not guess your site from your IP address
+    python pyoccult_setup.py --gmax 16    # a catalog to G 16 instead (own folder gaia_dr3_g16, ~3 GB)
+    python pyoccult_setup.py --gmax 17 --dir /data/gaia_g17
 
   0. Your observing site (sites.py, private): if missing, guessed from your IP address (ipinfo.io), or from a city or
      place name (Open-Meteo geocoding), or typed in; non-interactive runs copy sites_example.py.
@@ -160,7 +162,7 @@ import pyoccult_gaia_local as gaia
 from pyoccult_kernels import KERNELS, download_kernels
 
 
-def show_status():
+def show_status(d=None):
     with open("sites.py") as f:
         example = f.read() == open("sites_example.py").read() if os.path.isfile("sites_example.py") else False
     print(f"  site {config.site_name!r:26s} {config.LAT:.4f} {config.LON:.4f}, {config.ELE:g} m, "
@@ -174,16 +176,37 @@ def show_status():
               " replace it with your exact position (GPS, map) before observing.")
     for k in KERNELS:
         print(f"  {k:28s} {'ok' if os.path.isfile(k) else 'missing'}")
-    d = getattr(config, "gaia_local_dir", None)
+    d = d or getattr(config, "gaia_local_dir", None)
     if not d:
         print("  local Gaia catalog            gaia_local_dir not set in pyoccult_config.py")
         return
     st = gaia.status(d)
     print(f"  local Gaia catalog {d:12s}  {st['done']}/{st['total'] or '?'} files, {st['gb']:.1f} GB"
           + (" (complete)" if st["complete"] else ""))
-    gmax = gaia.index_gmax(getattr(config, "pick_cam_limit", 15.0))
+    gmax = index_limit(d)
     have = os.path.isfile(os.path.join(d, f"bright_G{gmax:.1f}.v2.npy"))
     print(f"  bright-star index G <= {gmax:<5g}  {'ok' if have else 'missing'}")
+
+
+def index_limit(d):
+    """Bright-star index limit for the pick tool: whole magnitudes >= 15, but never past the catalog's own limit."""
+    lim = gaia.index_gmax(getattr(config, "pick_cam_limit", 15.0))
+    try:
+        import json
+        lim = min(lim, json.load(open(os.path.join(d, "catalog.json")))["gmax"])
+    except (OSError, ValueError, KeyError):
+        pass
+    return float(lim)
+
+
+def catalog_target(gmax_arg, dir_arg):
+    """(folder, gmax) for the Gaia build: --gmax / --dir, else the config. A limit other than the config's goes to its
+    own folder (gaia_dr3_g<gmax>) unless --dir is given: one folder holds one limit."""
+    cfg_dir = getattr(config, "gaia_local_dir", None) or "gaia_dr3_g18"
+    cfg_gmax = float(getattr(config, "gaia_local_gmax", 18.0))
+    gmax = cfg_gmax if gmax_arg is None else float(gmax_arg)
+    d = dir_arg or (cfg_dir if gmax == cfg_gmax else f"gaia_dr3_g{gmax:g}")
+    return d, gmax
 
 
 if __name__ == "__main__":
@@ -192,22 +215,32 @@ if __name__ == "__main__":
     ap.add_argument("--status", action="store_true", help="only show what is installed")
     ap.add_argument("--no-geoip", action="store_true", help="do not guess the site from the IP address")
     ap.add_argument("--workers", type=int, default=6, help="parallel Gaia downloads")
+    ap.add_argument("--gmax", type=float, help="faintest Gaia G kept in the local catalog (default: config "
+                                               "gaia_local_gmax, 18); a new limit needs its own folder")
+    ap.add_argument("--dir", help="catalog folder (default: config gaia_local_dir, or gaia_dr3_g<gmax> for another --gmax)")
     a = ap.parse_args()
     if a.status:
-        show_status()
+        show_status(catalog_target(a.gmax, a.dir)[0] if (a.gmax is not None or a.dir) else None)
         sys.exit(0)
     print("1. SPICE kernels")
     if not download_kernels(config.earth_pck_max_age):
         sys.exit("kernel download failed")
+    d = None
     if not a.no_gaia:
-        d, gmax = getattr(config, "gaia_local_dir", None) or "gaia_dr3_g18", getattr(config, "gaia_local_gmax", 18.0)
-        print(f"2. local Gaia catalog G <= {gmax} in {d}")
-        if gaia.status(d)["complete"]:
+        d, gmax = catalog_target(a.gmax, a.dir)
+        print(f"2. local Gaia catalog G <= {gmax:g} in {d}")
+        st = gaia.status(d)
+        if st["total"] and abs(st.get("gmax", gmax) - gmax) > 1e-9:
+            sys.exit(f"   {d} already holds a catalog with G <= {st['gmax']:g}; use another --dir for G <= {gmax:g}")
+        if st["complete"]:
             print("   complete")
         else:
             gaia.build(d, gmax, a.workers)
         print("3. bright-star index")
-        gaia.BrightIndex(d, gaia.index_gmax(getattr(config, "pick_cam_limit", 15.0)))
+        gaia.BrightIndex(d, index_limit(d))
         print("   ok")
+        if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 18.0)):
+            print(f"\n   To search with this catalog, set in pyoccult_config.py:\n"
+                  f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")
     print()
-    show_status()
+    show_status(d)

@@ -74,7 +74,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   39 events incl. all 13 OWC reference events with H < 17 (same stars, times within 5 s, drops/durations as
   pyoccult.py); 819762 (H 18.45) needs `--all`. 875 s in one process, 318 s with 4 workers, same events.
   SBDB bulk elements MUST be full precision (`full-prec=true`): rounded ones give ~40" errors.
-- Report map: works through a web server (OpenStreetMap needs a Referer); Carto/Esri basemaps from `file://` untested.
+- Report map: OpenStreetMap tiles only (`--tile-url`), so it works through a web server (OSM needs a Referer), not
+  from `file://`. Map dialog reopen bug fixed 2026-10-02 (the box was cleared on every open, removing Leaflet's panes).
 
 ## Ideas not built yet
 - Star angular-diameter model for the drop and duration.

@@ -25,14 +25,15 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 | File | What it does |
 |---|---|
 | `pyoccult.py` | the search: finds star occultations by your targets for your site, appends to `hits_log.csv` |
-| `pyoccult_config.py` | run and site configuration |
-| `sites.py` | configures observer site(s), use the `example_sites.py` file as a template and copy to your sites.py |
+| `pyoccult_config.py` | run configuration (window, targets, limits, output) |
+| `sites.py` | your observing site(s) with their view and equipment; private, created by `pyoccult_setup.py` from `sites_example.py` |
 | `pyoccult_paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
 | `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py` |
 | `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
 | `pyoccult_owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
+| supporting modules | `pyoccult_corridor.py` (star corridor), `pyoccult_screen.py` + `pyoccult_orbits.py` (pick tool engine), `pyoccult_sbdb.py` (asteroid size cache), `pyoccult_kernels.py` (kernel download) |
 
 See `ABOUT.md` for the computations, data sources and open points.
 
@@ -100,10 +101,9 @@ APPROXIMATE in `sites.py`, and `--status` keeps warning until you replace it wit
 a shadow can be only a few km wide). Without a terminal, setup copies `sites_example.py` instead. Also check these in
 `pyoccult_config.py`:
 
-* `sites.py`: before running any script, please setup your site, copy sites_example.py to sites.py and adjust your site info! See below for details.
 * `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free.
 * `gaia_local_gmax`: faintest star kept (default 18). Fainter stars are never searched; 18 suits most small telescopes.
-  A different value needs a new folder.
+  A different value needs a new folder (`--gmax`, see below).
 * `cache_path`: where the smaller caches go (asteroid orbits, SBDB data). Defaults to `/dev/shm` on Linux (RAM, emptied
   on reboot) and to the system temp folder elsewhere.
 
@@ -113,7 +113,12 @@ a shadow can be only a few km wide). Without a terminal, setup copies `sites_exa
 python pyoccult_setup.py              # kernels + local Gaia catalog + bright-star index
 python pyoccult_setup.py --no-gaia    # kernels only (e.g. to try the old "windows" search mode)
 python pyoccult_setup.py --status     # what is installed
+python pyoccult_setup.py --gmax 16    # a smaller catalog to G 16 (own folder gaia_dr3_g16, ~3 GB); --dir to choose the folder
 ```
+
+The catalog limit defaults to `gaia_local_gmax` (18). Another limit with `--gmax` is built in its own folder
+(`gaia_dr3_g<limit>`, or `--dir`); setup then prints the two lines to set in `pyoccult_config.py` (`gaia_local_dir`,
+`gaia_local_gmax`) so the search uses it. Stars fainter than the catalog limit are never searched.
 
 The Gaia download is long. On Linux you can let it run on its own and check on it later:
 
@@ -127,7 +132,8 @@ It is safe to stop and rerun: finished files are skipped, so the same command re
 incomplete catalog and tells you to rerun the setup. See "Local Gaia catalog" below for what is kept and why.
 
 ## 5. Configure and run
-Set your site and search window in `pyoccult_config.py` (see "Site Configuration and Run Setup" below), then:
+Check your site in `sites.py` and set the search window and targets in `pyoccult_config.py` (see "Site Configuration
+and Run Setup" below), then:
 
 ```bash
 ./pyoccult.py                         # search; results appended to hits_log.csv, maps in maps/
@@ -154,10 +160,8 @@ To include the maps' KML links in the published page, also copy the `maps` folde
 ## Quick Tips
 * **Deactivate:** When you are done working, simply type `deactivate` to exit the virtual environment.
 * **Version Control:** Do not upload your `.venv` folder to GitHub. Add `.venv/` to your `.gitignore` file, but **do** commit your `requirements.txt` file.
-* **Updating the list:** If you install new packages later and want to update your file, run:
-  ```bash
-  pip freeze > requirements.txt
-  ```
+* **Updating the list:** if the code needs a new package, add its name to `requirements.txt` (unpinned, no version
+  numbers, like the others).
 
 * **Install + run:** Quick Start, all of above for Linux:
   ```
@@ -176,8 +180,9 @@ To include the maps' KML links in the published page, also copy the `maps` folde
 All settings live in `pyoccult_config.py` (a Python file: edit it, keep the names). The search, the pick tool and the
 report read it from the project folder.
 
-**Observing sites** are kept apart from the settings, in `sites.py` (yours, not in git). Copy `sites_example.py` to
-`sites.py` and enter your sites; without `sites.py` the example site (New York City Hall) is used:
+**Observing sites** are kept apart from the settings, in `sites.py` (yours, not in git). `pyoccult_setup.py` creates it
+on the first run (see step 4), or copy `sites_example.py` to `sites.py` yourself; without `sites.py` the example site
+(New York City Hall) is used:
 
 ```python
 # sites.py
@@ -283,8 +288,11 @@ python pyoccult_gaia_local.py build --dir gaia_dr3_g18 --gmax 18 --workers 6
 python pyoccult_gaia_local.py status
 ```
 
+`pyoccult_setup.py --gmax N` passes another limit through to this build (see step 4).
+
 * It streams all of Gaia DR3 `gaia_source` from ESA's CDN (3386 files, **753 GB download**), keeps G <= gmax with full
-  astrometry and ruwe < 1.4 (7 columns, binary), and deletes each download. G <= 18 keeps about 19 GB.
+  astrometry and ruwe < 1.4 (7 columns, binary), and deletes each download. G <= 18 keeps about 11 GB
+  (280 M of 1.81 G stars), G <= 16 about 3 GB.
   At about 1.4 Gbit/s it takes 1.5 to 2 hours.
 * It is resumable: rerun the same command after an interruption, finished files are skipped.
 * `gaia_local_dir` in pyoccult_config.py must name that folder. pyoccult.py refuses a missing or incomplete catalog.
@@ -299,7 +307,7 @@ python pyoccult_gaia_local.py status
 search, and writes the asteroids of the best events to `targets.py` for `pyoccult.py`.
 
 ```bash
-python pyoccult_pick.py                          # window, site and camera from pyoccult_config.py, H < 17
+python pyoccult_pick.py                          # window from pyoccult_config.py, site and equipment from sites.py, H < 17
 python pyoccult_pick.py --start 2026-10-01 --days 14 --top 30
 python pyoccult_pick.py --all                    # exhaustive: every numbered asteroid (~900k)
 python pyoccult_pick.py --sort date              # ranking: mag (default, brightest star first), date, margin, drop
@@ -312,7 +320,8 @@ How it works:
 * Orbits are integrated with the planets' gravity for the whole window (agrees with JPL Horizons to about 0.01").
 * The stars are the actual Gaia stars along each path, from the bright-star index of the local catalog
   (`python pyoccult_setup.py` builds it). Only times when the asteroid is up and the Sun is down are searched.
-* Each event is solved for your site and kept if the shadow passes within the asteroid radius + `max_shadow_dist`.
+* Each event is solved for your site and kept if the shadow passes within the asteroid radius + your reach
+  (the site's `reach_km`, else `max_shadow_dist`).
 * Detection follows OWC's General Observability Criterion with the site's equipment (see "Observing sites"):
   `StarMag < 5 log10(aperture_cm) + 2.5 log10(MaxDuration / frames) + 8.5 + mag_adjust`, optionally less the extinction
   at the star's altitude, plus the hard limits `min_dur_s` and `min_mag_drop`. Bright stars therefore allow short
@@ -357,18 +366,21 @@ The page header shows the site, its equipment, the magnitude and observing limit
 ```bash
 python pyoccult_report.py hits_log.csv                           # writes hits_report.html next to the CSV
 python pyoccult_report.py hits_log.csv -o hits_report.md         # Markdown instead
-python pyoccult_report.py hits_log.csv --kml-dir maps --max-miss 200 --min-drop 0.3 --title "Long Island"
+python pyoccult_report.py hits_log.csv --kml-dir maps --max-miss 200 --min-drop 0.3 --title "My events"
 python pyoccult_report.py hits_log.csv --sort date               # by event time (default --sort mag: brightest star first)
 ```
 
-* Observer `LAT`/`LON` (for the compass direction) and `map_dir` (optional, default `maps`) come from `pyoccult_config.py`; override with `--lat`, `--lon`, `--kml-dir`.
+* The site (header, compass directions, map pin) comes from the run summary in `hits_log.runs.jsonl`, else from
+  `pyoccult_config.py` (`sites.py`); `--lat`, `--lon` override it. `map_dir` (default `maps`) or `--kml-dir` locate the KML files.
 * `--max-miss KM` and `--min-drop MAG` filter the list; `--no-embed` leaves out the embedded map viewer.
 * Each event row links to its KML file (`maps/<asteroid>_<YYYYMMDDTHHMM>*.kml`, written by the shadow-path module). The map button opens an embedded Leaflet map with the centre line (green), the shadow limits (red), the 3-sigma limits (orange, dashed) and your site, zoomed to the nearest point of the path. A link there opens that point in Google Maps.
 * View it through a web server for reliable maps: copy the report, the `maps` folder (for the KML links) and, e.g.,
   ```bash
   cp hits_report.html /var/www/html/pyoccult/ && cp -r maps /var/www/html/pyoccult/
   ```
-  and open `http://localhost/pyoccult/hits_report.html`. Opened straight from disk (`file://`), the OpenStreetMap tiles are blocked because the request carries no Referer; the default light and satellite basemaps are meant to work from disk, and the map has a basemap switcher and a notice if tiles fail. The map needs internet (Leaflet and tiles load from CDNs); the event table does not.
+  and open `http://localhost/pyoccult/hits_report.html`. Opened straight from disk (`file://`), the OpenStreetMap
+  tiles are blocked because the request carries no Referer. `--tile-url` sets another tile server (an `{z}/{x}/{y}`
+  URL template). The map needs internet (Leaflet and tiles load from CDNs); the event table does not.
 * To refresh the report after every run, add the report command at the end of your batch job.
 
 

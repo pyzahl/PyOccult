@@ -211,7 +211,7 @@ asteroids of the best events; their size data goes to the shared size cache.
 | Asteroid names | SBDB full name, from the same per-asteroid cache as the size | `get_asteroid_name` |
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
-| Map | Leaflet 1.9.4 (cdnjs); Carto, Esri, OpenStreetMap tiles | report |
+| Map | Leaflet 1.9.4 (cdnjs); OpenStreetMap tiles (`--tile-url` for others) | report |
 | Reference | Occult / OWC search results, pasted as text into `owc_reference.txt` (private, not in git) | validation |
 
 ---
@@ -247,5 +247,6 @@ asteroids of the best events; their size data goes to the shared size cache.
   says "no". Harmless today, because `handle_star` rejects unobservable events with `observable(...)[0]`.
 - **Unverified**: the Horizons RSS 3-sigma column names in `pyoccult_paths.py` (falls back to `default_sigma3_km`), and
   the Earth-PCK body id 3000 used for the coverage message at start-up.
-- **Report**: the Carto and Esri basemaps have not been tried from `file://`; the map works through a web server.
+- **Report**: the map uses OpenStreetMap tiles, which need the page served by a web server (a `file://` page sends no
+  Referer, so the tiles are refused); `--tile-url` selects another tile server.
 - **Ideas**: `m_before` / `m_during` columns in the log; process-level parallelism by target in `pyoccult.py`.
