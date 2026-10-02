@@ -26,7 +26,7 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 |---|---|
 | `pyoccult.py` | the search: finds star occultations by your targets for your site, appends to `hits_log.csv` |
 | `pyoccult_config.py` | run and site configuration |
-| `sites.py` | configures observer site(s), use the example_sites as a template and copy to sites.py |
+| `sites.py` | configures observer site(s), use the example_sites.py file as a template and copy to sites.py |
 | `pyoccult_paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
 | `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py` |
