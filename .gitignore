@@ -1,0 +1,25 @@
+# generated data and downloads (pyoccult_setup.py recreates them)
+*.bsp
+*.bpc
+*.tls
+*.tpc
+gaia_dr3_*/
+jpl_asteroids_spice.csv
+sbdb_cache.json
+# run outputs
+hits_log.csv
+hits_report.html
+hits_report.md
+maps/
+pick_events.csv
+pick_candidates.csv
+owc_check_hits.csv
+targets.py
+*.log
+# python and editor leftovers
+__pycache__/
+.venv/
+*~
+\#*\#
+.#*
+*.tmp

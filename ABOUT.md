@@ -205,3 +205,44 @@ Compared against the OWC list you gave as reference data (OWC uses occult.exe):
 - Maximum durations agree within about +/-8%.
 - 218001 is the outlier (drop and duration, see Part 4).
 - Moon, shadow-path and magnitude-drop outputs have so far been compared only through this list; a systematic comparison has not been done.
+
+
+
+
+## Optimazation Potentials
+
+Your four ideas are all reasonable, but I'd reorder them. One of them also points at a possible correctness problem. These numbers come from reading your code and from estimates, not from profiling a run.
+
+Check first: possible silent truncation at MAG_MIN = 20. A 10′ cone is about 0.09 deg², and at G ≤ 20 that holds thousands of stars, more near the Milky Way. If the synchronous Gaia.launch_job is capped at about 2000 rows (I flagged that as unverified earlier), dense cones lose stars without any error. Print len(df) after the query and warn if it is exactly 2000. If it is, switch to launch_job_async.
+
+Your four ideas
+
+D, a smaller cone: yes, but the 5′ tile snapping limits it. Your cone is centred on the tile centre, not the asteroid, so it needs about 3.5′ of slack. The asteroid moves only 0.6–1.3′ per window, and the Earth-reach corridor is about ±0.05–0.13′ wide. Shrinking the cone means shrinking the tiles too, which gives you more queries, not fewer.
+
+C, the Gaia query: this is where the large gain is. Over 20 days an asteroid sweeps a path a few degrees long. The corridor that matters is under 0.5′ wide, but today you query about 200 overlapping 10′ cones per asteroid. That is hundreds of thousands of rows, or tens of millions across 100 asteroids, to keep a few thousand. The fix is one query per asteroid per run: a thin strip polygon along the 20-day path (or a few ≤1° segments), padded by about 1′ because the cone centre is the apparent position (LT+S) while the prescreen uses CN. This also makes the cache per asteroid and date range, so the tile logic goes away.
+
+B, longer windows: a small gain, and the star field isn't the limit. Stars are propagated to the window centre, so the leftover error is proper motion × the time offset. For a 1″/yr star and a 3 h window that is about 0.2 mas, roughly 0.3 km at the asteroid. Even a full day stays under about 5 km for all but the highest-proper-motion stars. The real limits are the cone coverage and having one minimum per star, which holds for a shadow faster than the observer's roughly 0.35 km/s ground speed and so fails only near stationary points. Your 10 min overlap is also more than needed, since the is_new_hit dedupe already handles repeats. I'd treat B as a stepping stone to the restructure below.
+
+A, parallel by target: yes, as a last step. It scales almost linearly for the CPU part, but a few things need handling:
+
+Use processes, not threads, because SPICE isn't thread-safe. Each worker loads its own kernels.
+Do the kernel checks, the Horizons SPK fetches and the Gaia queries once in the parent, so workers do no network work (the archives throttle concurrent users).
+Write cache files atomically (temp file plus os.replace) and have workers return records so the parent writes hits_log.csv.
+Your _seen dedupe is per target, so splitting by target keeps it correct.
+Two free reductions
+Cap the Gaia magnitude per target. Your code drops events with mag_drop < 0.1, which requires the star to be no fainter than m_ast + 2.5. A 15.5-mag asteroid therefore never needs G > 18, and for a 14-mag one G ≤ 16.5 is enough. Query min(MAG_MIN, m_ast_max + 2.5). Taking G ≤ 20 down to about 17 cuts rows by roughly 4×.
+Propagate only the survivors. Run screen_stars on the raw J2016 positions with about 30″ of padding, then run apply_space_motion only on those few. Right now every window propagates the whole cone.
+The restructure I'd suggest
+
+For each asteroid, make one pass over the whole run:
+
+Compute the path vectorized at about 10 min steps.
+Do one strip query.
+Scan every star's plane distance over the whole interval at once and find the local minima below the margin.
+Refine each candidate with minimize_scalar in a ±10 min bracket, then apply the existing observable and metric code.
+
+That replaces about 480 window iterations per asteroid with one vector operation and one query. It makes B, C and D moot, and A becomes a simple per-target split.
+
+Before any of this, run python -m cProfile -s cumtime pyoccult.py | head -30 on 2 targets and 1 day. The split between Gaia, apply_space_motion and star_test decides how much each step matters.
+
+Want me to write the per-asteroid version as a drop-in alternative to your driver loop, starting with the strip query and the vectorized scan?

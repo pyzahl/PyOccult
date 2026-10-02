@@ -11,18 +11,34 @@ except ImportError:
     targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]  # uses this manual list if targets.py is not present
     target_names = {} # currently not required. A id: name dict
     
-max_shadow_dist = 200  ## in km: travel distance from observer location
+max_shadow_dist = 20  ## in km: travel distance from observer location
+
+search_mode = "corridor"   # "corridor": stars along each path from the local Gaia copy (fast); "windows": old per-window archive cones
+min_mag_drop = 0.1         # mag; events with a smaller drop are not logged (also sets the Gaia magnitude cap per asteroid)
+corridor_step_s = 600      # s, coarse path step for the corridor candidate scan
+gaia_local_dir = "gaia_dr3_g18"  # folder of the local Gaia copy, required by corridor mode (python pyoccult_gaia_local.py build)
+gaia_local_gmax = 18.0     # faintest G kept when building the local copy (~19 GB for 18)
 
 ### CONFIG OBSERVER
 
-LAT = 40.9541175
-LON = -72.92614552
-ELE = 69
+LAT = 40.9541175        # Lattitude
+LON = -72.92614552      # Logitude in deg, neg is West
+ELE = 69                # elevation in m
 
-MAG_MIN = 20
+MAG_MIN = 15            # mag of faintest stars to consider
 MIN_STAR_ALT = 10.0     # deg, use the same constants in both gates
 MAX_SUN_ALT  = -6.0     # deg, try -12 for faint stars
 ALT_MARGIN   = 3.0      # early gate is looser than the final one, so it never rejects a real event
+
+### CONFIG PICK TOOL (pyoccult_pick.py: event finder over all asteroids)
+
+pick_hmax = 17.0         # asteroids with H below this (pyoccult_pick.py --all: every numbered asteroid)
+pick_cam_limit = 15.0    # faintest star, Gaia G
+pick_aperture_cm = 25.0  # telescope aperture
+pick_ref_mag = 12.5      # exposure calibration: a star of this G needs ...
+pick_ref_exp_s = 0.08    # ... this exposure (s) at 25 cm; scales with star flux and aperture^2
+pick_frames = 4          # the event must last this many exposures (detection frames)
+pick_min_dur_s = 0.4     # and at least this long, s
 
 ### CONFIG OUTPUT
 
@@ -32,7 +48,12 @@ write_maps = True
 map_dir = "maps"
 default_sigma3_km = 10.0
 
-cache_path = "/dev/shm"  ## good for Linux, but volatile after reboot
+## cache folder for all tools (Gaia strips, asteroid SPKs, SBDB download). /dev/shm is RAM on Linux (fast, emptied on reboot);
+## elsewhere the system temp folder is used. Set any folder here, e.g. cache_path = "C:/pyoccult_cache"
+import os as _os, tempfile as _tempfile
+cache_path = "/dev/shm" if _os.path.isdir("/dev/shm") else _tempfile.gettempdir()
+
+sbdb_max_age_days = 30  ## asteroid size data (SBDB) is cached in cache_path and refetched after this many days
 
 ### Init, Cleanups, ToDO clean SHM cache?
 earth_pck_max_age = 7 ## days for earth pck to expire/auto update

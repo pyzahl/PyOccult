@@ -10,6 +10,7 @@ Standard library only. Usage:
     python pyoccult_report.py hits_log.csv                       # -> hits_report.html next to the CSV
     python pyoccult_report.py hits_log.csv -o events.html --kml-dir maps --max-miss 50 --min-drop 0.5
     python pyoccult_report.py hits_log.csv --format md           # Markdown table instead
+    python pyoccult_report.py hits_log.csv --sort date           # by event time (default: by star magnitude)
 
 The observer position (needed only for the compass direction) comes from pyoccult_config.py (LAT, LON)
 if that file is importable, or from --lat / --lon (east-positive degrees).
@@ -416,8 +417,10 @@ def html_row(e):
 
 
 def to_html(events, meta):
-    head = ('<th data-k>Asteroid</th><th data-k>Event time (UT)</th>'
-            '<th class="num" data-k title="Gaia G magnitude of the star">Star mag</th>'
+    on = lambda key: ' sorted-asc' if meta.get("sort", "date") == key else ""
+    head = ('<th data-k>Asteroid</th>'
+            f'<th class="{on("date").strip()}" data-k>Event time (UT)</th>'
+            f'<th class="num{on("mag")}" data-k title="Gaia G magnitude of the star">Star mag</th>'
             '<th class="num" data-k title="Magnitude drop with the star fully covered">Mag drop</th>'
             '<th class="num" data-k title="Maximum duration (centre line), seconds">Max dur (s)</th>'
             '<th data-k title="Star altitude and compass direction at closest approach">Altitude</th>'
@@ -488,6 +491,8 @@ def main(argv=None):
     ap.add_argument("--lon", type=float, help="observer longitude, deg east (negative = west)")
     ap.add_argument("--max-miss", type=float, help="only events whose centre-line distance is below this (km)")
     ap.add_argument("--min-drop", type=float, help="only events with at least this magnitude drop")
+    ap.add_argument("--sort", choices=("mag", "date"), default="mag",
+                    help="row order: mag = brightest star first (default), date = by event time")
     ap.add_argument("--title", default="PyOccult asteroid occultation events")
     ap.add_argument("--no-embed", action="store_true", help="do not embed the KML paths and map viewer in the HTML page")
     ap.add_argument("--tile-url", default="https://tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -517,7 +522,10 @@ def main(argv=None):
         events = [e for e in events if e["miss"] is not None and e["miss"] <= a.max_miss]
     if a.min_drop is not None:
         events = [e for e in events if e["drop"] is not None and e["drop"] >= a.min_drop]
-    events.sort(key=lambda e: e["when"])
+    if a.sort == "mag":                                  # brightest first, unknown magnitudes last, ties by time
+        events.sort(key=lambda e: (e["mag"] is None, e["mag"] if e["mag"] is not None else 0.0, e["when"]))
+    else:
+        events.sort(key=lambda e: e["when"])
 
     paths = {}
     if fmt_name == "html" and not a.no_embed:
@@ -532,10 +540,10 @@ def main(argv=None):
 
     span = ""
     if events:
-        span = f" from {events[0]['when']:%Y-%m-%d} to {events[-1]['when']:%Y-%m-%d}"
+        span = f" from {min(e['when'] for e in events):%Y-%m-%d} to {max(e['when'] for e in events):%Y-%m-%d}"
     observer = f"observer {abs(lat):.4f}°{'N' if lat >= 0 else 'S'} {abs(lon):.4f}°{'E' if lon >= 0 else 'W'}" \
         if lat is not None and lon is not None else "observer position not set"
-    meta = dict(title=a.title, span=span, observer=observer, generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
+    meta = dict(title=a.title, span=span, sort=a.sort, observer=observer, generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
                 paths=paths, tiles=a.tile_url, obs=[lat, lon] if lat is not None and lon is not None else None)
     text = to_markdown(events, meta) if fmt_name == "md" else to_html(events, meta)
     with open(out, "w", encoding="utf-8") as f:

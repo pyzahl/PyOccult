@@ -1,5 +1,5 @@
 #!.venv/bin/python3
-import sys, base64, functools, os, re
+import sys, base64, functools, os, re, time
 from datetime import datetime
 import numpy as np
 import requests
@@ -24,6 +24,8 @@ warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
 import pyoccult_config as config
 from pyoccult_paths import shadow_path, path_sigma3_km, write_shadow_kml
+import pyoccult_corridor as corridor
+import pyoccult_sbdb as sbdb_cache
 
 ########################## PROLOGUE KERNEL INIT SECTION
 
@@ -40,81 +42,7 @@ spice.clpool()
 
 
 
-def check_file_age(file_path_str, days=-1):
-    file_path = Path(file_path_str)
-    if not file_path.is_file(): ## does not exist => False
-        #print(f"Error: The file '{file_path_str}' does not exist.")
-        return False
-
-    if days < 0:  ## do not care (always good) => True
-        return True
-    
-    now = datetime.now()
-    
-    # Get last modification time and creation time (with fallback for Unix)
-    last_write_date = datetime.fromtimestamp(file_path.stat().st_mtime)
-    try:
-        ctime_timestamp = file_path.stat().st_birthtime
-    except AttributeError:
-        ctime_timestamp = file_path.stat().st_ctime
-    creation_date = datetime.fromtimestamp(ctime_timestamp)
-
-    # Calculate age in days
-    age_since_creation = (now - creation_date).days
-    age_since_write = (now - last_write_date).days
-
-    #print(f"File: {file_path.name}")
-    #print(f"Created: {creation_date} ({age_since_creation} days old)")
-    #print(f"Modified: {last_write_date} ({age_since_write} days old)")
-    return age_since_write <= days ## older than days => False
-    
-
-# Basic Kerenls and Data
-def download_kernels():
-    urls = {
-        # fname: [url, maxage]
-        "naif0012.tls": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls", -1],
-        "de440.bsp": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp", -1],
-        "pck00010.tpc": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc", -1],
-        "earth_latest_high_prec.bpc": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc", config.earth_pck_max_age],
-    }
-    
-    # Complete browser headers to clear security checks
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1"
-    }
-
-    for name, [url, maxage] in urls.items():
-        #print (f"{name}: {url} ** maxage: {maxage} d")
-        
-        # Clean check: Delete the file if it somehow contains HTML text
-        if os.path.exists(name):
-            with open(name, 'r', errors='ignore') as f:
-                first_line = f.readline()
-                if "<!doctype" in first_line.lower() or "<html" in first_line.lower():
-                    print(f"Purging old HTML file from cache: {name}")
-                    os.remove(name)
-
-        # Download using the system curl pipeline if it doesn't exist
-        if not check_file_age (name, maxage):
-            print(f"Downloading {name} via system curl...")
-            try:
-                # -L follows redirects, -s hides progress bar, -f fails silently on server errors
-                subprocess.run(
-                    ["curl", "-L", "-A", "Mozilla/5.0", url, "-o", name],
-                    check=True
-                )
-            except subprocess.CalledProcessError as e:
-                print(f"🚨 Curl download failed for {name}: {e}")
-                return False
-                
-    print("✅ All kernels verified and downloaded cleanly via curl.")
-
-    return True
+from pyoccult_kernels import check_file_age, download_kernels
 
 
 # ==========================================
@@ -123,7 +51,7 @@ def download_kernels():
 
 
 
-if download_kernels():
+if download_kernels(config.earth_pck_max_age):
     try:
         print ('* Loading Compute Kernels *')
         # Load all required kernels
@@ -252,40 +180,23 @@ def moon_info(et, star_dir, obs_geo):
     return dict(moon_sep_deg=sep, moon_alt_deg=alt_deg(et, moon_topo, obs_geo),
                 moon_illum_pct=illum, moon_age_deg=age)
 
-def tile_center(ra_deg, dec_deg, tile_arcmin=5.0):
-    t = tile_arcmin / 60.0
-    dec_c = round(dec_deg / t) * t
-    step = t / max(np.cos(np.radians(dec_c)), 0.05)
-    return (round(ra_deg / step) * step) % 360.0, dec_c
-
-def gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit, cache_dir=config.cache_path):
-    ra_c, dec_c = tile_center(ra_deg, dec_deg)
-    fp = Path(f"{cache_dir}/PyOccult_gaia_{ra_c:.4f}_{dec_c:.4f}_{radius_arcmin:g}_{mag_limit:g}.csv")
-    if fp.is_file():
-        return pd.read_csv(fp)
-    # ADQL query centered on (ra_c, dec_c), radius = radius_arcmin + 5 (tile size), via Gaia.launch_job_async
-
-    radius_deg = radius_arcmin / 60.0
+def gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit):
+    """Archive cone query, used only by the old "windows" search mode (the corridor mode reads the local Gaia copy).
+    Not cached. Async: the sync launch_job silently truncates at 2000 rows."""
     query = f"""
     SELECT 
         source_id, ra, dec, parallax, pmra, pmdec, phot_g_mean_mag, ruwe
     FROM gaiadr3.gaia_source
-    WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', {ra_c}, {dec_c}, {radius_deg}))
+    WHERE 1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', {ra_deg}, {dec_deg}, {radius_arcmin / 60.0}))
     AND phot_g_mean_mag <= {mag_limit}
     AND pmra IS NOT NULL AND pmdec IS NOT NULL -- Required for propagation
     AND ruwe < 1.4
     """
-
     try:
-        job = Gaia.launch_job(query)
-        df = job.get_results().to_pandas()
-
+        return Gaia.launch_job_async(query).get_results().to_pandas()
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
-
-    df.to_csv(fp, index=False)
-    return df
 
 # fetch_and_propagate_stars(): df = gaia_cone(...).copy(); then your existing SkyCoord /
 # apply_space_motion block, unchanged. Never cache that part.
@@ -306,14 +217,16 @@ def fetch_and_propagate_stars(
     # Parse target time and define reference epochs
     target_time = Time(event_time_str, scale="utc")
     gaia_epoch = Time("2016-01-01T12:00:00", scale="tcb")  # Gaia DR3 J2016.0 reference
-    # gaia_cone(...)      -> cached raw Gaia table (epoch 2016.0)
+    # gaia_cone(...)      -> raw Gaia table (epoch 2016.0)
     # propagate(df, time) -> adds ra_YYYYMMDD / dec_YYYYMMDD, never cached
     
     print(
         f"Querying Gaia DR3 & propagating positions to: {target_time.iso} UTC..."
     )
 
-    df = gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit).copy(); 
+    df = gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit)
+    if df is None:
+        return None
         
     # Handle missing or negative parallaxes safely by clipping them to 0 (very distant stars)
     #safe_parallax = np.where(
@@ -444,32 +357,35 @@ def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
         spice.boddef(target_id, _loaded[target_id])     # keep alias if callers still pass the number
     return _loaded[target_id]                           # NAIF id, safe to use directly in spkpos
 
-SIZE_OVERRIDES = {}   # curate best values here: {"19": (r_km, r_sigma_km, "source note")}
+SIZE_OVERRIDES = {}   # curate best values here: {"19": (r_km, r_sigma_km, "source note")}; they take priority
 
+# Size bounds: r_km is the nominal radius; r_min_km / r_max_km are about +/-3 sigma, or the albedo range for H-only
+# objects, widened by the tri-axial extent if given. They reflect size uncertainty only, not ephemeris uncertainty.
 
+def sbdb_phys(target_id, timeout=30):
+    """Raw SBDB physical parameters {name: {value, sigma, ref, ...}} plus '_fullname', from the shared cache
+    (pyoccult_sbdb.py; also filled by pyoccult_pick.py) or the SBDB API. Returns None if SBDB cannot be reached and
+    nothing is cached (failures are not cached)."""
+    n = str(target_id).strip()
+    hit, fresh = sbdb_cache.get(n, config.cache_path, getattr(config, "sbdb_max_age_days", 30))
+    if fresh:
+        return hit["phys"]
+    try:
+        resp = requests.get("https://ssd-api.jpl.nasa.gov/sbdb.api", params={"sstr": n, "phys-par": 1}, timeout=timeout)
+        resp.raise_for_status()
+        entry = sbdb_cache.entry_from_api(resp.json())
+    except (requests.RequestException, ValueError) as e:
+        print(f"SBDB lookup failed for {n}: {e}")
+        return hit["phys"] if hit else None                       # stale data beats none
+    sbdb_cache.put({n: entry}, config.cache_path)
+    return entry["phys"]
 
-#Things to check:
-
-#SBDB field names. I'm going from memory of the phys_par layout (name, value, sigma, ref). Print resp.json() for one target to confirm, and adjust num() if needed. extent should be the full dimensions in km.
-#Source labels. The ref string tells you which survey the diameter came from. Where you have better values (occultation chords, DAMIT shape models), put them in SIZE_OVERRIDES and they take priority.
-#What the bounds mean. r_km is the nominal radius. r_min_km and r_max_km are approximately ±3σ, or the albedo range for H-only objects, and are wider if the triaxial extents are bigger. The bounds reflect size uncertainty only, not ephemeris uncertainty.
 
 @functools.lru_cache(maxsize=None)
 def get_asteroid_size(target_id, timeout=30):
-    """Return dict(r_km, r_min_km, r_max_km, source), or None if nothing usable."""
+    """Return dict(r_km, r_min_km, r_max_km, source, H, G), or None if nothing usable."""
     n = str(target_id).strip()
-    if n in SIZE_OVERRIDES:
-        r, s, src = SIZE_OVERRIDES[n]
-        return dict(r_km=r, r_min_km=r - 3*s, r_max_km=r + 3*s, source=src)
-
-    try:
-        resp = requests.get("https://ssd-api.jpl.nasa.gov/sbdb.api",
-                            params={"sstr": n, "phys-par": 1}, timeout=timeout)
-        resp.raise_for_status()
-        pp = {p["name"]: p for p in resp.json().get("phys_par", [])}
-    except (requests.RequestException, ValueError) as e:
-        print(f"SBDB lookup failed for {n}: {e}")
-        return None
+    pp = sbdb_phys(n, timeout)                 # also for overrides: H and G for the asteroid magnitude
 
     def num(name, key="value"):
         try:
@@ -477,25 +393,27 @@ def get_asteroid_size(target_id, timeout=30):
         except (KeyError, TypeError, ValueError):
             return None
 
+    H, G = (num("H"), num("G")) if pp else (None, None)
+    if n in SIZE_OVERRIDES:
+        r, sg, src = SIZE_OVERRIDES[n]
+        return dict(r_km=r, r_min_km=max(r - 3*sg, 0.0), r_max_km=r + 3*sg, source=src, H=H, G=G)
+    if pp is None:
+        return None
+
     D = num("diameter")
-    H, G = num("H"), num("G")            # read once, before the `if D:` branch
-    # then add H=H, G=G to all three returned dicts (override branch: H=None, G=None)
-    # and clamp: r_min_km=max((D - 3*s)/2, 0.0)   (your 229912 run showed a negative r_min_km)
-    
     if D:
-        s = num("diameter", "sigma") or num("diameter_sigma") or 0.15 * D   # assume 15% if absent
-        out = dict(r_km=D/2, r_min_km=(D - 3*s)/2, r_max_km=(D + 3*s)/2,
-                   source=f"SBDB diameter (ref {pp['diameter'].get('ref', '?')})",
-                   H=H, G=G)
+        sg = num("diameter", "sigma") or num("diameter_sigma") or 0.15 * D   # assume 15% if absent
+        out = dict(r_km=D/2, r_min_km=max((D - 3*sg)/2, 0.0), r_max_km=(D + 3*sg)/2,
+                   source=f"SBDB diameter (ref {pp['diameter'].get('ref', '?')})", H=H, G=G)
         ext = [float(x) for x in re.findall(r"[\d.]+", str(pp.get("extent", {}).get("value", "")))]
         if len(ext) >= 2:                      # tri-axial full dimensions -> semi-axes
             out["r_min_km"] = min(out["r_min_km"], min(ext)/2)
             out["r_max_km"] = max(out["r_max_km"], max(ext)/2)
         return out
-    
+
     if H is None:
-        return dict(H=H, G=G)
-    
+        return None                            # no diameter and no H: no size estimate possible
+
     Dp = lambda p: 1329.0 / np.sqrt(p) * 10**(-H/5)
     p = num("albedo")
     if p:
@@ -696,23 +614,22 @@ def star_test (loc = EarthLocation(lat=40.7128*u.deg, lon=-74.0060*u.deg, height
     print(f"Targeting window around: {center_time_utc} UTC")
     print(f"Initial Ephemeris Time (ET): {et_center:.3f}\n")
 
-    # Objective function to minimize for root-finding
-    def objective_func(et):
-        return get_besselian_miss_distance(et, star_direction, obs_geo, asteroid_id)
+    # Objective in seconds from et_center: the bounded solver's tolerance is sqrt(eps)*|x| + xatol/3, which for a raw
+    # ET (~8.4e8 s) is ~12 s, i.e. tens of km of miss distance. With a small offset xatol really applies.
+    def objective_func(dt):
+        return get_besselian_miss_distance(et_center + dt, star_direction, obs_geo, asteroid_id)
 
-    # Use a bounded scalar minimizer (+/- 10 minutes or 600 seconds from guess)
-    #time_span2 = (24*3600) / 2 # in sec
     time_span2 = time_span/2
     print("Computing exact time of closest approach...")
     result = minimize_scalar(
-        objective_func, 
-        bounds=(et_center - time_span2, et_center + time_span2), 
+        objective_func,
+        bounds=(-time_span2, time_span2),
         method='bounded',
-        options={'xatol': 1e-5} # sub-millisecond convergence tolerance
+        options={'xatol': 1e-3, 'maxiter': 1000} # ~1 ms
     )
 
     if result.success:
-        best_et = result.x
+        best_et = et_center + result.x
         min_distance = result.fun
         best_utc = spice.et2utc(best_et, "ISOC", 3)
         
@@ -792,64 +709,93 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
                        target_id, et0, time_span, margin_km=6378 + r_search + config.max_shadow_dist) 
     print (f"Pre-Screening: {idx}")
     for row in event_df.iloc[idx].itertuples(index=False):
-        print (row)
-        ra, dec = np.radians(getattr(row, ra_col)), np.radians(getattr(row, dec_col))
-        res = star_test(loc, event_time_utc, time_span, ra, dec, target_id, r_search, config.max_shadow_dist)
-        if res is None:
-            print (f" --- miss --- ")
+        handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et0, time_span, r_search, -np.inf, np.inf)
+
+
+def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, bracket_s, r_search, win_lo, win_hi):
+    """Refine one candidate star with the exact solver, log it (CSV, KML map) if it is a real, observable hit.
+    The solver searches et_guess +/- bracket_s/2. win_lo / win_hi: ET limits of the run (an event outside them
+    belongs to a neighbouring run). Returns True if logged."""
+    ra, dec = np.radians(getattr(row, ra_col)), np.radians(getattr(row, dec_col))
+    res = star_test(loc, spice.et2utc(et_guess, "ISOC", 3), bracket_s, ra, dec, target_id, r_search, config.max_shadow_dist)
+    if res is None:
+        print (f" --- miss --- ")
+        return False
+    # minimum on the bracket edge is not a real minimum; a neighbouring window/candidate finds it
+    if min(res['best_et'] - (et_guess - bracket_s/2), (et_guess + bracket_s/2) - res['best_et']) < 1.0:
+        print (f" --- not real --- ")
+        return False
+    if not (win_lo <= res['best_et'] <= win_hi):
+        print (f" --- outside run window --- ")
+        return False
+    if not is_new_hit(target_id, row.source_id, res['best_et']):
+        print (f" --- not a hit --- ")
+        return False
+    star_dir = np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+    ok, star_alt, sun_alt = observable(res['best_et'], star_dir, obs_geo)
+    if not ok:
+        print (f" --- not visible --- ")
+        return False                                   # drop this line to log invisible events too
+    m_ast = (apparent_mag_HG(res['best_et'], target_id, size['H'], size.get('G') or 0.15)
+             if size.get('H') is not None else np.nan)
+    met = event_metrics(res['best_et'], star_dir, obs_geo, target_id, size['r_km'], row.phot_g_mean_mag, m_ast)
+    if np.isfinite(met['mag_drop']) and met['mag_drop'] < getattr(config, "min_mag_drop", 0.1):
+        print (f" --- too low mag drop dM = {met['mag_drop']} --- ")
+        return False
+    moon = moon_info(res['best_et'], star_dir, obs_geo)
+
+    record = dict(target_id=target_id, target_name=get_asteroid_name(target_id),
+                  best_utc=res['best_utc'], best_et=res['best_et'],
+                  min_distance=res['min_distance'], margin_km=res['min_distance'] - size['r_km'],
+                  r_km=size['r_km'], r_min_km=size['r_min_km'], r_max_km=size['r_max_km'],
+                  r_search_km=r_search, size_source=size['source'],
+                  star=row.source_id, mag=row.phot_g_mean_mag,
+                  star_ra=np.degrees(ra), star_dec=np.degrees(dec),
+                  star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met, **moon,
+                  observable=res['observable'])
+    dx, dy = besselian_offsets(res['best_et'], star_dir, obs_geo, target_id)
+    record.update(offset_east_km=dx, offset_north_km=dy,
+                  max_duration_s=2*size['r_km']/met['speed_kms'])
+    print(record)
+    pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
+                                  header=not os.path.isfile(config.hits_output_cvs_file))
+
+    sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
+    if config.write_maps and res['min_distance'] < size['r_km'] + sigma3:   # only hits worth mapping
+        os.makedirs(config.map_dir, exist_ok=True)
+        paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
+        write_shadow_kml(paths, f"{config.map_dir}/{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}.kml",
+                         f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
+    return True
+
+
+def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=None):
+    """Replacement for the per-window target_test(): one call per asteroid for the whole run.
+    plan = corridor.plan_corridor(...) (needs SPICE, build serially). local = pyoccult_gaia_local.LocalGaia.
+    stars_cands = (stars, candidates) if already computed. Returns the number of logged hits."""
+    obs_geo = {'lon': loc.lon.to(u.rad).value, 'lat': loc.lat.to(u.rad).value, 'alt': loc.height.to(u.km).value}
+    r_search = size['r_max_km']
+    stars, cands = stars_cands or corridor.corridor_candidates(plan, local)
+    if cands.empty:
+        return 0
+    ets = plan['path']['ets']
+    win_lo, win_hi = float(ets[0]), float(ets[-1])
+    n_log = 0
+    for cand in cands.sort_values('et_guess').itertuples(index=False):
+        # the observer's closest approach can be up to margin/speed away from the Earth-centre estimate
+        bracket = corridor.solver_bracket_s(plan, cand.j)
+        # cheap early gate (Sun and asteroid altitude) before any solver work
+        if not window_is_observable(cand.et_guess, bracket, obs_geo, target_id):
             continue
-        # minimum on the window edge is not a real minimum; the overlapping neighbour finds it
-        if min(res['best_et'] - (et0 - time_span/2), (et0 + time_span/2) - res['best_et']) < 1.0:
-            print (f" --- not real --- ")
-            continue
-        if not is_new_hit(target_id, row.source_id, res['best_et']):
-            print (f" --- not a hit --- ")
-            continue
-        star_dir = np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
-        ok, star_alt, sun_alt = observable(res['best_et'], star_dir, obs_geo)
-        if not ok:
-            print (f" --- not visible --- ")
-            continue                                   # drop this line to log invisible events too
-        m_ast = (apparent_mag_HG(res['best_et'], target_id, size['H'], size.get('G') or 0.15)
-                 if size.get('H') is not None else np.nan)
-        met = event_metrics(res['best_et'], star_dir, obs_geo, target_id, size['r_km'], row.phot_g_mean_mag, m_ast)
+        # only the candidates need exact space motion: propagate each to its own event time
+        prop = corridor.propagate_exact(stars.iloc[[cand.star]], spice.et2utc(cand.et_guess, "ISOC", 0))
+        ra_col = prop.filter(regex=r'^ra_\d{8}$').columns[0]
+        dec_col = prop.filter(regex=r'^dec_\d{8}$').columns[0]
+        row = next(prop.itertuples(index=False))
+        n_log += handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, cand.et_guess, bracket,
+                             r_search, win_lo, win_hi)
+    return n_log
 
-        moon = moon_info(res['best_et'], star_dir, obs_geo)
-
-
-        if np.isfinite(met['mag_drop']) and met['mag_drop'] < 0.1:
-            print (f" --- too low mag drop dM = {met['mag_drop']} --- ")
-            continue
-
-        record = dict(target_id=target_id, target_name=get_asteroid_name(target_id),
-                      best_utc=res['best_utc'], best_et=res['best_et'],
-                      min_distance=res['min_distance'], margin_km=res['min_distance'] - size['r_km'],
-                      r_km=size['r_km'], r_min_km=size['r_min_km'], r_max_km=size['r_max_km'],
-                      r_search_km=r_search, size_source=size['source'],
-                      star=row.source_id, mag=row.phot_g_mean_mag,
-                      star_ra=np.degrees(ra), star_dec=np.degrees(dec),
-                      star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met, **moon,
-                      observable=res['observable'])
-
-        dx, dy = besselian_offsets(res['best_et'], star_dir, obs_geo, target_id)
-        record.update(offset_east_km=dx, offset_north_km=dy,
-                      max_duration_s=2*size['r_km']/met['speed_kms'])
-       
-        print(record)
-        pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
-                                      header=not os.path.isfile(config.hits_output_cvs_file))
-
-        sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
-        record.update(sigma3_km=sigma3,
-                      margin_in_sigma=(res['min_distance'] - size['r_km']) / (sigma3 / 3.0))
-        if config.write_maps and res['min_distance'] < size['r_km'] + sigma3:   # only hits worth mapping
-            os.makedirs(config.map_dir, exist_ok=True)
-            paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
-            write_shadow_kml(paths, f"{config.map_dir}/{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}.kml",
-                             f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
-
-
-            
 
 if __name__ == "__main__":
     mag_min = config.MAG_MIN
@@ -862,18 +808,52 @@ if __name__ == "__main__":
     periods = (pd.date_range(start=config.ct, periods=int(config.days*86400/config.spn), freq=f"{config.spn}s")
                  .strftime("%Y-%m-%d %H:%M:%S").tolist())
 
+    if getattr(config, "search_mode", "corridor") == "windows":    # old path: ~200 Gaia cones per asteroid
+        for t in config.targets:
+            size = get_asteroid_size(t)
+            if size is None:
+                print(f"No size data for {t}, skipping")
+                continue
+            print(f"Estimated/known target {t} size data: {size}")
+            fetch_target_orbit(t, epochs)                          # once per target
+            for ctp in periods:
+                target_test(obs_loc, ctp, config.spn + 600, t, size, mag_min)   # +10 min so windows overlap
+        spice.kclear()
+        sys.exit(0)
+
+    # stars come from the local Gaia copy (python pyoccult_gaia_local.py build); checked first, before any SPK work
+    if not getattr(config, "gaia_local_dir", None):
+        sys.exit("corridor mode needs the local Gaia catalog: set gaia_local_dir and run  python pyoccult_setup.py")
+    import pyoccult_gaia_local
+    local = pyoccult_gaia_local.LocalGaia(config.gaia_local_dir)         # raises if the catalog is incomplete
+    print(f"Using local Gaia catalog {config.gaia_local_dir} (G <= {local.gmax})")
+
+    et0 = spice.str2et(t0.strftime("%Y-%m-%dT%H:%M:%S"))
+    et1 = et0 + config.days * 86400.0
+
+    # pass 1 (serial, SPICE): sizes, SPKs and one corridor plan per target
+
+    print(
+        f"Pass 1 (serial, SPICE): sizes, SPKs and one corridor plan per target"
+    )
+
+    plans = {}
     for t in config.targets:
         size = get_asteroid_size(t)
         if size is None:
             print(f"No size data for {t}, skipping")
             continue
-
-        #If you'd rather use a fallback radius than skip targets with no size, build a complete dict (r_km, r_max_km, source, H=None, G=None) so the downstream code doesn't break.
-        ## Estimated/known target 200019 size: {'r_km': 1.9965, 'r_min_km': -0.052500000000000435, 'r_max_km': 4.0455000000000005, 'source': 'SBDB diameter (ref urn:nasa:pds:neowise_diameters_albedos::2.0[mainbelt] (http://adsabs.harvard.edu/abs/2011ApJ...741...68M))'}
-
         print(f"Estimated/known target {t} size data: {size}")
-        
-        fetch_target_orbit(t, epochs)                          # once per target
-        for ctp in periods:
-            target_test(obs_loc, ctp, config.spn + 600, t, size, mag_min)   # +10 min so windows overlap
+        fetch_target_orbit(t, epochs)                              # once per target
+        plans[t] = (size, corridor.plan_corridor(t, et0, et1, size, mag_min, config.max_shadow_dist,
+                                                 min_drop=getattr(config, "min_mag_drop", 0.1),
+                                                 step_s=getattr(config, "corridor_step_s", 600.0)))
+
+    # pass 2 (serial, SPICE): stars from the local catalog, scan and solve
+    print(
+        f"Pass 2 (serial, SPICE): stars from the local catalog, scan and solve"
+    )
+    for t, (size, plan) in plans.items():
+        n = target_test_corridor(obs_loc, plan, t, size, local=local)
+        print(f"{t}: {n} hit(s) logged")
     spice.kclear()

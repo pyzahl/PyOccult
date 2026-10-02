@@ -12,6 +12,9 @@ Tools in this project:
 | `pyoccult_paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
 | `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
 | `pyoccult_pick.py` | ranks asteroids to choose the `targets` list, writes `targets.py` |
+| `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
+| `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
+| `pyoccult_owc_check.py` | regression check against an OWC/Occult search result (`owc_reference.csv`) |
 
 See `ABOUT.md` for the computations, data sources and open points.
 
@@ -47,13 +50,63 @@ Before installing packages, you must activate the environment. The command depen
   ```
 *Once activated, your terminal prompt will show `(.venv)` at the beginning of the line.*
 
-NOTE: to run on non Linux platforms you need to adjust the cache the path from /dev/shm/... to what ever work fastest on your platform. (See pyoccult_config.py, bottom section to adjust)
+NOTE: all caches go to `cache_path` in pyoccult_config.py. It defaults to /dev/shm (RAM, Linux) and to the system temp folder on other platforms; set it to any folder you like.
 
 ## 3. Install from requirements.txt
 With the environment active, run `pip` to download and install all the listed packages into your isolated environment:
 
 ```bash
 pip install -r requirements.txt
+```
+
+## 4. One-time data setup
+
+PyOccult works offline from local data: SPICE kernels for the planets and Earth orientation, and a local copy of the
+Gaia star catalog. `pyoccult_setup.py` installs all of it.
+
+**What you need**
+
+| | Kernels | Gaia catalog (G <= 18) | Bright-star index |
+|---|---|---|---|
+| Download | ~120 MB | 753 GB (streamed, not stored) | none (built from the catalog) |
+| Disk | ~120 MB | ~11 GB | ~1.3 GB |
+| Time | a minute | 1.5-2 h at ~1.4 Gbit/s, longer on slower lines | ~30 s |
+
+Also needed: `curl` (for the kernels) and a few GB of free RAM while the index is built.
+
+**Before you start**, check these in `pyoccult_config.py`:
+
+* `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free.
+* `gaia_local_gmax`: faintest star kept (default 18). Fainter stars are never searched; 18 suits most small telescopes.
+  A different value needs a new folder.
+* `cache_path`: where the smaller caches go (asteroid orbits, SBDB data). Defaults to `/dev/shm` on Linux (RAM, emptied
+  on reboot) and to the system temp folder elsewhere.
+
+**Run it**
+
+```bash
+python pyoccult_setup.py              # kernels + local Gaia catalog + bright-star index
+python pyoccult_setup.py --no-gaia    # kernels only (e.g. to try the old "windows" search mode)
+python pyoccult_setup.py --status     # what is installed
+```
+
+The Gaia download is long. On Linux you can let it run on its own and check on it later:
+
+```bash
+nohup python pyoccult_setup.py > setup.log 2>&1 &
+tail -f setup.log                     # progress every 20 files, with an ETA
+```
+
+It is safe to stop and rerun: finished files are skipped, so the same command resumes. `--status` should end with
+`3386/3386 files ... (complete)` and `bright-star index ... ok`. The search (`pyoccult.py`) refuses to run on an
+incomplete catalog and tells you to rerun the setup. See "Local Gaia catalog" below for what is kept and why.
+
+## 5. Configure and run
+Set your site and search window in `pyoccult_config.py` (see "Site Configuration and Run Setup" below), then:
+
+```bash
+./pyoccult.py                         # search; results appended to hits_log.csv, maps in maps/
+python pyoccult_report.py hits_log.csv    # HTML event list with maps
 ```
 
 ---
@@ -71,6 +124,7 @@ pip install -r requirements.txt
   python -m venv .venv
   source .venv/bin/activate
   pip install -r requirements.txt
+  python pyoccult_setup.py            # one-time: kernels + local Gaia catalog (long download, resumable)
   echo 'EDIT IT, RUN IT:'
   ./pyoccult.py
   ```
@@ -96,6 +150,12 @@ except ImportError:
     
 max_shadow_dist = 200  ## in km: travel distance from observer location
 
+search_mode = "corridor"   # "corridor": stars along each path from the local Gaia copy (fast); "windows": old per-window archive cones
+min_mag_drop = 0.1         # mag; events with a smaller drop are not logged (also sets the Gaia magnitude cap per asteroid)
+corridor_step_s = 600      # s, coarse path step for the corridor candidate scan
+gaia_local_dir = "gaia_dr3_g18"  # folder of the local Gaia copy, required by corridor mode (python pyoccult_gaia_local.py build)
+gaia_local_gmax = 18.0     # faintest G kept when building the local copy (~19 GB for 18)
+
 ### CONFIG OBSERVER
 
 LAT = 44.9541175
@@ -115,9 +175,11 @@ write_maps = True
 map_dir = "maps"
 default_sigma3_km = 10.0
 
-cache_path = "/dev/shm"  ## good for Linux, but volatile after reboot
+cache_path = "/dev/shm" if _os.path.isdir("/dev/shm") else _tempfile.gettempdir()  ## RAM on Linux, temp folder elsewhere
 
 ### Init, Cleanups, ToDO clean SHM cache?
+sbdb_max_age_days = 30  ## asteroid size data (SBDB) is cached in cache_path and refetched after this many days
+
 earth_pck_max_age = 7 ## days for earth pck to expire/auto update
 force_cleanup = False
 ```
@@ -147,6 +209,28 @@ ALT_MARGIN: may adjust, early pre screening gate only
 Results are appended (if existing) to hits_log.csv
 
 
+## Local Gaia catalog (required)
+
+The corridor search (the default) needs the Gaia stars along each asteroid's path. The Gaia archive took many minutes
+per asteroid for that, or hung (it warns it is unstable while DR4 is being prepared), so the stars come from a local,
+magnitude-limited copy that you build once:
+
+```
+python pyoccult_setup.py                       # does all of it (kernels, catalog, bright-star index)
+python pyoccult_gaia_local.py build            # the catalog alone; folder and G limit from gaia_local_dir / gaia_local_gmax
+python pyoccult_gaia_local.py build --dir gaia_dr3_g18 --gmax 18 --workers 6
+python pyoccult_gaia_local.py status
+```
+
+* It streams all of Gaia DR3 `gaia_source` from ESA's CDN (3386 files, **753 GB download**), keeps G <= gmax with full
+  astrometry and ruwe < 1.4 (7 columns, binary), and deletes each download. G <= 18 keeps about 19 GB.
+  At about 1.4 Gbit/s it takes 1.5 to 2 hours.
+* It is resumable: rerun the same command after an interruption, finished files are skipped.
+* `gaia_local_dir` in pyoccult_config.py must name that folder. pyoccult.py refuses a missing or incomplete catalog.
+* A strip lookup takes about 1 s (2 s in the Galactic bulge), no network. Gaia is not cached elsewhere any more.
+* Stars fainter than `gaia_local_gmax` are not searched, whatever `MAG_MIN` says.
+
+
 
 ## Quick start: choose targets (pick tool)
 
@@ -156,7 +240,7 @@ Results are appended (if existing) to hits_log.csv
 python pyoccult_pick.py --catalog jpl_asteroids_spice.csv --hmax 14 --top 40
 ```
 
-* Needs `jpl_asteroids_spice.csv` (columns `SPICE ID, Full Name, Primary Designation`) and internet on the first run (one bulk download from JPL's Small-Body Database, cached as `sbdb_cache.json`; delete it to refresh).
+* Needs `jpl_asteroids_spice.csv` (columns `SPICE ID, Full Name, Primary Designation`) and internet on the first run (one bulk download from JPL's Small-Body Database, cached as `PyOccult_sbdb_cache.json` in `cache_path` and refreshed after `sbdb_max_age_days`). The size data of the chosen targets also goes to the shared per-asteroid cache `PyOccult_sbdb_phys.json`, so the following pyoccult.py run needs no SBDB lookups for them (other targets are looked up once and cached there too).
 * Reads `LAT`, `max_shadow_dist`, `MIN_STAR_ALT`, `MAX_SUN_ALT` from `pyoccult_config.py`. Run it from the project folder.
 * Prints a ranked table and writes two files:
   * `pick_candidates.csv`: the full ranked table
@@ -186,6 +270,7 @@ except ImportError:
 python pyoccult_report.py hits_log.csv                           # writes hits_report.html next to the CSV
 python pyoccult_report.py hits_log.csv -o hits_report.md         # Markdown instead
 python pyoccult_report.py hits_log.csv --kml-dir maps --max-miss 200 --min-drop 0.3 --title "Long Island"
+python pyoccult_report.py hits_log.csv --sort date               # by event time (default --sort mag: brightest star first)
 ```
 
 * Observer `LAT`/`LON` (for the compass direction) and `map_dir` (optional, default `maps`) come from `pyoccult_config.py`; override with `--lat`, `--lon`, `--kml-dir`.
