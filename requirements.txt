@@ -5,3 +5,4 @@ spiceypy
 astropy
 astroquery
 pandas
+nicegui

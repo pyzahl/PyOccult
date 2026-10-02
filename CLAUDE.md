@@ -23,6 +23,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   one `.npy` per source file plus `.cells.npy` (1x1 deg cell index) and `.hpm.npy` (pm > 1500 mas/yr). No healpy.
 - `pyoccult_sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
   `pyoccult.sbdb_phys()` (per-object API) and by `pyoccult_pick.py` for its top targets (bulk rows); standard library only.
+- `pyoccult_gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult_runner.py`
+  (JSON config overrides per run). `pyoccult_geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult_preview.py`:
+  event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).

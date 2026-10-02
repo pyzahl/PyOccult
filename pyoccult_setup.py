@@ -21,6 +21,7 @@ import argparse, os, shutil, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))                 # kernels live next to the scripts
+import pyoccult_geo as geo
 
 SITES_HINT = """   Edit sites.py and enter your observing site(s), then rerun or just start searching:
      - lat, lon: geodetic degrees, longitude east-positive (west is negative); ele: metres
@@ -34,52 +35,33 @@ APPROX = "APPROXIMATE"                       # marker in a generated sites.py: p
 
 
 def _get_json(url, timeout=10):
-    import json, urllib.request
-    req = urllib.request.Request(url, headers={"User-Agent": "PyOccult-setup"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
+    return geo.get_json(url, timeout)
 
 
 def _elevation(lat, lon):
-    """Ground elevation (m) from Open-Meteo, or None."""
-    try:
-        return float(_get_json(f"https://api.open-meteo.com/v1/elevation?latitude={lat}&longitude={lon}")["elevation"][0])
-    except Exception:
-        return None
+    return geo.elevation(lat, lon)
 
 
 def _ip_guess():
     """(lat, lon, ele, label) from the IP address (ipinfo.io; city level, 10-100 km, wrong behind a VPN), or None."""
-    try:
-        d = _get_json("https://ipinfo.io/json")
-        lat, lon = (float(x) for x in d["loc"].split(","))
-        return lat, lon, _elevation(lat, lon), ", ".join(x for x in (d.get("city"), d.get("region"), d.get("country")) if x)
-    except Exception as ex:
-        print(f"   IP lookup failed ({str(ex)[:80]})")
-        return None
+    r = geo.ip_location()
+    if r is None:
+        print("   IP lookup failed")
+    return r
 
 
 def _city(name):
     """Pick a place from Open-Meteo's geocoding: (lat, lon, ele, label) or None."""
-    import urllib.parse
-    try:
-        res = _get_json("https://geocoding-api.open-meteo.com/v1/search?"
-                        + urllib.parse.urlencode(dict(name=name, count=5))).get("results", [])
-    except Exception as ex:
-        print(f"   place lookup failed ({str(ex)[:80]})")
-        return None
+    res = geo.places(name)
     if not res:
-        print(f"   no place called {name!r} found")
+        print(f"   no place called {name!r} found (or offline)")
         return None
-    for i, r in enumerate(res, 1):
-        print(f"   {i}. {r['name']}, {r.get('admin1', '')}, {r.get('country', '')}: "
-              f"{r['latitude']:.4f}, {r['longitude']:.4f}, {r.get('elevation', 0):.0f} m")
+    for i, (lat, lon, ele, label) in enumerate(res, 1):
+        print(f"   {i}. {label}: {lat:.4f}, {lon:.4f}, {ele or 0:.0f} m")
     k = input(f"   which one [1-{len(res)}, Enter = 1]: ").strip() or "1"
     if not (k.isdigit() and 1 <= int(k) <= len(res)):
         return None
-    r = res[int(k) - 1]
-    return (r["latitude"], r["longitude"], r.get("elevation"),
-            ", ".join(x for x in (r["name"], r.get("admin1"), r.get("country")) if x))
+    return res[int(k) - 1]
 
 
 def _manual():

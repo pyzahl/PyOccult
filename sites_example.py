@@ -12,6 +12,8 @@
 #             a sensitive camera, - for worse), extinction (mag per airmass at the star's altitude, default 0 = off,
 #             ~0.2 typical), min_dur_s (hard limit, default 0.4), max_exp_s (longest usable exposure, default 0.64).
 #             The faintest star searched follows (25 cm: G 15.0, 50 cm: G 16.5), or set it with mag_limit.
+#   camera    focal_mm (default f/10 = 100 x aperture_cm), sensor_mm (width, height; default (5.6, 3.2)):
+#             the camera field drawn in the event preview.
 
 sites = {
     "nyc": dict(lat=40.7128, lon=-74.0060, ele=10, name="New York City Hall (example)",

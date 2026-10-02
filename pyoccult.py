@@ -639,6 +639,36 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
 
 
 RUN = dict(candidates=0, gated=0, solves=0, hits=0, maps_s=0.0, calc_s=0.0)      # run statistics (see run_summary)
+LOCAL = None             # the local Gaia catalog (set by the driver), for the event previews
+
+
+def write_preview(record, target_id, stem):
+    """Event preview SVG (pyoccult_preview.py): stars of the local catalog around the target star at the event date,
+    camera frame, asteroid track +/- 1 h. Written to <map_dir>/<stem>.svg next to the KML."""
+    import pyoccult_preview as preview
+    fov = preview.camera_fov_arcmin(config.camera_focal_mm, config.camera_sensor_mm)
+    field = max(config.preview_field_factor * max(fov), 10.0)
+    et = record["best_et"]
+    stars = LOCAL.cone(record["star_ra"], record["star_dec"], field / 60 * 0.75, config.preview_mag_limit)
+    ra, de = corridor.propagate_linear(stars, 2000.0 + et / (365.25 * 86400) - corridor.GAIA_EPOCH_YEAR)
+    def radec(t):
+        _, a, d = spice.recrad(spice.spkpos(target_id, t, 'J2000', 'CN', '399')[0])
+        return np.degrees(a), np.degrees(d)
+    # track span: about a quarter of the field, between 30 min and 12 h each side
+    (a0, d0), (a1, d1) = radec(et - 600.0), radec(et + 600.0)
+    rate = np.hypot((a1 - a0) * np.cos(np.radians(d0)), d1 - d0) * 60 / 20.0            # arcmin per minute
+    span = int(np.clip(field / 4 / max(rate, 1e-9), 30, 720))
+    track = [(m, *radec(et + 60.0 * m)) for m in np.linspace(-span, span, 13)]
+    svg = preview.render_svg(dict(ra=ra, dec=de, g=stars.phot_g_mean_mag.to_numpy()),
+                             dict(ra=record["star_ra"], dec=record["star_dec"], g=record["mag"]), track, fov,
+                             config.preview_field_factor,
+                             title=f"{record['target_name']}  {record['best_utc'][:19].replace('T', ' ')} UT",
+                             subtitle=f"Gaia DR3 {record['star']} \u00b7 G {record['mag']:.2f} \u00b7 drop "
+                                      f"{record['mag_drop']:.2f} mag \u00b7 max {record['max_duration_s']:.2f} s \u00b7 "
+                                      f"miss {record['min_distance']:.1f} km")
+    os.makedirs(config.map_dir, exist_ok=True)
+    with open(f"{config.map_dir}/{stem}.svg", "w", encoding="utf-8") as f:
+        f.write(svg)
 
 
 def owc_opt():
@@ -707,12 +737,18 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     RUN["calc_s"] += record["calc_s"]
 
     t_map = time.time()
+    stem = f"{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}"     # file name of KML and preview
     sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
     if config.write_maps and res['min_distance'] < size['r_km'] + sigma3:   # only hits worth mapping
         os.makedirs(config.map_dir, exist_ok=True)
         paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
-        write_shadow_kml(paths, f"{config.map_dir}/{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}.kml",
+        write_shadow_kml(paths, f"{config.map_dir}/{stem}.kml",
                          f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
+    if getattr(config, "write_previews", False) and LOCAL is not None:
+        try:
+            write_preview(record, target_id, stem)
+        except Exception as ex:                                       # a preview must never stop the search
+            print(f" --- no preview: {ex}")
     RUN["maps_s"] += time.time() - t_map
     return True
 
@@ -811,6 +847,7 @@ if __name__ == "__main__":
         sys.exit("corridor mode needs the local Gaia catalog: set gaia_local_dir and run  python pyoccult_setup.py")
     import pyoccult_gaia_local
     local = pyoccult_gaia_local.LocalGaia(config.gaia_local_dir)         # raises if the catalog is incomplete
+    LOCAL = local
     print(f"Using local Gaia catalog {config.gaia_local_dir} (G <= {local.gmax})")
 
     et0 = spice.str2et(t0.strftime("%Y-%m-%dT%H:%M:%S"))

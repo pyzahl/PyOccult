@@ -32,8 +32,9 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py` |
 | `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
+| `pyoccult_gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
 | `pyoccult_owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
-| supporting modules | `pyoccult_corridor.py` (star corridor), `pyoccult_screen.py` + `pyoccult_orbits.py` (pick tool engine), `pyoccult_sbdb.py` (asteroid size cache), `pyoccult_kernels.py` (kernel download) |
+| supporting modules | `pyoccult_corridor.py` (star corridor), `pyoccult_screen.py` + `pyoccult_orbits.py` (pick tool engine), `pyoccult_preview.py` (event preview image), `pyoccult_sbdb.py` (asteroid size cache), `pyoccult_kernels.py` (kernel download), `pyoccult_geo.py` (place and IP lookup), `pyoccult_runner.py` (runs with per-run settings) |
 
 See `ABOUT.md` for the computations, data sources and open points.
 
@@ -140,6 +141,8 @@ and Run Setup" below), then:
 python pyoccult_report.py hits_log.csv    # HTML event list with maps
 ```
 
+Or do all of it in the browser: `python pyoccult_gui.py` (see "Web interface (GUI)" below).
+
 A small script does a fresh run and publishes the report on a local web server (here nginx; the map tiles need a
 web server, see the report section). Save it as `run.sh` (it is in `.gitignore`, adjust the paths) and make it
 executable with `chmod +x run.sh`:
@@ -210,6 +213,8 @@ can also describe its view and its equipment; keys it leaves out take the defaul
 | `min_dur_s` | 0.4 | hard limit: shortest event, s |
 | `max_exp_s` | 0.64 | longest usable exposure, s; sets the faintest star searched |
 | `mag_limit` | from the above | faintest star searched (Gaia G), if you want to set it directly |
+| `focal_mm` | 100 x `aperture_cm` (f/10) | focal length, mm: with `sensor_mm` gives the camera field of the event preview |
+| `sensor_mm` | (5.6, 3.2) | camera sensor width and height, mm |
 
 Events are judged with OWC's General Observability Criterion: an event is kept if
 
@@ -262,6 +267,8 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 |---|---|---|
 | `hits_output_cvs_file` | `'hits_log.csv'` | results are appended here |
 | `write_maps`, `map_dir` | `True`, `"maps"` | write a KML ground track for every event close enough to matter |
+| `write_previews` | `True` | write an event preview (SVG) for every hit next to its KML |
+| `preview_mag_limit`, `preview_field_factor` | `16.0`, `3.0` | faintest star drawn; preview field = this x the camera field (at least 10′) |
 | `default_sigma3_km` | `10.0` | path uncertainty used when JPL Horizons has none |
 | `cache_path` | `/dev/shm` or the temp folder | asteroid orbit files and SBDB downloads (RAM on Linux, emptied on reboot) |
 | `sbdb_max_age_days` | `30` | asteroid size and orbit downloads are refreshed after this many days |
@@ -357,11 +364,36 @@ except ImportError:
 
 
 
+## Web interface (GUI)
+
+`pyoccult_gui.py` is a local web interface (NiceGUI) for everyday use:
+
+```bash
+python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your browser
+python pyoccult_gui.py --port 8090 --no-browser
+```
+
+* **Site**: choose or add a site, set its position by clicking the map (the elevation is looked up), by searching a
+  place or from your IP address, and edit its view and equipment; the derived star limit and camera field are shown.
+  **Save sites.py** rewrites `sites.py` (comments in it are not kept) and sets the default site.
+* **Search**: window, targets (from `targets.py` or typed in), minimum drop, maps and previews, then **Run search**.
+  The report is rebuilt and shown under **Results** when the run finishes.
+* **Pick**: window, H limit or all asteroids, number of targets, workers and ranking, then **Run pick**; the events
+  appear in a sortable table and `targets.py` is written for the search.
+* **Results**: the HTML report with its maps and previews.
+* **Log**: the live output of the running job, with **Stop**.
+
+Settings chosen in the GUI apply to that run only (via `pyoccult_runner.py`); `pyoccult_config.py` is not changed.
+Each run is its own process. The GUI listens on this computer only (127.0.0.1), because it can start programs.
+
+
 ## Quick start: hits_log.csv to HTML report
 
 `pyoccult_report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, offset from the centre line) and a **Map** button for each event. Standard library only, no install needed.
 The page header shows the site, its equipment, the magnitude and observing limits, and the statistics of the run
-(from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column.
+(from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column. The **Preview** button shows
+the event preview: the star field around the target star at the event date (local Gaia catalog), the camera frame
+(`focal_mm`, `sensor_mm` of the site), the target star, the asteroid's position and track, north up and east left.
 
 ```bash
 python pyoccult_report.py hits_log.csv                           # writes hits_report.html next to the CSV

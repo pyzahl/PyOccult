@@ -162,11 +162,12 @@ def compass(az):
 
 # ---------------------------------------------------------------- building events
 
-def find_kml(kml_dir, target_id, when):
+def find_kml(kml_dir, target_id, when, ext="kml"):
+    """<kml_dir>/<target>_<YYYYMMDDTHHMM>*.<ext>: the KML ground track, or with ext="svg" the event preview."""
     if not kml_dir or not os.path.isdir(kml_dir):
         return None
     stamp = when.strftime("%Y%m%dT%H%M")
-    found = sorted(glob.glob(os.path.join(glob.escape(kml_dir), f"{glob.escape(str(target_id))}_{stamp}*.kml")))
+    found = sorted(glob.glob(os.path.join(glob.escape(kml_dir), f"{glob.escape(str(target_id))}_{stamp}*.{ext}")))
     return found[0] if found else None
 
 
@@ -221,6 +222,8 @@ def build_event(r, lat, lon, kml_dir, out_dir):
         illum = num(r.get("moon_illum_pct"))
         moon = dict(icon=icon, sep=num(r["moon_sep_deg"]), alt=num(r["moon_alt_deg"]), illum=illum)
     kml_abs = find_kml(kml_dir, tid, when)
+    prev_abs = find_kml(kml_dir, tid, when, "svg")
+    preview = urllib.parse.quote(os.path.relpath(prev_abs, out_dir).replace(os.sep, "/")) if prev_abs else None
     kml = urllib.parse.quote(os.path.relpath(kml_abs, out_dir).replace(os.sep, "/")) if kml_abs else None
     miss, margin = num(r.get("min_distance")), num(r.get("margin_km"))
     if margin is None and miss is not None and rad is not None:
@@ -228,7 +231,7 @@ def build_event(r, lat, lon, kml_dir, out_dir):
     return dict(when=when, label=asteroid_label(tid, r.get("target_name")), tid=tid,
                 star=r.get("star", "").strip(), mag=mag, drop=drop, dur=dur, alt=alt,
                 compass=compass(az) if az is not None else "", az=az, moon=moon,
-                miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs,
+                miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs, preview=preview,
                 m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")), calc=num(r.get("calc_s")),
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
                 size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip())
@@ -304,8 +307,8 @@ document.querySelectorAll('th[data-k]').forEach(function(th){
     th.closest('tr').querySelectorAll('th').forEach(function(h){h.classList.remove('sorted-asc','sorted-desc')});
     th.classList.add(dir===1?'sorted-asc':'sorted-desc');
     rows.sort(function(a,b){
-      var x=a.cells[i].dataset.s||'',y=b.cells[i].dataset.s||'',nx=parseFloat(x),ny=parseFloat(y);
-      var c=(isNaN(nx)||isNaN(ny))?x.localeCompare(y):nx-ny;return c*dir;});
+      var x=a.cells[i].dataset.s||'',y=b.cells[i].dataset.s||'',num=/^\\s*-?\\d+(\\.\\d+)?([eE][-+]?\\d+)?\\s*$/;
+      var c=(num.test(x)&&num.test(y))?parseFloat(x)-parseFloat(y):x.localeCompare(y);return c*dir;});
     rows.forEach(function(r){tb.appendChild(r)});
   });
 });
@@ -330,6 +333,18 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 
 LEAFLET_TAGS = ('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">'
                 '<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>')
+
+PREVIEW_DIALOG = """<dialog id="prevdlg" aria-label="Event preview" style="width:auto;height:auto;max-width:96vw;max-height:96vh">
+<div class="dh"><h2>Preview</h2><button id="prevclose" type="button" aria-label="Close preview">✕</button></div>
+<img id="previmg" alt="Event preview" style="display:block;max-width:min(560px,94vw);max-height:84vh;margin:0 auto">
+</dialog>
+<script>
+(function(){var d=document.getElementById('prevdlg'),img=document.getElementById('previmg');
+document.querySelectorAll('.prevbtn').forEach(function(b){b.addEventListener('click',function(){
+  d.querySelector('h2').textContent=b.dataset.t;img.src=b.dataset.src;if(!d.open)d.showModal();});});
+document.getElementById('prevclose').addEventListener('click',function(){d.close();});
+d.addEventListener('click',function(ev){if(ev.target===d)d.close();});})();
+</script>"""
 
 DIALOG = """<dialog id="mapdlg" aria-label="Shadow path map">
 <div class="dh"><h2>Map</h2><button id="mapclose" type="button" aria-label="Close map">✕</button></div>
@@ -422,13 +437,18 @@ def shadow_cell(e):
 
 
 def map_cell(e):
-    if not e["kml"]:
+    if not e["kml"] and not e.get("preview"):
         return "<td>—</td>"
-    btn = ""
+    title = f'{e["label"]} · {fmt_time(e["when"])} UT'
+    out = ""
     if e.get("pkey"):
-        title = f'{e["label"]} · {fmt_time(e["when"])} UT'
-        btn = f'<button class="mapbtn" type="button" data-k="{esc(e["pkey"])}" data-t="{esc(title)}">Map</button> '
-    return f'<td>{btn}<a href="{e["kml"]}" download title="KML for Google Earth or My Maps">KML</a></td>'
+        out += f'<button class="mapbtn" type="button" data-k="{esc(e["pkey"])}" data-t="{esc(title)}">Map</button> '
+    if e.get("preview"):
+        out += (f'<button class="mapbtn prevbtn" type="button" data-src="{e["preview"]}" data-t="{esc(title)}" '
+                f'title="Star field at the event: camera frame, target star, asteroid track">Preview</button> ')
+    if e["kml"]:
+        out += f'<a href="{e["kml"]}" download title="KML for Google Earth or My Maps">KML</a>'
+    return f"<td>{out}</td>"
 
 
 def html_row(e):
@@ -451,7 +471,7 @@ def html_row(e):
     return (
         "<tr>"
         f'<td data-s="{esc(e["label"])}" title="{tip_ast}">{esc(e["label"])}</td>'
-        f'<td data-s="{esc(e["utc"])}" title="{esc(e["utc"])} UTC (closest approach to the observer)">{esc(fmt_time(e["when"]))}</td>'
+        f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)">{esc(fmt_time(e["when"]))}</td>'
         f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">{fmt(e["mag"])}</td>'
         f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}</td>'
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
@@ -481,15 +501,16 @@ def to_html(events, meta):
             '<th data-k title="Moon distance from the star; shown while the Moon is up">Moon dist</th>'
             '<th class="num" data-k title="Distance of the observer from the shadow centre line">Offset</th>'
             '<th class="num" data-k title="Calculation time for this event (exact solve and metrics), seconds">Calc (s)</th>'
-            '<th title="KML ground track of the shadow">Map</th>')
+            '<th title="Shadow path map, star-field preview and KML ground track">Map</th>')
     body = "".join(html_row(e) for e in events)
     table = (f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
              if events else '<div class="wrap"><div class="empty">No events match.</div></div>')
     n_kml = sum(1 for e in events if e["kml"])
+    n_prev = sum(1 for e in events if e.get("preview"))
     paths = meta.get("paths") or {}
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{esc(meta['title'])}</title><style>{CSS}{MAP_CSS if paths else ''}</style>{LEAFLET_TAGS if paths else ''}</head>
+<title>{esc(meta['title'])}</title><style>{CSS}{MAP_CSS if paths or n_prev else ''}</style>{LEAFLET_TAGS if paths else ''}</head>
 <body><main>
 <h1>{esc(meta['title'])}</h1>
 <p class="sub">{len(events)} events{esc(meta['span'])} · {esc(meta['observer'])} · times in UT · generated {esc(meta['generated'])} · {n_kml} map file{'s' if n_kml != 1 else ''}</p>
@@ -501,7 +522,7 @@ def to_html(events, meta):
 <li>Altitude is the star's altitude at closest approach. The Moon is shown only while above the horizon. Click a column heading to sort.</li>
 <li>Map shows the path on an interactive map (needs internet for the map tiles) and links the closest centre-line point in Google Maps. Google Maps itself cannot load a local KML file: use the KML link with Google Earth, or import it in My Maps (Create a new map, then Import).</li>
 </ul>
-</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}</body></html>
+</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}{PREVIEW_DIALOG if n_prev else ''}</body></html>
 """
 
 
@@ -520,7 +541,8 @@ def to_markdown(events, meta):
             off = f"inside ({e['miss']:.1f} km)"
         else:
             off = f"{e['miss']:.1f} km" + (f" ({e['margin']:.1f} outside)" if e["margin"] is not None else "")
-        kml = f"[KML]({e['kml']})" if e["kml"] else "—"
+        kml = " ".join(x for x in (f"[KML]({e['kml']})" if e["kml"] else "", f"[Preview]({e['preview']})"
+                                   if e.get("preview") else "") if x) or "—"
         out.append(f"| {e['label']} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])} | {fmt(e['dur'])} "
                    f"| {alt_text(e)} | {moon_text(e)} | {off} | {fmt(e['calc'])} | {kml} |")
     return "\n".join(out) + "\n"

@@ -16,6 +16,7 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
 | choose | `pyoccult_pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` |
 | predict | `pyoccult.py` | computes the events of the target asteroids exactly, appends them to `hits_log.csv`, writes KML maps |
 | present | `pyoccult_report.py` | turns `hits_log.csv` into an HTML or Markdown event list with an embedded map |
+| operate | `pyoccult_gui.py` | local web interface (NiceGUI): sites on a map, runs, live log, results |
 | check | `pyoccult_owc_check.py` | reruns an OWC search result you saved (`owc_reference.txt`, private) and compares event by event |
 
 Supporting modules: `pyoccult_corridor.py` (per-asteroid star corridor and candidate scan), `pyoccult_gaia_local.py`
@@ -140,6 +141,14 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
   (`surfpt`; a miss raises `NotFoundError` and the point is skipped), with the centre-line duration at each point.
 - 3 sigma: the JPL Horizons RSS 3-sigma position uncertainty times the distance, else `default_sigma3_km`.
 - KML for Google Earth or Google My Maps; written when the miss distance is below `r + 3 sigma`.
+
+### 2.11 Event preview: `pyoccult_preview.py`
+
+- For every hit, an SVG next to its KML: the local-catalog stars (to `preview_mag_limit`) in a field
+  `preview_field_factor` times the camera field (at least 10′), moved linearly by proper motion to the event date;
+  gnomonic projection around the target star, north up and east left (as on the sky; a telescope may flip it).
+- Camera field `2 atan(sensor / 2 focal)` from the site's `focal_mm` and `sensor_mm`; asteroid track from the SPK
+  (`CN`, geocentric) over a span chosen so it covers about a quarter of the field (30 min to 12 h each side).
 
 ---
 

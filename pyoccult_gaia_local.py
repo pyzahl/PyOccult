@@ -235,6 +235,21 @@ class LocalGaia:
                                        [np.empty(0, DTYPE)])
         return self._hpm
 
+    def cone(self, ra_deg, dec_deg, radius_deg, mag_cap=None):
+        """Stars (DataFrame, epoch 2016.0) within radius_deg of (ra, dec), G <= mag_cap. For small fields (previews)."""
+        from pyoccult_corridor import _unit
+        cap = self.gmax if mag_cap is None else min(mag_cap, self.gmax)
+        c = _unit(ra_deg, dec_deg)
+        files = sorted({i for k in cells_near([ra_deg], [dec_deg], [radius_deg]).tolist() for i in self.by_cell.get(k, ())})
+        parts = []
+        for i in files:
+            a = np.load(os.path.join(self.dir, self.stems[i] + ".npy"), mmap_mode="r")
+            a = a[a["phot_g_mean_mag"] <= cap]
+            if len(a):
+                parts.append(np.asarray(a[_unit(a["ra"], a["dec"]) @ c >= math.cos(math.radians(radius_deg))]))
+        arr = np.concatenate(parts) if parts else np.empty(0, DTYPE)
+        return pd.DataFrame({k: arr[k].astype(np.float64) if k != "source_id" else arr[k] for k in COLS})
+
     def corridor_stars(self, plan, include_high_pm=True, chunk_deg=0.05):
         """Stars (G <= plan mag_cap) within margin_km/distance + pad of the plan's path, plus the high-pm stars."""
         from pyoccult_corridor import _radec, _unit

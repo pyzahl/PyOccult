@@ -66,6 +66,10 @@ _lim = (5 * __import__("math").log10(pick_aperture_cm) + 2.5 * __import__("math"
 MAG_MIN = min(site.get("mag_limit", round(_lim, 1)), gaia_local_gmax)   # faintest star searched
 pick_cam_limit = MAG_MIN                           # same limit for the pick tool
 
+# camera, for the event preview: field of view from the focal length and the sensor size
+camera_focal_mm = site.get("focal_mm", 100.0 * pick_aperture_cm)   # focal length, mm (default f/10)
+camera_sensor_mm = tuple(site.get("sensor_mm", (5.6, 3.2)))        # sensor width, height, mm (5.6 x 3.2: e.g. IMX290)
+
 ### CONFIG PICK TOOL (pyoccult_pick.py: event finder over all asteroids; equipment comes from the site above)
 
 pick_hmax = 17.0         # asteroids with H below this (pyoccult_pick.py --all: every numbered asteroid)
@@ -76,6 +80,9 @@ hits_output_cvs_file = 'hits_log.csv'
 
 write_maps = True
 map_dir = "maps"
+write_previews = True       # event preview image (star field, camera frame, asteroid track) per hit, as SVG in map_dir
+preview_mag_limit = 16.0    # faintest star drawn (Gaia G)
+preview_field_factor = 3.0  # preview field = this x the camera field (at least 10 arcmin)
 default_sigma3_km = 10.0
 
 ## cache folder for all tools (asteroid SPKs, SBDB downloads). /dev/shm is RAM on Linux (fast, emptied on reboot);
