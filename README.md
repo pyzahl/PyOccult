@@ -4,9 +4,11 @@ Python Occultation Searcher by PyZahl (C) 2026.
 Experimental Python, Astropy, Spiceypy based Asteroid Occultation Search Tool.
 
 ## What is it?
-Scientific background, start here:
-https://occultations.org/
-https://occultations.org/occultations/what-is-an-occultation/
+Scientific background, start here; International Occultation Timing Association (IOTA):
+
+- https://occultations.org/
+
+- https://occultations.org/occultations/what-is-an-occultation/
 
 ### Citing: Asteroid Occultations
 
