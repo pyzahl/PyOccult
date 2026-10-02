@@ -367,8 +367,8 @@ function show(key,title){
   dlg.querySelector('h2').textContent=title;
   if(!dlg.open)dlg.showModal();
   if(!window.L){box.innerHTML='<p style="margin:14px">The map library could not be loaded (offline?). Use the KML link instead.</p>';return;}
-  box.textContent='';
-  if(!map){map=L.map(box,{worldCopyJump:true});
+  if(!map){box.textContent='';                 /* only before the first map: later it would remove Leaflet's panes */
+    map=L.map(box,{worldCopyJump:true});
     L.tileLayer(TILES,{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);}
   if(layer)layer.remove();
   layer=L.featureGroup().addTo(map);
