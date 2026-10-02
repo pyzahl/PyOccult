@@ -69,6 +69,44 @@ def read_log(path):
     return rows, skipped
 
 
+def read_last_run(csv_path):
+    """The last run summary pyoccult.py appended to <hits log>.runs.jsonl, or None."""
+    path = os.path.splitext(csv_path)[0] + ".runs.jsonl"
+    try:
+        with open(path) as f:
+            lines = [ln for ln in f if ln.strip()]
+        return json.loads(lines[-1]) if lines else None
+    except (OSError, ValueError):
+        return None
+
+
+def header_info(run, lat, lon):
+    """(label, text) lines for the page header: site, equipment, limits, run statistics."""
+    if not run:
+        if lat is None or lon is None:
+            return []
+        return [("Site", f"{abs(lat):.4f}°{'N' if lat >= 0 else 'S'} {abs(lon):.4f}°{'E' if lon >= 0 else 'W'}"
+                         " (no run summary found)")]
+    s, L = run["site"], run["limits"]
+    ns, ew = ("N" if s["lat"] >= 0 else "S"), ("E" if s["lon"] >= 0 else "W")
+    out = [("Site", f"{s['name']}" + (f" ({s['desc']})" if s.get("desc") else "") +
+            f": {abs(s['lat']):.4f}°{ns} {abs(s['lon']):.4f}°{ew}, {s['ele']:g} m"),
+           ("Equipment", f"{s['aperture_cm']:g} cm aperture, {s['frames']} detection frames, MagAdjust "
+                         f"{s['mag_adjust']:+g}, extinction " +
+                         (f"{s['extinction']:g} mag/airmass" if s["extinction"] else "off")),
+           ("Limits", f"stars G ≤ {L['mag_limit']:g}, star altitude ≥ {L['min_star_alt']:g}°, Sun ≤ "
+                      f"{L['max_sun_alt']:g}°, reach {L['reach_km']:g} km, drop ≥ {L['min_mag_drop']:g} mag, "
+                      f"duration ≥ {L['min_dur_s']:g} s"),
+           ("Run", f"{run['run_utc']} UT, {run['window_start'][:10]} + {run['window_days']:g} d, {run['targets']} asteroids, "
+                   f"{run['candidates']} candidates, {run['solves']} exact solves, {run['hits']} hits"),
+           ("Timing", f"total {run['total_s']:.1f} s: start-up {run['startup_s']:.1f} s, asteroid data "
+                      f"{run['init_s']:.1f} s, search {run['search_s']:.1f} s (maps {run['maps_s']:.1f} s); "
+                      f"{run['per_asteroid_s']:.2f} s per asteroid, {run['per_solve_s'] * 1000:.0f} ms search time per "
+                      f"exact solve" + (f", {run['calc_per_hit_s'] * 1000:.0f} ms calculation per hit"
+                                        if "calc_per_hit_s" in run else ""))]
+    return out
+
+
 def asteroid_label(target_id, name):
     """'218001 (2001 XQ72)' -> '(218001) 2001 XQ72';  '4272 Entsuji (1977 EG5)' -> '(4272) Entsuji'."""
     name = (name or "").strip()
@@ -191,7 +229,8 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 star=r.get("star", "").strip(), mag=mag, drop=drop, dur=dur, alt=alt,
                 compass=compass(az) if az is not None else "", az=az, moon=moon,
                 miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs,
-                m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")),
+                m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")), calc=num(r.get("calc_s")),
+                margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
                 size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip())
 
 
@@ -237,6 +276,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-ap
 main{max-width:1180px;margin:0 auto;padding:24px 16px 40px}
 h1{font-size:1.35rem;margin:0 0 4px}
 .sub{color:var(--muted);margin:0 0 16px}
+.info{display:grid;grid-template-columns:max-content 1fr;gap:2px 14px;font-size:.88rem;margin:0 0 16px}
+.info dt{color:var(--muted)}.info dd{margin:0}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%;min-width:760px}
 th,td{padding:8px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
@@ -397,7 +438,13 @@ def html_row(e):
     if e["m_ast"] is not None:
         before = f"{e['m_before']:.2f} → " if e["m_before"] is not None else ""
         drop_tip = esc(f"{before}{e['m_ast']:.2f} mag during the event (asteroid alone)")
-    alt_tip = esc(f"azimuth {e['az']:.0f}°") if e["az"] is not None else ""
+    alt_tip = f"azimuth {e['az']:.0f}°" if e["az"] is not None else ""
+    if e["airmass"] is not None:
+        alt_tip += f" · airmass {e['airmass']:.2f}" + (f", extinction {e['ext']:.2f} mag" if e["ext"] else "")
+    alt_tip = esc(alt_tip)
+    mag_tip = esc(f"{e['margin_mag']:+.2f} mag below the observability limit" if e["margin_mag"] is not None
+                  and e["margin_mag"] >= 0 else f"{-e['margin_mag']:.2f} mag fainter than the observability limit"
+                  if e["margin_mag"] is not None else "")
     moon = e["moon"]
     moon_tip = esc(f"Moon {moon['alt']:.0f}° above horizon, {moon['illum']:.0f}% lit") if moon and moon["illum"] is not None else ""
     s = lambda v, nd=3: "" if v is None else f"{v:.{nd}f}"
@@ -405,15 +452,22 @@ def html_row(e):
         "<tr>"
         f'<td data-s="{esc(e["label"])}" title="{tip_ast}">{esc(e["label"])}</td>'
         f'<td data-s="{esc(e["utc"])}" title="{esc(e["utc"])} UTC (closest approach to the observer)">{esc(fmt_time(e["when"]))}</td>'
-        f'<td class="num" data-s="{s(e["mag"])}">{fmt(e["mag"])}</td>'
+        f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">{fmt(e["mag"])}</td>'
         f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}</td>'
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
         f'<td data-s="{s(moon["sep"], 1) if moon else ""}" title="{moon_tip}">{esc(moon_text(e))}</td>'
         f"{shadow_cell(e)}"
+        f'<td class="num" data-s="{s(e["calc"])}">{fmt(e["calc"])}</td>'
         f"{map_cell(e)}"
         "</tr>"
     )
+
+
+def info_html(info):
+    if not info:
+        return ""
+    return '<dl class="info">' + "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in info) + "</dl>"
 
 
 def to_html(events, meta):
@@ -426,6 +480,7 @@ def to_html(events, meta):
             '<th data-k title="Star altitude and compass direction at closest approach">Altitude</th>'
             '<th data-k title="Moon distance from the star; shown while the Moon is up">Moon dist</th>'
             '<th class="num" data-k title="Distance of the observer from the shadow centre line">Offset</th>'
+            '<th class="num" data-k title="Calculation time for this event (exact solve and metrics), seconds">Calc (s)</th>'
             '<th title="KML ground track of the shadow">Map</th>')
     body = "".join(html_row(e) for e in events)
     table = (f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
@@ -438,6 +493,7 @@ def to_html(events, meta):
 <body><main>
 <h1>{esc(meta['title'])}</h1>
 <p class="sub">{len(events)} events{esc(meta['span'])} · {esc(meta['observer'])} · times in UT · generated {esc(meta['generated'])} · {n_kml} map file{'s' if n_kml != 1 else ''}</p>
+{info_html(meta.get("info"))}
 {table}
 <ul class="notes">
 <li>Star magnitude is Gaia G. The drop assumes the star is fully covered and ignores the star's angular size and diffraction, so bright stars and very small bodies can show a smaller real drop.</li>
@@ -453,9 +509,10 @@ def to_html(events, meta):
 
 def to_markdown(events, meta):
     out = [f"# {meta['title']}", "",
-           f"{len(events)} events{meta['span']} · {meta['observer']} · times in UT · generated {meta['generated']}", "",
-           "| Asteroid | Event time (UT) | Star mag (G) | Mag drop | Max dur (s) | Altitude | Moon dist | Offset | Map |",
-           "|---|---|---:|---:|---:|---|---|---:|---|"]
+           f"{len(events)} events{meta['span']} · {meta['observer']} · times in UT · generated {meta['generated']}", ""]
+    out += [f"- **{k}:** {v}" for k, v in (meta.get("info") or [])] + ([""] if meta.get("info") else [])
+    out += ["| Asteroid | Event time (UT) | Star mag (G) | Mag drop | Max dur (s) | Altitude | Moon dist | Offset | Calc (s) | Map |",
+            "|---|---|---:|---:|---:|---|---|---:|---:|---|"]
     for e in events:
         if e["miss"] is None:
             off = "—"
@@ -465,7 +522,7 @@ def to_markdown(events, meta):
             off = f"{e['miss']:.1f} km" + (f" ({e['margin']:.1f} outside)" if e["margin"] is not None else "")
         kml = f"[KML]({e['kml']})" if e["kml"] else "—"
         out.append(f"| {e['label']} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])} | {fmt(e['dur'])} "
-                   f"| {alt_text(e)} | {moon_text(e)} | {off} | {kml} |")
+                   f"| {alt_text(e)} | {moon_text(e)} | {off} | {fmt(e['calc'])} | {kml} |")
     return "\n".join(out) + "\n"
 
 
@@ -543,7 +600,11 @@ def main(argv=None):
         span = f" from {min(e['when'] for e in events):%Y-%m-%d} to {max(e['when'] for e in events):%Y-%m-%d}"
     observer = f"observer {abs(lat):.4f}°{'N' if lat >= 0 else 'S'} {abs(lon):.4f}°{'E' if lon >= 0 else 'W'}" \
         if lat is not None and lon is not None else "observer position not set"
-    meta = dict(title=a.title, span=span, sort=a.sort, observer=observer, generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
+    run = read_last_run(a.csv)
+    if run and run.get("site"):                                  # the run's site wins over the current config
+        lat, lon = run["site"]["lat"], run["site"]["lon"]
+        observer = f"site {run['site']['name']}"
+    meta = dict(title=a.title, span=span, sort=a.sort, info=header_info(run, lat, lon), observer=observer, generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
                 paths=paths, tiles=a.tile_url, obs=[lat, lon] if lat is not None and lon is not None else None)
     text = to_markdown(events, meta) if fmt_name == "md" else to_html(events, meta)
     with open(out, "w", encoding="utf-8") as f:

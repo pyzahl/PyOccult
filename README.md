@@ -14,7 +14,7 @@ Tools in this project:
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py` |
 | `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
-| `pyoccult_owc_check.py` | regression check against an OWC/Occult search result (`owc_reference.csv`) |
+| `pyoccult_owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
 
 See `ABOUT.md` for the computations, data sources and open points.
 
@@ -176,7 +176,7 @@ can also describe its view and its equipment; keys it leaves out take the defaul
 | `aperture_cm` | 25 | telescope aperture, cm |
 | `frames` | 4 | detection frames: video frames the event must cover |
 | `mag_adjust` | 0 | OWC's MagAdjust: + for better conditions (dark sky, sensitive camera), - for worse |
-| `extinction` | 0 (off) | atmospheric extinction, mag per airmass (~0.2): low stars count as fainter |
+| `extinction` | `atm_extinction` (0, off) | atmospheric extinction, mag per airmass (~0.2): low stars count as fainter |
 | `min_dur_s` | 0.4 | hard limit: shortest event, s |
 | `max_exp_s` | 0.64 | longest usable exposure, s; sets the faintest star searched |
 | `mag_limit` | from the above | faintest star searched (Gaia G), if you want to set it directly |
@@ -217,6 +217,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `MAG_MIN` | from the site | faintest star (Gaia G) searched: the site's `mag_limit`, else from its aperture; at most `gaia_local_gmax` |
 | `pick_aperture_cm`, `pick_frames`, `pick_mag_adjust`, `pick_extinction`, `pick_min_dur_s` | from the site | the site's equipment (used by the pick tool) |
 | `ALT_MARGIN` | `3.0` | the early visibility gate is this much looser than the final test, so it never rejects a real event |
+| `atm_extinction` | `0.0` | atmospheric extinction for low altitudes, mag per airmass (0 = off, ~0.2 typical, ~0.3 hazy); a star at altitude h counts as fainter by `atm_extinction * (airmass - 1)`; a site's `extinction` overrides it |
 
 **Pick tool** (`pyoccult_pick.py`, see below)
 
@@ -237,7 +238,11 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `earth_pck_max_age` | `7` | the Earth orientation kernel is refreshed after this many days |
 | `force_cleanup` | `False` | `True` deletes and re-downloads the SPICE kernels at start-up |
 
-Results are appended to `hits_log.csv` (a rerun appends again; the report drops duplicates).
+Results are appended to `hits_log.csv` (a rerun appends again; the report drops duplicates). Each hit also records
+`calc_s` (its calculation time), `airmass`, `extinction_mag` and `mag_margin` (magnitudes below OWC's observability
+limit, after extinction). At the end of a run `pyoccult.py` prints a summary (total time, start-up, asteroid data
+loading, search, maps, time per asteroid and per exact solve, counts) and appends it, with the site, equipment and
+limits, as one line to `hits_log.runs.jsonl`; the report shows the latest one in its header.
 
 
 ## Local Gaia catalog (required)
@@ -321,6 +326,8 @@ except ImportError:
 ## Quick start: hits_log.csv to HTML report
 
 `pyoccult_report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, offset from the centre line) and a **Map** button for each event. Standard library only, no install needed.
+The page header shows the site, its equipment, the magnitude and observing limits, and the statistics of the run
+(from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column.
 
 ```bash
 python pyoccult_report.py hits_log.csv                           # writes hits_report.html next to the CSV

@@ -45,6 +45,11 @@ MAX_SUN_ALT = site.get("max_sun_alt", -6.0)        # deg, the Sun must be below 
 max_shadow_dist = site.get("reach_km", max_shadow_dist)   # km, travel distance from the site (default: search setup)
 ALT_MARGIN = 3.0                                   # early gate is looser than the final one, never rejects a real event
 
+# atmospheric extinction for lower altitudes, mag per airmass: a star at altitude h counts as fainter by
+# atm_extinction * (airmass(h) - 1) in the observability test (0 = off; ~0.2 typical, ~0.3 hazy or light-polluted).
+# A site's `extinction` key overrides it.
+atm_extinction = 0.0
+
 # equipment: OWC's General Observability Criterion. An event is observable if
 #   StarMag < 5 log10(aperture_cm) + 2.5 log10(MaxDuration / frames) + 8.5 + mag_adjust
 # (mag_adjust > 0 for better conditions: dark sky, sensitive camera; < 0 for worse), optionally with atmospheric
@@ -53,7 +58,7 @@ ALT_MARGIN = 3.0                                   # early gate is looser than t
 pick_aperture_cm = site.get("aperture_cm", 25.0)   # telescope aperture, cm
 pick_frames = site.get("frames", 4)                # detection frames
 pick_mag_adjust = site.get("mag_adjust", 0.0)      # OWC MagAdjust, mag
-pick_extinction = site.get("extinction", 0.0)      # mag per airmass; 0 = off, ~0.2 typical
+pick_extinction = site.get("extinction", atm_extinction)   # mag per airmass (see atm_extinction above)
 pick_min_dur_s = site.get("min_dur_s", 0.4)        # hard limit: shortest event, s
 pick_max_exp_s = site.get("max_exp_s", 0.64)       # longest usable exposure, s (25 cm: G 15.0, as OWC)
 _lim = (5 * __import__("math").log10(pick_aperture_cm) + 2.5 * __import__("math").log10(pick_max_exp_s)

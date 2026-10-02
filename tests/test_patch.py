@@ -2,7 +2,7 @@ import sys, os, math, types, tempfile, numpy as np, pandas as pd
 sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..')); import pyoccult_corridor as C
 exec(open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), 'test_corridor.py')).read().split("# ---------- 3. magnitude cap")[0])      # reuse synthetic path, catalogue, FakeLocal (no tests after this point)
 src = open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'pyoccult.py')).read()
-funcs = src[src.index("def handle_star"):src.index('if __name__ == "__main__":')]   # handle_star + target_test_corridor
+funcs = src[src.index("RUN = dict("):src.index('if __name__ == "__main__":')]   # run stats, handle_star, target_test_corridor
 
 out_csv = os.path.join(tempfile.mkdtemp(), "hits.csv")
 calls = dict(star_test=0, gate=0, propagate=0)
@@ -10,8 +10,12 @@ class Q:                                   # stand-in for astropy quantity
     def __init__(s, v): s.value = v
     def to(s, _): return s
 class Loc: lon, lat, height = Q(-1.27), Q(0.71), Q(0.04)
-class Cfg: max_shadow_dist = 200.0; hits_output_cvs_file = out_csv; min_mag_drop = 0.1; cache_path = tempfile.mkdtemp(); write_maps = False; default_sigma3_km = 10.0
-ns = dict(np=np, pd=pd, os=os, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
+class Cfg:
+    max_shadow_dist = 200.0; hits_output_cvs_file = out_csv; min_mag_drop = 0.1; cache_path = tempfile.mkdtemp()
+    write_maps = False; default_sigma3_km = 10.0
+    pick_aperture_cm = 25.0; pick_frames = 4; pick_mag_adjust = 0.0; pick_extinction = 0.2       # site equipment
+import time, json, datetime, pyoccult_screen
+ns = dict(np=np, pd=pd, os=os, time=time, json=json, datetime=datetime.datetime, screen=pyoccult_screen, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
 ns['spice'] = types.SimpleNamespace(et2utc=lambda et, f, p: "ET:%r" % float(et))
 def star_test(loc, utc, span, ra, dec, tid, r, reach):
     calls['star_test'] += 1
@@ -42,7 +46,9 @@ log = pd.read_csv(out_csv)
 print("candidates", len(sub), "gate calls", calls['gate'], "solver calls", calls['star_test'], "propagations", calls['propagate'], "logged", n, "csv rows", len(log))
 assert calls['gate'] == len(sub) and calls['propagate'] == calls['gate'] - (sub.et_guess.astype(int) % 5 == 0).sum()
 assert calls['star_test'] == calls['propagate'] and n == len(log) and n > 0
-need = {"target_id","best_utc","min_distance","r_min_km","r_max_km","size_source","star","mag","mag_drop","moon_sep_deg","offset_east_km","max_duration_s","observable"}
+need = {"target_id","best_utc","min_distance","r_min_km","r_max_km","size_source","star","mag","mag_drop","moon_sep_deg","offset_east_km","max_duration_s","observable","calc_s","airmass","extinction_mag","mag_margin"}
 assert need <= set(log.columns), need - set(log.columns)
 print(log.iloc[0][["target_id","star","mag","min_distance","mag_drop","max_duration_s"]].to_dict())
+assert (log.calc_s >= 0).all() and (log.airmass > 1).all() and (log.extinction_mag > 0).all()
+assert ns["RUN"]["hits"] == n and ns["RUN"]["solves"] == calls["star_test"] and ns["RUN"]["candidates"] == len(sub)
 print("PATCH SMOKE TEST PASSED")

@@ -1,33 +1,65 @@
 #!.venv/bin/python3
-"""pyoccult_owc_check.py - regression check against an OWC/Occult search result.
+"""pyoccult_owc_check.py - regression check against an OWC (Occult Watcher Cloud) search result.
 
-Runs pyoccult.py (corridor mode) for the asteroids in owc_reference.csv with the OWC search settings, then matches every
-OWC event to our hits and checks: time within 10 s, magnitude drop within 0.25 mag, maximum duration within 10 %.
-pyoccult_config.py is not changed: the settings below override it for this run only. Hits go to owc_check_hits.csv,
-no maps.
+Paste an OWC search result (the page text: the "Search Results for filter ..." line and the event table) into
+owc_reference.txt (private, not in git: it names your site). This script reads the events and the search settings
+from it (distance from shadow, StarMag, MinDur, Aperture, DetectionFrames, MinStarAltitude), runs pyoccult.py
+(corridor mode) for those asteroids over the events' dates at your site (sites.py), then matches every OWC event to
+our hits and checks: time within 10 s, magnitude drop within 0.25 mag, maximum duration within 10 %.
+pyoccult_config.py is not changed: the settings override it for this run only. Hits go to owc_check_hits.csv, no maps.
 
     python pyoccult_owc_check.py                 # search + compare
     python pyoccult_owc_check.py --compare-only  # compare an existing owc_check_hits.csv
+    python pyoccult_owc_check.py --ref other_owc_result.txt
 
 Duration = diameter / shadow speed. The report shows our diameter and the one OWC's duration implies (OWC duration x our
 speed); when only the diameters differ, the result is "ok, size differs", not a failure. Drops above DROP_TOTAL mag
 are not compared (they differ only by the asteroid's own magnitude estimate).
 """
-import argparse, os, runpy, sys
+import argparse, os, re, runpy, sys
 import pandas as pd
 
-REF = "owc_reference.csv"
+REF = "owc_reference.txt"
 OUT = "owc_check_hits.csv"
 TOL_T, TOL_DROP, TOL_DUR = 10.0, 0.25, 0.10
 DROP_TOTAL = 5.0          # drops above this are total occultations either way: not compared
-SETTINGS = dict(ct="2026-10-01T00:00:00", days=8, max_shadow_dist=20.0, MAG_MIN=15.0, MIN_STAR_ALT=5.0,
-                write_maps=False, search_mode="corridor")
+EVENT = re.compile(r"\((\d+)\)\s*([^\t]*)\t\s*(\d{4}-[A-Za-z]{3}-\d{2}),\s*(\d{2}:\d{2}:\d{2})\s*\t\s*([\d.]+)\s*\t\s*([\d.]+)"
+                   r"\s*\t\s*([\d.]+)\s*\t\s*(\d+)")
 
 
-def run(ref):
+def _clean_name(text):
+    """'2000 SB350 NALowMagMDMattson' -> '2000 SB350': drop OWC's trailing tag words (capitals run into lowercase)."""
+    words = text.split()
+    while words and re.match(r"^[A-Z]{2,}[A-Za-z]*[a-z]", words[-1]):
+        words.pop()
+    return " ".join(words)
+
+
+def read_owc(path):
+    """(events DataFrame, settings dict) from an OWC search result pasted as text."""
+    text = open(path, encoding="utf-8").read()
+    rows = [dict(target_id=int(m[1]), name=_clean_name(m[2]),
+                 event_utc=pd.Timestamp(f"{m[3]} {m[4]}").strftime("%Y-%m-%dT%H:%M:%S"), star_mag_v=float(m[5]),
+                 mag_drop_v=float(m[6]), max_dur_s=float(m[7]), altitude_deg=float(m[8])) for m in EVENT.finditer(text)]
+    if not rows:
+        sys.exit(f"no OWC events found in {path}")
+    ref = pd.DataFrame(rows)
+    f = re.search(r"Search Results for filter(.*)", text)
+    f = f[1] if f else ""
+    num = lambda pat, d: float(m[1]) if (m := re.search(pat, f, re.I)) else d
+    t0 = pd.Timestamp(ref.event_utc.min()).normalize() - pd.Timedelta(days=1)
+    t1 = pd.Timestamp(ref.event_utc.max()).normalize() + pd.Timedelta(days=2)
+    settings = dict(max_shadow_dist=num(r"([\d.]+)\s*km from shadow", 20.0), MAG_MIN=num(r"StarMag:\s*([\d.]+)", 15.0),
+                    pick_min_dur_s=num(r"MinDur:\s*([\d.]+)", 0.4), pick_aperture_cm=num(r"Aperture:\s*([\d.]+)", 25.0),
+                    pick_frames=int(num(r"DetectionFrames:\s*(\d+)", 4)), MIN_STAR_ALT=num(r"MinStarAltitude:\s*([\d.]+)", 10.0),
+                    ct=t0.strftime("%Y-%m-%dT%H:%M:%S"), days=(t1 - t0).days, write_maps=False, search_mode="corridor")
+    return ref, settings
+
+
+def run(ref, settings):
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import pyoccult_config as config
-    for k, v in SETTINGS.items():
+    for k, v in settings.items():
         setattr(config, k, v)
     config.targets = [str(t) for t in ref.target_id]
     config.hits_output_cvs_file = OUT
@@ -80,8 +112,12 @@ def compare(ref):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--compare-only", action="store_true")
+    ap.add_argument("--ref", default=REF, help="OWC search result as text (default owc_reference.txt)")
     a = ap.parse_args()
-    ref = pd.read_csv(REF, comment="#")
+    ref, settings = read_owc(a.ref)
+    print(f"{len(ref)} OWC events, {settings['ct'][:10]} + {settings['days']} d, reach {settings['max_shadow_dist']:g} km, "
+          f"G <= {settings['MAG_MIN']:g}, min alt {settings['MIN_STAR_ALT']:g}, {settings['pick_aperture_cm']:g} cm, "
+          f"{settings['pick_frames']} frames", flush=True)
     if not a.compare_only:
-        run(ref)
+        run(ref, settings)
     sys.exit(0 if compare(ref) else 1)

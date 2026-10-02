@@ -7,10 +7,13 @@ gaia_dr3_*/
 jpl_asteroids_spice.csv
 sbdb_cache.json
 # private and local files
+owc_reference.txt
+owc_reference.csv
 sites.py
 run.sh
 # run outputs
 hits_log.csv
+*.runs.jsonl
 hits_report.html
 hits_report.md
 maps/

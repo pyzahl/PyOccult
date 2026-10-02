@@ -11,7 +11,7 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `pyoccult_config.py`: run config (targets, window, site, thresholds). Optional: `map_dir`, `min_mag_drop`, `search_mode` (`corridor`/`windows`), `corridor_step_s`,
   `gaia_local_dir` (required by corridor mode), `gaia_local_gmax`.
 - `pyoccult_paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.
-- `pyoccult_report.py`: `hits_log.csv` to HTML/Markdown with an embedded Leaflet map. Standard library only.
+- `pyoccult_report.py`: `hits_log.csv` (+ last run of `hits_log.runs.jsonl` for the header) to HTML/Markdown with an embedded Leaflet map. Standard library only.
 - `pyoccult_pick.py`: event finder over all asteroids (OWC-style) for a window; writes `pick_events.csv` and
   `targets.py`. Engine `pyoccult_screen.py` (site solve, OWC observability formula), orbits `pyoccult_orbits.py` (SBDB full-precision
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= 15, cells sorted by G). Worker processes.
@@ -23,7 +23,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   one `.npy` per source file plus `.cells.npy` (1x1 deg cell index) and `.hpm.npy` (pm > 1500 mas/yr). No healpy.
 - `pyoccult_sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
   `pyoccult.sbdb_phys()` (per-object API) and by `pyoccult_pick.py` for its top targets (bulk rows); standard library only.
-- `pyoccult_owc_check.py` + `owc_reference.csv`: regression run against an OWC search (own settings, config untouched).
+- `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
+  text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).
 
 ## Conventions that matter
@@ -50,8 +51,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   signatures.
 
 ## Status
-- Validated 2026-10-01 (`python pyoccult_owc_check.py`, 14 OWC events, Rocky Point, Oct 2-7): all 14 found, same stars
-  (our G equals OWC's "V" column to 0.01, so OWC shows Gaia G), times within 5.4 s (11 within 3 s). Drops match within
+- Validated 2026-10-02 (`python pyoccult_owc_check.py`, 16 OWC events at the user's site, Oct 2-9): all 16 found, same
+  stars (our G equals OWC's "V" column to 0.01, so OWC shows Gaia G), times within 5.4 s (13 within 3 s). Drops match within
   0.25 mag below 5 mag. Durations match within 10 % wherever both use the same diameter; 4 events differ only by
   diameter (H+albedo estimates, or OWC using another source than NEOWISE). Open: 218001 (OWC drop 1.56 mag, ours 12.97;
   OWC diameter 3.56 km, ours 1.77 km from H). Hypothesis, unverified: the 5.6 mag star's angular diameter makes it

@@ -1,5 +1,6 @@
 #!.venv/bin/python3
 import sys, base64, functools, os, re, time
+T_START = time.time()                    # run statistics: start-up time is measured from here
 from datetime import datetime
 import numpy as np
 import requests
@@ -26,6 +27,7 @@ import pyoccult_config as config
 from pyoccult_paths import shadow_path, path_sigma3_km, write_shadow_kml
 import pyoccult_corridor as corridor
 import pyoccult_sbdb as sbdb_cache
+import pyoccult_screen as screen          # OWC observability formula, extinction
 
 ########################## PROLOGUE KERNEL INIT SECTION
 
@@ -636,10 +638,22 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
         handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et0, time_span, r_search, -np.inf, np.inf)
 
 
-def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, bracket_s, r_search, win_lo, win_hi):
+RUN = dict(candidates=0, gated=0, solves=0, hits=0, maps_s=0.0, calc_s=0.0)      # run statistics (see run_summary)
+
+
+def owc_opt():
+    """The chosen site's equipment for screen.owc_limit / extinction_loss (from pyoccult_config, i.e. sites.py)."""
+    return dict(aperture=config.pick_aperture_cm, frames=config.pick_frames, mag_adjust=config.pick_mag_adjust,
+                extinction=config.pick_extinction)
+
+
+def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, bracket_s, r_search, win_lo, win_hi,
+                t_start=None):
     """Refine one candidate star with the exact solver, log it (CSV, KML map) if it is a real, observable hit.
     The solver searches et_guess +/- bracket_s/2. win_lo / win_hi: ET limits of the run (an event outside them
-    belongs to a neighbouring run). Returns True if logged."""
+    belongs to a neighbouring run). t_start: when work on this candidate began (for calc_s). Returns True if logged."""
+    t_start = t_start or time.time()
+    RUN["solves"] += 1
     ra, dec = np.radians(getattr(row, ra_col)), np.radians(getattr(row, dec_col))
     res = star_test(loc, spice.et2utc(et_guess, "ISOC", 3), bracket_s, ra, dec, target_id, r_search, config.max_shadow_dist)
     if res is None:
@@ -680,17 +694,58 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     dx, dy = besselian_offsets(res['best_et'], star_dir, obs_geo, target_id)
     record.update(offset_east_km=dx, offset_north_km=dy,
                   max_duration_s=2*size['r_km']/met['speed_kms'])
+    # OWC observability with atmospheric extinction at the star's altitude (upper size bound, as the pick tool)
+    opt = owc_opt()
+    ext = float(screen.extinction_loss(star_alt, opt))
+    record.update(airmass=float(screen.airmass(star_alt)), extinction_mag=ext,
+                  mag_margin=float(screen.owc_limit(2*size['r_max_km']/met['speed_kms'], opt)) - row.phot_g_mean_mag - ext,
+                  calc_s=time.time() - t_start)
     print(record)
     pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
                                   header=not os.path.isfile(config.hits_output_cvs_file))
+    RUN["hits"] += 1
+    RUN["calc_s"] += record["calc_s"]
 
+    t_map = time.time()
     sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
     if config.write_maps and res['min_distance'] < size['r_km'] + sigma3:   # only hits worth mapping
         os.makedirs(config.map_dir, exist_ok=True)
         paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
         write_shadow_kml(paths, f"{config.map_dir}/{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}.kml",
                          f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
+    RUN["maps_s"] += time.time() - t_map
     return True
+
+
+def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
+    """Print the run statistics and the site/limits, and append them as one JSON line to <hits log>.runs.jsonl
+    (read by pyoccult_report.py for the page header)."""
+    t_end = time.time()
+    n_ok = max(n_targets, 1)
+    s = dict(run_utc=datetime.fromtimestamp(T_START, tz=__import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), mode=mode,
+             window_start=str(config.ct), window_days=config.days, targets=n_targets,
+             candidates=RUN["candidates"], gated=RUN["gated"], solves=RUN["solves"], hits=RUN["hits"],
+             total_s=t_end - T_START, startup_s=t_main - T_START, init_s=t_pass1, search_s=t_pass2,
+             maps_s=RUN["maps_s"], per_asteroid_s=(t_pass1 + t_pass2) / n_ok, search_per_asteroid_s=t_pass2 / n_ok,
+             per_solve_s=(t_pass2 - RUN["maps_s"]) / max(RUN["solves"], 1),
+             calc_per_hit_s=RUN["calc_s"] / max(RUN["hits"], 1),
+             site=dict(name=config.site_name, desc=config.site.get("name", ""), lat=config.LAT, lon=config.LON,
+                       ele=config.ELE, aperture_cm=config.pick_aperture_cm, frames=config.pick_frames,
+                       mag_adjust=config.pick_mag_adjust, extinction=config.pick_extinction),
+             limits=dict(mag_limit=config.MAG_MIN, min_star_alt=config.MIN_STAR_ALT, max_sun_alt=config.MAX_SUN_ALT,
+                         reach_km=config.max_shadow_dist, min_mag_drop=getattr(config, "min_mag_drop", 0.1),
+                         min_dur_s=config.pick_min_dur_s))
+    print(f"\nRun summary ({mode}): {n_targets} asteroids, {s['candidates']} candidates, {s['solves']} exact solves, "
+          f"{s['hits']} hits")
+    print(f"  total {s['total_s']:.1f} s = start-up {s['startup_s']:.1f} s + asteroid data {t_pass1:.1f} s + search "
+          f"{t_pass2:.1f} s (of it maps {s['maps_s']:.1f} s)")
+    print(f"  per asteroid {s['per_asteroid_s']:.2f} s (search {s['search_per_asteroid_s']:.2f} s); search time per "
+          f"exact solve {s['per_solve_s'] * 1000:.0f} ms (with star lookup and scan); calculation per hit "
+          f"{s['calc_per_hit_s'] * 1000:.0f} ms")
+    stem = os.path.splitext(config.hits_output_cvs_file)[0]
+    with open(stem + ".runs.jsonl", "a") as f:
+        f.write(json.dumps(s) + "\n")
+    return s
 
 
 def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=None):
@@ -705,11 +760,14 @@ def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=Non
     ets = plan['path']['ets']
     win_lo, win_hi = float(ets[0]), float(ets[-1])
     n_log = 0
+    RUN["candidates"] += len(cands)
     for cand in cands.sort_values('et_guess').itertuples(index=False):
+        t_start = time.time()
         # the observer's closest approach can be up to margin/speed away from the Earth-centre estimate
         bracket = corridor.solver_bracket_s(plan, cand.j)
         # cheap early gate (Sun and asteroid altitude) before any solver work
         if not window_is_observable(cand.et_guess, bracket, obs_geo, target_id):
+            RUN["gated"] += 1
             continue
         # only the candidates need exact space motion: propagate each to its own event time
         prop = corridor.propagate_exact(stars.iloc[[cand.star]], spice.et2utc(cand.et_guess, "ISOC", 0))
@@ -717,11 +775,12 @@ def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=Non
         dec_col = prop.filter(regex=r'^dec_\d{8}$').columns[0]
         row = next(prop.itertuples(index=False))
         n_log += handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, cand.et_guess, bracket,
-                             r_search, win_lo, win_hi)
+                             r_search, win_lo, win_hi, t_start)
     return n_log
 
 
 if __name__ == "__main__":
+    t_main = time.time()
     mag_min = config.MAG_MIN
     obs_loc = EarthLocation(lat=config.LAT*u.deg, lon=config.LON*u.deg, height=config.ELE*u.m)
 
@@ -733,6 +792,7 @@ if __name__ == "__main__":
                  .strftime("%Y-%m-%d %H:%M:%S").tolist())
 
     if getattr(config, "search_mode", "corridor") == "windows":    # old path: ~200 Gaia cones per asteroid
+        t_w = time.time()
         for t in config.targets:
             size = get_asteroid_size(t)
             if size is None:
@@ -742,6 +802,7 @@ if __name__ == "__main__":
             fetch_target_orbit(t, epochs)                          # once per target
             for ctp in periods:
                 target_test(obs_loc, ctp, config.spn + 600, t, size, mag_min)   # +10 min so windows overlap
+        run_summary("windows", t_main, 0.0, time.time() - t_w, len(config.targets))
         spice.kclear()
         sys.exit(0)
 
@@ -761,6 +822,7 @@ if __name__ == "__main__":
         f"Pass 1 (serial, SPICE): sizes, SPKs and one corridor plan per target"
     )
 
+    t_p1 = time.time()
     plans = {}
     for t in config.targets:
         size = get_asteroid_size(t)
@@ -773,11 +835,15 @@ if __name__ == "__main__":
                                                  min_drop=getattr(config, "min_mag_drop", 0.1),
                                                  step_s=getattr(config, "corridor_step_s", 600.0)))
 
+    t_p1 = time.time() - t_p1
+
     # pass 2 (serial, SPICE): stars from the local catalog, scan and solve
+    t_p2 = time.time()
     print(
         f"Pass 2 (serial, SPICE): stars from the local catalog, scan and solve"
     )
     for t, (size, plan) in plans.items():
         n = target_test_corridor(obs_loc, plan, t, size, local=local)
         print(f"{t}: {n} hit(s) logged")
+    run_summary("corridor", t_main, t_p1, time.time() - t_p2, len(plans))
     spice.kclear()

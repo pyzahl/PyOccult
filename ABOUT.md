@@ -16,7 +16,7 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
 | choose | `pyoccult_pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` |
 | predict | `pyoccult.py` | computes the events of the target asteroids exactly, appends them to `hits_log.csv`, writes KML maps |
 | present | `pyoccult_report.py` | turns `hits_log.csv` into an HTML or Markdown event list with an embedded map |
-| check | `pyoccult_owc_check.py` | reruns a stored OWC search (`owc_reference.csv`) and compares event by event |
+| check | `pyoccult_owc_check.py` | reruns an OWC search result you saved (`owc_reference.txt`, private) and compares event by event |
 
 Supporting modules: `pyoccult_corridor.py` (per-asteroid star corridor and candidate scan), `pyoccult_gaia_local.py`
 (local Gaia catalog and bright-star index), `pyoccult_screen.py` (the pick tool's event screen),
@@ -127,6 +127,11 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
 - Moon: topocentric separation from the star, altitude, illumination `(1 + cos a)/2`, phase age (ecliptic longitude
   Moon minus Sun).
 - `offset_east_km`, `offset_north_km`: shadow axis minus observer on the plane, i.e. how to move to the centre line.
+- Observability (logged, not filtered): `airmass` (Kasten & Young), `extinction_mag` = extinction x (airmass - 1), and
+  `mag_margin` = OWC limit (3.3, upper size bound) - star magnitude - extinction.
+- Run statistics: `calc_s` per hit (from the candidate's start to the logged record, without the map); per run a
+  summary (start-up, asteroid data loading = pass 1, search = pass 2, maps, per asteroid, per exact solve, counts,
+  site, equipment, limits) printed and appended to `<hits log>.runs.jsonl` for the report header.
 
 ### 2.10 Shadow ground track: `pyoccult_paths.py`
 
@@ -207,14 +212,14 @@ asteroids of the best events; their size data goes to the shared size cache.
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
 | Map | Leaflet 1.9.4 (cdnjs); Carto, Esri, OpenStreetMap tiles | report |
-| Reference | Occult / OWC predictions (`owc_reference.csv`) | validation |
+| Reference | Occult / OWC search results, pasted as text into `owc_reference.txt` (private, not in git) | validation |
 
 ---
 
 ## Part 5: Validation
 
-- **OWC reference** (`python pyoccult_owc_check.py`; 14 events, Rocky Point NY, Oct 2-7 2026, 20 km reach, G <= 15):
-  all 14 found with the same stars; times within 5.4 s (11 within 3 s). Drops agree within 0.25 mag below 5 mag (above
+- **OWC reference** (`python pyoccult_owc_check.py`; 16 events at the observer's site, Oct 2-9 2026, 20 km reach,
+  G <= 15, 25 cm, 4 frames): all 16 found with the same stars; times within 5.4 s (13 within 3 s). Drops agree within 0.25 mag below 5 mag (above
   that both are total and differ only by the asteroid's estimated brightness). Durations agree within 10 % wherever
   both use the same diameter; 4 events differ only by diameter (sizes from H, or OWC using another source than
   NEOWISE). 218001 is the open case (Part 6).
