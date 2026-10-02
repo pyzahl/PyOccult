@@ -140,7 +140,7 @@ To include the maps' KML links in the published page, also copy the `maps` folde
   source .venv/bin/activate
   pip install -r requirements.txt
   python pyoccult_setup.py            # one-time: kernels + local Gaia catalog (long download, resumable)
-  echo 'EDIT IT, RUN IT:'
+  echo 'EDIT SITES AND CONFIG, RUN IT:'
   ./pyoccult.py
   ```
 
