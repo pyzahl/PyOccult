@@ -9,7 +9,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `gaia_local_dir` (required by corridor mode), `gaia_local_gmax`.
 - `pyoccult_paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.
 - `pyoccult_report.py`: `hits_log.csv` to HTML/Markdown with an embedded Leaflet map. Standard library only.
-- `pyoccult_pick.py`: ranks asteroids by expected usable events/yr and writes `targets.py`. Needs numpy; SBDB bulk download.
+- `pyoccult_pick.py`: event finder over all asteroids (OWC-style) for a window; writes `pick_events.csv` and
+  `targets.py`. Engine `pyoccult_screen.py` (site solve, exposure rule), orbits `pyoccult_orbits.py` (SBDB full-precision
+  elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= 15, cells sorted by G). Worker processes.
 - `pyoccult_corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
 - `pyoccult_setup.py`: one-time bootstrap (kernels via `pyoccult_kernels.py`, local Gaia catalog, bright-star index);
@@ -64,8 +66,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   the fixed solver.
 - Corridor solver bracket: the scan estimates the Earth-centre closest approach; the observer's can be margin/speed
   (10-20 min) away, so the bracket is `corridor.solver_bracket_s` (+/- 1.3 margin/speed, >= 1 step, <= 4 h).
-- Not run against live services: SBDB bulk query syntax in `pyoccult_pick.py` (`sb-cdata`), Horizons RSS 3-sigma column
-  names in `pyoccult_paths.py`.
+- Not run against live services: Horizons RSS 3-sigma column names in `pyoccult_paths.py`.
+- Pick tool validated 2026-10-01: blind screen of all 465k asteroids (H < 17), Oct 1 + 8 d, 20 km reach, min alt 5:
+  39 events incl. all 13 OWC reference events with H < 17 (same stars, times within 5 s, drops/durations as
+  pyoccult.py); 819762 (H 18.45) needs `--all`. 875 s in one process, 318 s with 4 workers, same events.
+  SBDB bulk elements MUST be full precision (`full-prec=true`): rounded ones give ~40" errors.
 - Report map: works through a web server (OpenStreetMap needs a Referer); Carto/Esri basemaps from `file://` untested.
 
 ## Ideas not built yet

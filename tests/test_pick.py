@@ -1,43 +1,73 @@
-import sys, json, math, numpy as np
-sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..'))
-import pyoccult_pick as P
+import os, sys, json, math, time, types, tempfile, numpy as np
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+import pyoccult_pick as P, pyoccult_screen as SC
 
-# 1 galactic matrix: galactic centre and north pole
-def eq(ra, dec):
-    ra, dec = math.radians(ra), math.radians(dec); return np.array([math.cos(dec)*math.cos(ra), math.cos(dec)*math.sin(ra), math.sin(dec)])
-l0 = P.EQ2GAL @ eq(266.405, -28.936); print("GC galactic xyz", l0.round(3)); assert abs(l0[0]-1) < 1e-3
-ngp = P.EQ2GAL @ eq(192.859, 27.128); assert abs(ngp[2]-1) < 1e-3
-assert P.EQ2GAL @ P.EQ2GAL.T @ np.eye(3) is not None and np.allclose(P.EQ2GAL @ P.EQ2GAL.T, np.eye(3), atol=1e-6)
+# ---------- 1. exposure rule: exposure(m) and the faintest useful star are inverse; aperture scales flux
+opt = dict(ref_mag=12.5, ref_exp=0.08, ref_aperture=25.0, aperture=25.0, frames=4)
+assert abs(SC.exposure_s(12.5, opt) - 0.08) < 1e-12 and abs(SC.exposure_s(15.0, opt) / SC.exposure_s(12.5, opt) - 10) < 1e-9
+for dur in (0.2, 0.5, 2.0, 5.0):
+    m = SC.faintest_useful_star(dur, opt)
+    assert abs(opt["frames"] * SC.exposure_s(m, opt) - dur) < 1e-9, (dur, m)
+big = dict(opt, aperture=50.0); assert abs(SC.faintest_useful_star(1.0, big) - SC.faintest_useful_star(1.0, opt) - 2.5 * math.log10(4)) < 1e-9
+assert abs(SC.drop_cut(0.1) - 2.5388) < 1e-3
+# the OWC reference events that define the default calibration are detectable: (G, OWC duration)
+for g, dur in ((12.28, 0.48), (14.09, 1.55), (12.78, 0.51), (14.06, 4.33)):
+    assert dur >= 4 * SC.exposure_s(g, opt), (g, dur)
+print("exposure: G 12.5 ->", SC.exposure_s(12.5, opt), "s, G 15 ->", round(float(SC.exposure_s(15, opt)), 2), "s;",
+      "faintest star for a 0.5 s event:", round(float(SC.faintest_useful_star(0.5, opt)), 2))
 
-# 2 Earth: distance 0.983..1.017 AU; at the March equinox the Earth sees the Sun near ecliptic longitude 0
-jd = 2451545.0 + np.arange(0, 366.0)
-E, R = P.earth_helio_ecl(jd); print("R range", R.min().round(4), R.max().round(4)); assert .982 < R.min() < .984 and 1.016 < R.max() < 1.018
-jd_eq = 2461119.0                      # ~2026-03-20 14:46 UT equinox is JD 2461120.1
-e1, _ = P.earth_helio_ecl(np.array([2461120.1])); lam = math.degrees(math.atan2(-e1[0,1], -e1[0,0])) % 360
-print("Sun ecl lon at 2026 equinox", round(lam,3)); assert abs(lam - (360 - 0.01397*26.2)) < 0.03   # J2000 frame: equinox of date is 0.366 deg west
+# ---------- 2. asteroid table: sizes like pyoccult.get_asteroid_size, bad orbits skipped, H limit
+F = P.SBDB_FIELDS
+def row(**kw):
+    d = dict(spkid=20000001, full_name=" 1 Test", H="10", G=None, diameter=None, diameter_sigma=None, extent=None,
+             albedo=None, a="2.5", e="0.1", i="5", om="10", w="20", ma="30", epoch="2461200.5", condition_code="0",
+             neo="N", **{"class": "MBA"}); d.update(kw); return [d[f] for f in F]
+data = [row(), row(spkid=20000002, diameter="100", diameter_sigma="2"), row(spkid=20000003, diameter="50"),
+        row(spkid=20000004, e="1.2"), row(spkid=20000005, H=None), row(spkid=20000006, H="18.0")]
+rows = P.build_rows(F, data, 17.0)
+assert [r["number"] for r in rows] == [1, 2, 3], [r["number"] for r in rows]
+r1, r2, r3 = rows
+Dp = lambda p, H: 1329.0 / math.sqrt(p) * 10 ** (-H / 5)
+assert r1["D_est"] and abs(r1["D_km"] - Dp(0.14, 10)) < 1e-9 and abs(r1["D_max_km"] - Dp(0.05, 10)) < 1e-9 and r1["G"] == 0.15
+assert not r2["D_est"] and r2["D_km"] == 100 and r2["D_max_km"] == 106 and abs(r3["D_max_km"] - 50 * 1.45) < 1e-9
+assert len(P.build_rows(F, data, None)) == 4                       # --all keeps H 18, still skips the bad ones
 
-# 3 Kepler: period closure, radius bounds, orbit-plane normal
-el = {k: np.array([v]) for k, v in dict(a=2.766, e=0.0796, i=10.59, om=80.27, w=73.4, ma=130.0, epoch=2460600.5).items()}
-per = 365.25636 * el['a'][0]**1.5 * 0.98560767 / 0.98560767
-t = 2460600.5 + np.array([0.0, 1681.0])                         # ~ period of Ceres (4.60 yr = 1680 d)
-pos, r = P.kepler_helio_ecl(el, t)
-P_days = 360.0 / (0.98560767 / el['a'][0]**1.5); print("period d", round(P_days,1))
-pos2, _ = P.kepler_helio_ecl(el, np.array([2460600.5 + P_days]))
-assert np.allclose(pos[0,0], pos2[0,0], atol=1e-6), (pos[0,0], pos2[0,0])
-tt = 2460600.5 + np.linspace(0, P_days, 400); pp, rr = P.kepler_helio_ecl(el, tt)
-assert abs(rr.min()-2.766*(1-.0796)) < 2e-3 and abs(rr.max()-2.766*(1+.0796)) < 2e-3
-hvec = np.cross(pp[0,10], pp[0,11]); hvec /= np.linalg.norm(hvec); I, O = math.radians(10.59), math.radians(80.27)
-want = np.array([math.sin(I)*math.sin(O), -math.sin(I)*math.cos(O), math.cos(I)])
-assert np.allclose(hvec, want, atol=1e-3), (hvec, want)
-# vis-viva check at one point (speed)
-v = np.linalg.norm(pp[0,11]-pp[0,10]) / (tt[11]-tt[10]); vv = 0.01720209895*math.sqrt(2/rr[0,10] - 1/2.766); print("speed", round(v,6), round(vv,6)); assert abs(v-vv)/vv < 2e-3
+# ---------- 3. SBDB bulk cache: reused only if full precision, all fields, covering hmax and fresh
+calls = []
+class R:
+    def __init__(s, b): s.b = b
+    def __enter__(s): return s
+    def __exit__(s, *a): pass
+    def read(s): return json.dumps(s.b).encode()
+def urlopen(url, timeout):
+    calls.append(url); return R(dict(fields=F, data=data))
+_j = json
+P.urllib.request.urlopen = urlopen
+cache = os.path.join(tempfile.mkdtemp(), "bulk.json")
+P.fetch_sbdb(17.0, cache, 1e9); assert len(calls) == 1 and "full-prec=true" in calls[0] and "H%7CLT%7C17" in calls[0]
+P.fetch_sbdb(17.0, cache, 1e9); assert len(calls) == 1, "cache not reused"
+P.fetch_sbdb(16.0, cache, 1e9); assert len(calls) == 1, "a cache for H < 17 covers H < 16"
+P.fetch_sbdb(None, cache, 1e9); assert len(calls) == 2 and "sb-cdata" not in calls[1], "--all needs a new download"
+P.fetch_sbdb(17.0, cache, 1e9); assert len(calls) == 2, "the --all cache covers H < 17"
+P.fetch_sbdb(17.0, cache, 0.0); assert len(calls) == 3, "expired cache not refreshed"
+b = _j.load(open(cache)); b["full_prec"] = False; _j.dump(b, open(cache, "w"))
+P.fetch_sbdb(17.0, cache, 1e9); assert len(calls) == 4, "an old rounded-elements cache must be replaced"
+assert not [f for f in os.listdir(os.path.dirname(cache)) if f.endswith(".tmp")]
 
-# 4 brightness: Ceres-like H=3.4 near opposition at r=2.6, delta=1.6 -> V ~ 7.2-7.6 ; small-phase should equal H+5log(r d)
-m = P.apparent_mag(np.array(3.4), np.array(0.12), np.array(2.6), np.array(1.6), np.array(1.0)); print("m_ast", float(m)); assert abs(float(m) - (3.4 + 5*math.log10(2.6*1.6))) < 1e-9
-# 5 diameters
-D, est = P.diameter_km(np.array([np.nan, 100.0]), np.array([np.nan, 0.1]), np.array([12.0, 9.0])); print(D, est); assert est.tolist() == [True, False] and abs(D[0] - 1329/math.sqrt(0.14)*10**(-12/5)) < 1e-9
-# 6 star density model: monotonic in mag, higher at plane, sky-mean equals the table
-d = P.star_density(np.array([0., 30., 90.]), 14.0); print("dens G<14 b=0,30,90", d.round(0)); assert d[0] > d[1] > d[2]
-bs = np.radians(np.linspace(-90, 90, 20001)); mean = np.sum(P.star_density(np.degrees(bs), 14.0)*np.cos(bs))/np.sum(np.cos(bs)); print("sky mean", round(mean,1)); assert abs(mean-580) < 8
-assert P.star_density(np.array(0.), 15) > P.star_density(np.array(0.), 14)
-print("unit checks OK")
+# ---------- 4. screen helpers: cubic interpolation and the site solver on a straight shadow track
+ets = np.arange(0.0, 6000.0, 600.0)
+g = np.stack([ets * 7.0 - 20000.0, 3.0e8 + 0 * ets, 50.0 + ets * 0.002], 1)        # linear motion: exact for cubics
+tq = np.array([601.0, 2999.5, 4200.0]); gi = SC._interp(g, ets, tq)
+assert np.allclose(gi, np.stack([tq * 7.0 - 20000.0, 3.0e8 + 0 * tq, 50.0 + tq * 0.002], 1))
+class FakeSite:                                                                         # observer fixed at the origin
+    def at(self, et):
+        et = np.atleast_1d(et); return np.zeros((len(et), 3)), np.tile([0.0, 0.0, 1.0], (len(et), 1))
+sdir = np.array([[0.0, 1.0, 0.0]])                                                       # star along +y: plane is x, z
+T_TRUE, B = 2000.0, 37.0                                                                 # closest approach time, miss km
+track = lambda t: np.stack([7.0 * (np.atleast_1d(t) - T_TRUE), 3.0e8 + 0 * np.atleast_1d(t), B + 0 * np.atleast_1d(t)], 1)
+t, miss, off, v = SC.solve_site(None, FakeSite(), track, sdir, np.array([2300.0]), np.array([900.0]))
+print("site solver: t", round(float(t[0]), 4), "miss", round(float(miss[0]), 4), "speed", round(float(v[0]), 4))
+assert abs(t[0] - T_TRUE) < 1e-3 and abs(miss[0] - B) < 1e-6 and abs(v[0] - 7.0) < 1e-9
+t, miss, _, _ = SC.solve_site(None, FakeSite(), track, sdir, np.array([2300.0]), np.array([100.0]))
+assert abs(t[0] - 2200.0) < 1e-9, "the solution must stay inside the bracket"
+print("PICK TESTS PASSED")

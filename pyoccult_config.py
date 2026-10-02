@@ -2,7 +2,7 @@
     
 ### SEARCH SETUP
 
-ct, days, spn = "2026-10-01T00:00:00", 20, 3600
+ct, days, spn = "2026-10-01T00:00:00", 20, 3600   # start (UTC), days to search, window length in s ("windows" mode only)
 
 # if targets.py file was created it is automatically used, delete it to use a manaual list as the example below after ImportError:
 try:
@@ -17,7 +17,7 @@ search_mode = "corridor"   # "corridor": stars along each path from the local Ga
 min_mag_drop = 0.1         # mag; events with a smaller drop are not logged (also sets the Gaia magnitude cap per asteroid)
 corridor_step_s = 600      # s, coarse path step for the corridor candidate scan
 gaia_local_dir = "gaia_dr3_g18"  # folder of the local Gaia copy, required by corridor mode (python pyoccult_gaia_local.py build)
-gaia_local_gmax = 18.0     # faintest G kept when building the local copy (~19 GB for 18)
+gaia_local_gmax = 18.0     # faintest G kept when building the local copy (~11 GB for 18; a new value needs a new folder)
 
 ### CONFIG OBSERVER
 
@@ -48,7 +48,7 @@ write_maps = True
 map_dir = "maps"
 default_sigma3_km = 10.0
 
-## cache folder for all tools (Gaia strips, asteroid SPKs, SBDB download). /dev/shm is RAM on Linux (fast, emptied on reboot);
+## cache folder for all tools (asteroid SPKs, SBDB downloads). /dev/shm is RAM on Linux (fast, emptied on reboot);
 ## elsewhere the system temp folder is used. Set any folder here, e.g. cache_path = "C:/pyoccult_cache"
 import os as _os, tempfile as _tempfile
 cache_path = "/dev/shm" if _os.path.isdir("/dev/shm") else _tempfile.gettempdir()
