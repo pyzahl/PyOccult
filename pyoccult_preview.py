@@ -11,6 +11,8 @@ import math
 import numpy as np
 
 SIZE = 560                                 # image width and height, px (field area)
+DENSE_START, DENSE_KEEP = 4000, 1500      # very dense field (> DENSE_START stars): only the brightest DENSE_KEEP are
+                                           # drawn normally, the fainter ones as small dim dots
 
 
 def camera_fov_arcmin(focal_mm, sensor_mm):
@@ -56,13 +58,21 @@ def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", sub
     xi, eta = _gnomonic(stars["ra"], stars["dec"], target["ra"], target["dec"])
     g = np.asarray(stars["g"], float)
     order = np.argsort(-g)
-    g_ref = min(float(np.min(g)) if len(g) else target["g"], target["g"])
+    X, Y = px(np.asarray(xi, float)), py(np.asarray(eta, float))
+    inside = (X >= 0) & (X <= SIZE) & (Y >= 0) & (Y <= SIZE)
+    g_in = np.sort(g[inside])
+    g_dim = float(g_in[DENSE_KEEP]) if len(g_in) > DENSE_START else None   # very dense: fainter than this dimmed
+    g_max = float(g_in[-1]) if len(g_in) else 0.0
     for k in order:
-        x, y = px(xi[k]), py(eta[k])
-        if 0 <= x <= SIZE and 0 <= y <= SIZE:
-            r = float(np.clip(0.8 + 0.55 * (16.5 - g[k]), 0.7, 7.5))
-            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r:.2f}" fill="#f8fafc" fill-opacity="'
-                       f'{min(1.0, 0.45 + 0.08 * (16.5 - g[k])):.2f}"><title>G {g[k]:.2f}</title></circle>')
+        if not inside[k]:
+            continue
+        if g_dim is not None and g[k] > g_dim:                         # small, dim dot, fading towards the limit
+            t = (g[k] - g_dim) / max(g_max - g_dim, 0.1)
+            r, op = 0.85 - 0.4 * t, 0.38 - 0.22 * t
+        else:
+            r, op = float(np.clip(0.8 + 0.55 * (16.5 - g[k]), 0.7, 7.5)), min(1.0, 0.45 + 0.08 * (16.5 - g[k]))
+        out.append(f'<circle cx="{X[k]:.1f}" cy="{Y[k]:.1f}" r="{r:.2f}" fill="#f8fafc" fill-opacity="'
+                   f'{op:.2f}"><title>G {g[k]:.2f}</title></circle>')
     # camera frame
     out.append(f'<rect x="{cx - fw * scale / 2:.1f}" y="{cy - fh * scale / 2:.1f}" width="{fw * scale:.1f}" '
                f'height="{fh * scale:.1f}" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6 4"/>')
@@ -107,6 +117,7 @@ def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", sub
                f'<text x="16" y="{SIZE - 30}" stroke="none">{bar}′</text></g>')
     out.append("</g>")
     out.append(f'<text x="12" y="60" fill="#6b7280" font-size="11">'
-               f'field {field:.0f}′ · stars to G {float(np.max(g)) if len(g) else 0:.1f} · N up, E left</text>')
+               f'field {field:.0f}′ · stars to G {float(np.max(g)) if len(g) else 0:.1f}'
+               + (f' · dense: fainter than G {g_dim:.1f} dimmed' if g_dim is not None else '') + ' · N up, E left</text>')
     out.append("</svg>")
     return "\n".join(out)

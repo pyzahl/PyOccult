@@ -246,6 +246,14 @@ def build_event(r, lat, lon, kml_dir, out_dir):
         moon = dict(icon=icon, sep=num(r["moon_sep_deg"]), alt=num(r["moon_alt_deg"]), illum=illum)
     kml_abs = find_kml(kml_dir, tid, when)
     prev_abs = find_kml(kml_dir, tid, when, "svg")
+    fov = 2.0                                                    # deg; the preview's field when there is one
+    if prev_abs:
+        try:
+            with open(prev_abs, encoding="utf-8") as f:
+                m = re.search(r"field (\d+(?:\.\d+)?)\u2032", f.read())
+            fov = float(m[1]) / 60.0 if m else fov
+        except OSError:
+            pass
     preview = urllib.parse.quote(os.path.relpath(prev_abs, out_dir).replace(os.sep, "/")) if prev_abs else None
     kml = urllib.parse.quote(os.path.relpath(kml_abs, out_dir).replace(os.sep, "/")) if kml_abs else None
     miss, margin = num(r.get("min_distance")), num(r.get("margin_km"))
@@ -257,7 +265,7 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs, preview=preview,
                 m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")), calc=num(r.get("calc_s")),
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
-                size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip())
+                size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(), ra=ra, dec=dec, fov=fov)
 
 
 def dedupe(events, tol=300.0):
@@ -356,6 +364,18 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 
 LEAFLET_TAGS = ('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">'
                 '<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>')
+
+KSTARS_JS = """<script>
+(function(){var site=__SITE__,bs=document.querySelectorAll('.ksbtn');if(!bs.length||location.protocol==='file:')return;
+fetch('/api/kstars/status').then(function(r){return r.json();}).then(function(j){if(!j.ok)return;
+ bs.forEach(function(b){b.hidden=false;b.addEventListener('click',function(){
+  var q=new URLSearchParams({ra:b.dataset.ra,dec:b.dataset.dec,utc:b.dataset.utc,fov:b.dataset.fov});
+  if(site){q.set('lat',site.lat);q.set('lon',site.lon);q.set('ele',site.ele||0);}
+  b.textContent='KStars …';
+  fetch('/api/kstars/show?'+q).then(function(r){return r.json();}).then(function(j){
+   b.textContent=j.ok?'KStars ✓':'KStars ✗';b.title=j.msg;setTimeout(function(){b.textContent='KStars';},4000);})
+  .catch(function(){b.textContent='KStars ✗';});});});}).catch(function(){});})();
+</script>"""
 
 PREVIEW_DIALOG = """<dialog id="prevdlg" aria-label="Event preview" style="width:auto;height:auto;max-width:96vw;max-height:96vh">
 <div class="dh"><h2>Preview</h2><button id="prevclose" type="button" aria-label="Close preview">✕</button></div>
@@ -460,10 +480,14 @@ def shadow_cell(e):
 
 
 def map_cell(e):
+    ks = (f'<button class="mapbtn ksbtn" type="button" hidden data-ra="{e["ra"]:.7f}" data-dec="{e["dec"]:.7f}" '
+          f'data-utc="{esc(e["utc"])}" data-fov="{e["fov"]:.3f}" title="Point KStars at the star at the event time, '
+          f'seen from the site (Linux, KStars running, report opened from the GUI)">KStars</button> '
+          if e.get("ra") is not None and e.get("dec") is not None else "")
     if not e["kml"] and not e.get("preview"):
-        return "<td>—</td>"
+        return f"<td>{ks}—</td>" if ks else "<td>—</td>"
     title = f'{e["label"]} · {fmt_time(e["when"])} UT'
-    out = ""
+    out = ks
     if e.get("pkey"):
         out += f'<button class="mapbtn" type="button" data-k="{esc(e["pkey"])}" data-t="{esc(title)}">Map</button> '
     if e.get("preview"):
@@ -545,7 +569,7 @@ def to_html(events, meta):
 <li>Altitude is the star's altitude at closest approach. The Moon is shown only while above the horizon. Click a column heading to sort.</li>
 <li>Map shows the path on an interactive map (needs internet for the map tiles) and links the closest centre-line point in Google Maps. Google Maps itself cannot load a local KML file: use the KML link with Google Earth, or import it in My Maps (Create a new map, then Import).</li>
 </ul>
-</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}{PREVIEW_DIALOG if n_prev else ''}</body></html>
+</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}{PREVIEW_DIALOG if n_prev else ''}{KSTARS_JS.replace("__SITE__", json.dumps(meta.get("site")))}</body></html>
 """
 
 
@@ -656,7 +680,9 @@ def main(argv=None):
         lat, lon = run["site"]["lat"], run["site"]["lon"]
         observer = f"site {run['site']['name']}"
     meta = dict(title=a.title, span=span, sort=a.sort, info=header_info(run, lat, lon), observer=observer, generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
-                paths=paths, tiles=a.tile_url, obs=[lat, lon] if lat is not None and lon is not None else None)
+                paths=paths, tiles=a.tile_url, obs=[lat, lon] if lat is not None and lon is not None else None,
+                site=dict(lat=lat, lon=lon, ele=(run or {}).get("site", {}).get("ele", 0.0))
+                if lat is not None and lon is not None else None)
     text = to_markdown(events, meta) if fmt_name == "md" else to_html(events, meta)
     with open(out, "w", encoding="utf-8") as f:
         f.write(text)

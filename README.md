@@ -31,6 +31,7 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 | `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py`, and saves both per site and window in `picks/` |
 | `pyoccult_picks.py` | the saved picks: which one a search uses, `list`, `import` |
+| `pyoccult_kstars.py` | points a running KStars at an event (Linux, D-Bus); used by the report's KStars button in the GUI |
 | `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
 | `pyoccult_gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
@@ -445,7 +446,11 @@ python pyoccult_gui.py --port 8090 --no-browser
   drop, maps and previews, then **Run search**. A line says which saved pick the search will use, or that none
   covers the window.
   The report is rebuilt and shown under **Results** when the run finishes.
-* **Results**: the HTML report with its maps and previews.
+* **Results**: the HTML report with its maps and previews. On Linux with KStars running, each event also gets a
+  **KStars** button: it points KStars at the target star at the event time, seen from the site (it sets KStars'
+  location to the site), with a field like the preview's. It uses KStars' D-Bus interface (`gdbus` or `dbus-send`,
+  both standard on Linux desktops). Elsewhere (macOS, Windows, KStars not running, the report opened as a file) the
+  button does not appear.
 * **Log**: the live output of the running job, with **Stop**.
 
 Settings chosen in the GUI apply to that run only (via `pyoccult_runner.py`); `pyoccult_config.py` is not changed.

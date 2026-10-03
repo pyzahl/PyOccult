@@ -32,6 +32,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `pyoccult_gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult_runner.py`
   (JSON config overrides per run). `pyoccult_geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult_preview.py`:
   event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.
+- `pyoccult_kstars.py`: KStars D-Bus control (Linux only, `gdbus` with `--` before args, else `dbus-send`; never raises).
+  setGPSLocation(site) -> setLocalTime (KStars local time: re-read `tz` from location(), it follows DST of the shown
+  date) -> setRaDecJ2000 (RA in hours) -> setTracking -> setApproxFOV. GUI routes `/api/kstars/status|show`; the report's
+  hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).
@@ -94,3 +98,4 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - Process-level parallelism by target (`ProcessPoolExecutor`; parent does kernel checks, Horizons SPKs and opens the local Gaia catalog;
   workers return records, parent writes the CSV).
 - `m_before` / `m_during` columns in the log.
+

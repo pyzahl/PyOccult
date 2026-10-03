@@ -470,6 +470,18 @@ def main():
     os.makedirs(config.map_dir, exist_ok=True)
     app.add_static_files("/out/maps", os.path.join(ROOT, config.map_dir), max_cache_age=0)
     app.add_static_file(local_file=os.path.join(ROOT, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
+    import pyoccult_kstars                                      # report's KStars buttons (Linux; hidden elsewhere)
+
+    @app.get("/api/kstars/status")
+    def kstars_status():
+        ok, msg = pyoccult_kstars.available()
+        return {"ok": ok, "msg": msg}
+
+    @app.get("/api/kstars/show")
+    def kstars_show(ra: float, dec: float, utc: str, fov: float = 2.0, lat: float = None, lon: float = None,
+                    ele: float = 0.0):
+        ok, msg = pyoccult_kstars.show(ra, dec, utc, fov, lat, lon, ele)
+        return {"ok": ok, "msg": msg}
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
                         strict=False, max_cache_age=0)
     ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(ROOT, "pyoccult_logo.svg"),
