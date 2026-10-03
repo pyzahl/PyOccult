@@ -407,6 +407,21 @@ the site and window in its header.
 Tune it like OWC: with the same aperture, frames and MagAdjust as in OWC you get OWC's selection. Raise `mag_adjust`
 for a dark site or a sensitive camera, lower it for light pollution or a less sensitive one.
 
+**How wide is the corridor?** An event is kept when the shadow's centre line passes the site within
+**r_max + reach**: r_max is the upper bound of the asteroid's radius, reach is how far you can travel (the site's
+**Reach** in the GUI, `reach_km` in `sites.py`, `--reach` on the command line; default `max_shadow_dist`). It is the
+same rule `pyoccult.py` uses for logging, and Reach is the only setting for it. Example: reach 25 km and a 10 km
+asteroid (r_max about 5 km) keep events whose centre line passes within 30 km of the site, on either side.
+
+* Sigmas: only the size has one. r_max comes from the SBDB diameter + 3 sigma (sigma 15 % of the diameter when SBDB
+  gives none); with only H it is the diameter for albedo 0.05 instead of the nominal 0.14 (about 1.7x larger). The
+  orbit uncertainty is not added: an event whose path is uncertain by more than your reach can be missed or kept
+  wrongly. Raise Reach for such poorly known orbits, and check the 3-sigma lines on the map of the final prediction.
+* Positions in the pick are good to about 2 km (orbits integrated from SBDB elements); `pyoccult.py` then computes
+  the kept events exactly with the JPL Horizons orbit.
+* The stars are first gathered from a wider strip (Earth radius + r_max + reach on each side, plus a margin for proper
+  motion). That strip is only a coarse pre-filter before the exact solve for the site and does not change the result.
+
 Use the result in `pyoccult_config.py`:
 
 ```python
@@ -479,7 +494,7 @@ python pyoccult_report.py hits_log.csv --sort date               # by event time
 * The site (header, compass directions, map pin) comes from the run summary in `hits_log.runs.jsonl`, else from
   `pyoccult_config.py` (`sites.py`); `--lat`, `--lon` override it. `map_dir` (default `maps`) or `--kml-dir` locate the KML files.
 * `--max-miss KM` and `--min-drop MAG` filter the list; `--no-embed` leaves out the embedded map viewer.
-* Each event row links to its KML file (`maps/<asteroid>_<YYYYMMDDTHHMM>*.kml`, written by the shadow-path module). The map button opens an embedded Leaflet map with the centre line (green), the shadow limits (red), the 3-sigma limits (orange, dashed) and your site, zoomed to the nearest point of the path. A link there opens that point in Google Maps.
+* Each event row links to its KML file (`maps/<asteroid>_<YYYYMMDDTHHMM>*.kml`, written by the shadow-path module). The map button opens an embedded Leaflet map with the centre line (green), the shadow limits (red), the 1-sigma limits (purple, dotted: the real shadow edge stays inside them about 2 times in 3), the 3-sigma limits (orange, dashed) and your site, zoomed to the nearest point of the path. A link there opens that point in Google Maps.
 * View it through a web server for reliable maps: copy the report, the `maps` folder (for the KML links) and, e.g.,
   ```bash
   cp hits_report.html /var/www/html/pyoccult/ && cp -r maps /var/www/html/pyoccult/

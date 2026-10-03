@@ -195,7 +195,8 @@ def find_kml(kml_dir, target_id, when, ext="kml"):
 
 
 KML_NS = "{http://www.opengis.net/kml/2.2}"
-LINE_STYLES = (("Centre", "#15803d", 3, None), ("Shadow limit", "#dc2626", 2, None), ("3-sigma", "#d97706", 2, "6 6"))
+LINE_STYLES = (("Centre", "#15803d", 3, None), ("Shadow limit", "#dc2626", 2, None), ("1-sigma", "#7c3aed", 1.5, "2 4"),
+               ("3-sigma", "#d97706", 2, "6 6"))
 
 
 def kml_to_data(path):
@@ -360,6 +361,7 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 .legend{margin-left:auto;color:var(--muted)}
 .legend i{display:inline-block;width:18px;height:3px;margin:0 5px 2px 12px;vertical-align:middle}
 .legend i.dash{background:repeating-linear-gradient(90deg,#d97706 0 6px,transparent 6px 10px)}
+.legend i.dot{background:repeating-linear-gradient(90deg,#7c3aed 0 2px,transparent 2px 5px)}
 """
 
 LEAFLET_TAGS = ('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">'
@@ -401,7 +403,7 @@ DIALOG = """<dialog id="mapdlg" aria-label="Shadow path map">
 <div class="df"><button class="tb" id="mapobs" type="button">Zoom to observer</button>
 <button class="tb" id="mapall" type="button">Whole path</button>
 <a id="mapgm" target="_blank" rel="noopener" hidden>Closest centre-line point in Google Maps</a>
-<span class="legend"><i style="background:#15803d"></i>centre line<i style="background:#dc2626"></i>shadow limits<i class="dash"></i>3σ limits</span></div>
+<span class="legend"><i style="background:#15803d"></i>centre line<i style="background:#dc2626"></i>shadow limits<i class="dot"></i>1σ limits<i class="dash"></i>3σ limits</span></div>
 </dialog>"""
 
 MAP_JS = """

@@ -40,6 +40,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
+- `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for
+  pyoccult_owc_check.py) with the matching pick runs (`.pick.csv/.log`) and a README of settings and findings. Keep
+  adding sets there; never delete them.
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).
 
 ## Conventions that matter

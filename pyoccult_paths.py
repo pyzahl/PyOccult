@@ -29,7 +29,8 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
     """Ground track of the shadow axis and its limits.
 
     Returns {name: [(et, lon_deg, lat_deg, duration_s_or_None), ...]} for
-    'center', 'edge_plus', 'edge_minus' (+/- r_km) and 'sigma_plus', 'sigma_minus' (+/- (r_km + sigma3_km)).
+    'center', 'edge_plus', 'edge_minus' (+/- r_km), 'sigma1_plus', 'sigma1_minus' (+/- (r_km + sigma3_km / 3), the
+    1-sigma limits) and 'sigma_plus', 'sigma_minus' (+/- (r_km + sigma3_km)).
     '+' is the side 90 deg counter-clockwise of the shadow's motion in the plane (x east, y north).
     duration_s is the centre-line duration 2*r/(shadow speed relative to the ground point).
 
@@ -60,6 +61,7 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
     ets = et_best + step * np.arange(-n_steps, n_steps + 1)
 
     offsets = {'center': 0.0, 'edge_plus': r_km, 'edge_minus': -r_km,
+               'sigma1_plus': r_km + sigma3_km / 3.0, 'sigma1_minus': -(r_km + sigma3_km / 3.0),
                'sigma_plus': r_km + sigma3_km, 'sigma_minus': -(r_km + sigma3_km)}
     out = {k: [] for k in offsets}
 
@@ -130,6 +132,8 @@ def write_shadow_kml(paths, filename, title, observer=None, tick_every=10):
     parts = [line("Centre line", paths['center'], "ff00ff00", 3),             # KML colours are aabbggrr
              line("Shadow limit A", paths['edge_plus'], "ff0000ff", 2),
              line("Shadow limit B", paths['edge_minus'], "ff0000ff", 2),
+             line("1-sigma limit A", paths.get('sigma1_plus', []), "ffff66cc", 1),
+             line("1-sigma limit B", paths.get('sigma1_minus', []), "ffff66cc", 1),
              line("3-sigma limit A", paths['sigma_plus'], "ff00ffff", 2),
              line("3-sigma limit B", paths['sigma_minus'], "ff00ffff", 2)]
     for i, (et, lon, lat, dur) in enumerate(paths['center']):

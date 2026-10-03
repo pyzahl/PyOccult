@@ -9,6 +9,7 @@ sbdb_cache.json
 # private and local files
 owc_reference.txt
 owc_reference.csv
+owc_refs/
 sites.py
 run.sh
 # run outputs

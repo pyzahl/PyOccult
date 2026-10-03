@@ -142,10 +142,24 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
 
 ### 2.10 Shadow ground track: `pyoccult_paths.py`
 
-- About 1.3 Earth radii of track on each side of the event, ~100 km per step. Five lines: centre, the shadow limits
-  (+/-r) and the 3-sigma limits (+/-(r + 3 sigma)); each plane point is projected onto the Earth ellipsoid
+- About 1.3 Earth radii of track on each side of the event, ~100 km per step. Seven lines: centre, the shadow limits
+  (+/-r), the 1-sigma limits (+/-(r + sigma)) and the 3-sigma limits (+/-(r + 3 sigma)); each plane point is projected onto the Earth ellipsoid
   (`surfpt`; a miss raises `NotFoundError` and the point is skipped), with the centre-line duration at each point.
-- 3 sigma: the JPL Horizons RSS 3-sigma position uncertainty times the distance, else `default_sigma3_km`.
+- Sigma: `path_sigma3_km` asks JPL Horizons for the plane-of-sky 3-sigma position uncertainty at the event
+  (`RSS_3sigma`, arcsec) and converts it to km at the asteroid's distance; sigma = that / 3. Without a Horizons
+  covariance it uses `default_sigma3_km` (10 km, so sigma 3.3 km). Only the orbit counts: the star's position error is
+  not added. Gaia DR3 positions carried from 2016 to 2026 with their proper-motion errors are good to about 1 mas
+  for bright stars (~1 km at 1.2 AU) and several mas for faint ones (G 17-18: several km), so for faint stars the
+  real band is wider than drawn.
+- RSS is the size of the whole error ellipse, dominated by its long axis. What moves the path on the ground is the
+  part across the track; the part along the track only shifts the time. So the 1- and 3-sigma lines are as wide as
+  the long axis whichever way it points: right when the long axis lies across the track, too wide when it lies along
+  it. Example, 172559 on 2026-10-19 (1.21 AU): long axis 0.03" (3 sigma) at position angle -4 deg, short axis 0.004",
+  track to the east-north-east, so the long axis lies nearly across the track and sigma ~9 km is the real cross-track
+  value there (3 sigma 26 km).
+- Occult/OWC draw the same kind of diagram (shadow, then the 1-sigma band, then 2- and 3-sigma lines), but take the
+  uncertainty from their own orbit data, not from Horizons, so their band can be narrower or wider than ours for the
+  same event (e.g. an OWC event with a 9 km shadow and a 1-sigma band of ~2 km on each side).
 - KML for Google Earth or Google My Maps; written for every logged event, i.e. when the miss distance is below
   `r_max + max_shadow_dist` (the shadow plus the distance you can travel), also when the site lies outside the
   3-sigma band: then the map shows where to go.
@@ -250,6 +264,36 @@ records which list was used, and the report header shows it.
   that both are total and differ only by the asteroid's estimated brightness). Durations agree within 10 % wherever
   both use the same diameter; 4 events differ only by diameter (sizes from H, or OWC using another source than
   NEOWISE). 218001 is the open case (Part 6).
+- **OWC reference, second site** (OWC data of 2026-10-02, events Oct 3-6 2026; checked 2026-10-03). Two OWC
+  filters at another observer site: A = 25 km from shadow, G <= 15, 15 cm, 8 frames, min altitude 10 (6 events);
+  B = 20 km, G <= 15, 15 cm, 4 frames, min altitude 5 (10 events). Search: `pyoccult_owc_check.py` with the OWC filter
+  and the Sun below -6 (OWC shows no Sun limit). Pick: `pyoccult_pick.py` blind over all asteroids with the same
+  filter, Oct 1 + 7 d.
+
+  | Asteroid | Set | Time diff (s) | Star G = OWC V | Drop ours / OWC | Duration ours / OWC (s) | Diameter ours / OWC-implied (km) | Pick |
+  |---|---|---|---|---|---|---|---|
+  | (218001) 2001 XQ72 | A | +0.5 | 5.61 | 12.97 / 1.56 | 0.25 / 0.51 | 1.77 (H) / 3.56 | found (H < 17) |
+  | (17834) 1998 HL43 | A, B | +0.4 | 7.39 | 9.65 / 9.83 | 0.66 / 0.73 | 8.64 / 9.49 | found |
+  | (21641) Tiffanyko | A, B | -0.1 | 8.10 | 10.85 / 10.89 | 0.79 / 0.95 | 3.04 / 3.66 | found |
+  | (19714) 1999 UD | A, B | +1.0 | 10.29 | 6.70 / 6.69 | 0.57 / 0.61 | 3.26 / 3.50 | found |
+  | (111287) 2001 XT47 | A, B | +0.8 | 10.42 | 9.25 / 9.30 | 0.80 / 0.86 | 5.57 / 6.00 | found |
+  | (56450) 2000 GU80 | A | +0.3 | 11.39 | 8.83 / 8.90 | 0.73 / 0.72 | 6.42 / 6.30 | found (Sun -11.5: needs a Sun limit above -12) |
+  | (121701) 1999 XR78 | B | +0.4 | 11.93 | 8.56 / 8.48 | 0.66 / 0.67 | 6.78 / 6.91 | found |
+  | (305580) 2008 YO22 | B | +4.7 | 12.08 | 9.73 / 9.74 | 1.10 / 1.10 | 1.94 (H) / 1.94 | found |
+  | (819762) 2014 MK56 | B | +1.3 | 12.11 | 11.22 / 11.85 | 0.31 / 0.54 | 0.73 (H) / 1.26 | found |
+  | (167022) 2003 QL33 | B | -3.0 | 13.13 | 7.31 / 7.46 | 1.58 / 1.83 | 2.67 / 3.08 | found |
+  | (54653) 2000 SB350 | B | -0.3 | 13.37 | 6.78 / 6.84 | 2.13 / 2.07 | 19.82 / 19.24 | found |
+  | (70141) 1999 NE18 | B | +0.5 | 14.06 | 6.37 / 6.47 | 4.46 / 4.33 | 4.45 / 4.33 | found |
+
+  Search: all 16 OWC events found (A 6/6, B 10/10), the same stars, times within 4.7 s (14 of 16 entries within
+  1.3 s). Drops agree within 0.18 mag except 218001 (the open case, Part 6) and 819762 (0.63 mag: both are
+  near-total drops of a 12 mag star, they differ by the estimated asteroid brightness of an H-only body).
+  Durations differ only where the diameters differ (OWC-implied diameter = OWC duration x our shadow speed; (H) =
+  ours from H and an assumed albedo).
+  Pick: all 16 found as well (A with H < 17, B with H < 19 for 819762, H 18.45), times within 5 s of OWC, the same
+  stars. The B pick lists 30 events in Oct 1-7 against OWC's 10; the extras were not checked one by one (the pick
+  keeps an event if it CAN be observable: upper size bound, OWC applies the nominal size, e.g. 56450 passes
+  24 km from the site, inside our r_max + 20 km, outside OWC's 20 km from the nominal edge).
 - **Corridor vs the old windows search** (23 asteroids, 20 days, 200 km reach): all 40 old hits with G <= 18 found,
   within 1.4 ms and 0.8 m (after the solver fix); 10 more real hits. The other old hits were on stars fainter than the
   catalog's G 18.
@@ -272,8 +316,14 @@ records which list was used, and the report header shows it.
   ~15 km on the plane for a 10 mas star at 2 AU; matters for nearby (often bright) stars.
 - **`star_test`'s `observable` text column**: `if not observable(...)` tests a tuple (always true), so the text never
   says "no". Harmless today, because `handle_star` rejects unobservable events with `observable(...)[0]`.
-- **Unverified**: the Horizons RSS 3-sigma column names in `pyoccult_paths.py` (falls back to `default_sigma3_km`), and
-  the Earth-PCK body id 3000 used for the coverage message at start-up.
+- **Path uncertainty (sigma)**: use the part of the Horizons error ellipse across the track (quantity 37: `SMAA_3sigma`,
+  `SMIA_3sigma`, `Theta_3sigma`, projected onto the direction across the shadow's motion) instead of the RSS value, which
+  overstates the path width whenever the long axis lies along the track. Also: Horizons gives these values to 0.01"
+  only, which is coarse for well-known orbits (0.01" is ~10 km at 1.4 AU), and a value that rounds to 0.00 falls back to
+  the 10 km default. Then compare with OWC event by event; the OWC orbit uncertainty comes from another source, so an
+  exact match is not expected.
+- **Verified 2026-10-03**: the Horizons column is `RSS_3sigma` (matched by `path_sigma3_km`), and the Earth-PCK body
+  id 3000 gives the coverage message at start-up.
 - **Report**: the map uses OpenStreetMap tiles, which need the page served by a web server (a `file://` page sends no
   Referer, so the tiles are refused); `--tile-url` selects another tile server.
 - **Ideas**: `m_before` / `m_during` columns in the log; process-level parallelism by target in `pyoccult.py`.

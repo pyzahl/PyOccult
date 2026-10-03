@@ -87,7 +87,8 @@ def run_case(label, xi0, eta0, vxi, veta, r=2.0, s3=6.0, expect_empty=False, exp
     paths = m.shadow_path('4272', STAR, ET0, r, s3)           # defaults: auto span and step
     print(f"\n== {label}: speed {np.hypot(vxi, veta):.2f} km/s, points per line:",
           {k: len(v) for k, v in paths.items()})
-    offs = {'center': 0.0, 'edge_plus': r, 'edge_minus': -r, 'sigma_plus': r+s3, 'sigma_minus': -(r+s3)}
+    offs = {'center': 0.0, 'edge_plus': r, 'edge_minus': -r, 'sigma1_plus': r+s3/3, 'sigma1_minus': -(r+s3/3),
+            'sigma_plus': r+s3, 'sigma_minus': -(r+s3)}
     if expect_empty:
         assert all(len(v) == 0 for v in paths.values()), "expected no points"
         print("   all lines empty, no exception")
