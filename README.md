@@ -284,7 +284,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | Setting | Example | Meaning |
 |---|---|---|
 | `hits_output_cvs_file` | `'hits_log.csv'` | results are appended here |
-| `write_maps`, `map_dir` | `True`, `"maps"` | write a KML ground track for every event close enough to matter |
+| `write_maps`, `map_dir` | `True`, `"maps"` | write a KML ground track for every logged event |
 | `write_previews` | `True` | write an event preview (SVG) for every hit next to its KML |
 | `preview_mag_limit`, `preview_field_factor` | `16.0`, `3.0` | faintest star drawn; preview field = this x the camera field (at least 10′) |
 | `default_sigma3_km` | `10.0` | path uncertainty used when JPL Horizons has none |

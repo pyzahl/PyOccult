@@ -739,7 +739,7 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     t_map = time.time()
     stem = f"{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}"     # file name of KML and preview
     sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
-    if config.write_maps and res['min_distance'] < size['r_km'] + sigma3:   # only hits worth mapping
+    if config.write_maps and res['min_distance'] < r_search + config.max_shadow_dist:   # shadow + reach, as logged
         os.makedirs(config.map_dir, exist_ok=True)
         paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
         write_shadow_kml(paths, f"{config.map_dir}/{stem}.kml",

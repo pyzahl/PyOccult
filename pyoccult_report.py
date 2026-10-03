@@ -276,7 +276,7 @@ CSS = """
 --head:#1e2732;--accent:#6aa6ff;--in-bg:#17402a;--in-ink:#8be0ae;--near-bg:#4a3a12;--near-ink:#f3cf7a}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:1180px;margin:0 auto;padding:24px 16px 40px}
+main{max-width:1440px;margin:0 auto;padding:24px 16px 40px}
 h1{font-size:1.35rem;margin:0 0 4px}
 .sub{color:var(--muted);margin:0 0 16px}
 .info{display:grid;grid-template-columns:max-content 1fr;gap:2px 14px;font-size:.88rem;margin:0 0 16px}
