@@ -447,8 +447,12 @@ python pyoccult_gui.py --port 8090 --no-browser
   covers the window.
   The report is rebuilt and shown under **Results** when the run finishes.
 * **Results**: the HTML report with its maps and previews. On Linux with KStars running, each event also gets a
-  **KStars** button: it points KStars at the target star at the event time, seen from the site (it sets KStars'
-  location to the site), with a field like the preview's. It uses KStars' D-Bus interface (`gdbus` or `dbus-send`,
+  **KStars** button: it points KStars at the target star at the event time, seen from the site, with a field like
+  the preview's. "KStars: set its location to the event site" (on by default) moves KStars' location to the site;
+  a message says from where, so you can switch back in KStars. Off, KStars keeps its location, and the message warns
+  if that is more than 50 km from the site (horizon and altitudes are then for that place). KStars picks the time
+  zone of a location it is moved to itself, so its local-time label can be off by an hour or two; the sky is
+  computed for the right UT. It uses KStars' D-Bus interface (`gdbus` or `dbus-send`,
   both standard on Linux desktops). Elsewhere (macOS, Windows, KStars not running, the report opened as a file) the
   button does not appear.
 * **Log**: the live output of the running job, with **Stop**.

@@ -34,7 +34,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.
 - `pyoccult_kstars.py`: KStars D-Bus control (Linux only, `gdbus` with `--` before args, else `dbus-send`; never raises).
   setGPSLocation(site) -> setLocalTime (KStars local time: re-read `tz` from location(), it follows DST of the shown
-  date) -> setRaDecJ2000 (RA in hours) -> setTracking -> setApproxFOV. GUI routes `/api/kstars/status|show`; the report's
+  date) -> setRaDecJ2000 (RA in hours) -> setTracking -> setApproxFOV. `set_location` (GUI Results checkbox,
+  `KSTARS_OPT`): move KStars to the site (message names the old place) or keep it (warn if > 50 km). KStars ignores
+  the tz passed to setGPSLocation and picks its own (Long Island got -6): label only, UT is right. GUI routes `/api/kstars/status|show`; the report's
   hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.

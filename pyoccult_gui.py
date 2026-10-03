@@ -210,6 +210,10 @@ def index():
             with ui.row().classes("items-center"):
                 ui.button("Rebuild report", on_click=lambda: build_report()).props("outline")
                 ui.link("Open in a new tab", "/out/hits_report.html", new_tab=True)
+                ui.checkbox("KStars: set its location to the event site", value=KSTARS_OPT["set_location"],
+                            on_change=lambda e: KSTARS_OPT.update(set_location=bool(e.value))).tooltip(
+                    "The report's KStars buttons (Linux, KStars running). Off: KStars keeps its location; "
+                    "you are told if that is far from the site.")
             frame = ui.element("iframe").classes("w-full").style("height: 75vh; border: 1px solid #ddd")
 
     with ui.card().classes("w-full") as log_card:
@@ -461,6 +465,9 @@ def index():
         await run_process(args, log, env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
 
 
+KSTARS_OPT = dict(set_location=True)                   # Results tab option, read by /api/kstars/show
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--port", type=int, default=8080)
@@ -480,7 +487,7 @@ def main():
     @app.get("/api/kstars/show")
     def kstars_show(ra: float, dec: float, utc: str, fov: float = 2.0, lat: float = None, lon: float = None,
                     ele: float = 0.0):
-        ok, msg = pyoccult_kstars.show(ra, dec, utc, fov, lat, lon, ele)
+        ok, msg = pyoccult_kstars.show(ra, dec, utc, fov, lat, lon, ele, set_location=KSTARS_OPT["set_location"])
         return {"ok": ok, "msg": msg}
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
                         strict=False, max_cache_age=0)

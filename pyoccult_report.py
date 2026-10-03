@@ -373,8 +373,14 @@ fetch('/api/kstars/status').then(function(r){return r.json();}).then(function(j)
   if(site){q.set('lat',site.lat);q.set('lon',site.lon);q.set('ele',site.ele||0);}
   b.textContent='KStars …';
   fetch('/api/kstars/show?'+q).then(function(r){return r.json();}).then(function(j){
-   b.textContent=j.ok?'KStars ✓':'KStars ✗';b.title=j.msg;setTimeout(function(){b.textContent='KStars';},4000);})
-  .catch(function(){b.textContent='KStars ✗';});});});}).catch(function(){});})();
+   b.textContent=j.ok?'KStars ✓':'KStars ✗';b.title=j.msg;toast(j.msg,!j.ok||j.msg.indexOf('; ')>0);
+   setTimeout(function(){b.textContent='KStars';},4000);})
+  .catch(function(){b.textContent='KStars ✗';toast('KStars: no answer from the GUI',true);});});});}).catch(function(){});
+function toast(msg,stay){var t=document.getElementById('kstoast');if(!t){t=document.createElement('div');t.id='kstoast';
+ t.setAttribute('role','status');t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);'+
+ 'max-width:min(720px,92vw);padding:10px 14px;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:.9rem;'+
+ 'box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:1000';document.body.appendChild(t);}
+ t.textContent=msg;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(function(){t.hidden=true;},stay?9000:4000);}})();
 </script>"""
 
 PREVIEW_DIALOG = """<dialog id="prevdlg" aria-label="Event preview" style="width:auto;height:auto;max-width:96vw;max-height:96vh">

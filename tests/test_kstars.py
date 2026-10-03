@@ -39,6 +39,24 @@ assert K.show(10.0, 5.0, "2026-10-19T00:00:00")[0]
 ra = next(c for c in calls if c[5].endswith("setRaDecJ2000"))
 assert ra[6:] == [f"double:{10.0 / 15.0}", "double:5.0"], ra
 
+# location option: KStars is at Central Islip (fake_loc); the site is Seewis (~6300 km away) or next door
+K.shutil.which = lambda n: "/usr/bin/gdbus" if n == "gdbus" else None
+fake_loc = '(\'{"name":"Central Islip","latitude":40.79,"longitude":-73.2,"tz":-4,"tz0":-5}\',)'
+def run_loc(cmd, **kw):
+    calls.append(cmd)
+    return R(fake_loc if "org.kde.kstars.location" in cmd else "()")
+K.subprocess.run = run_loc
+methods = lambda: [c[c.index("--method") + 1].rsplit(".", 1)[1] for c in calls]
+calls.clear()
+ok, msg = K.show(80.0, 31.0, "2026-10-19T00:27:34", 2.0, lat=46.99, lon=9.64, ele=958)
+assert ok and "setGPSLocation" in methods() and "changed from Central Islip" in msg, msg
+calls.clear()
+ok, msg = K.show(80.0, 31.0, "2026-10-19T00:27:34", 2.0, lat=46.99, lon=9.64, ele=958, set_location=False)
+assert ok and "setGPSLocation" not in methods() and "km from the site" in msg, msg
+calls.clear()
+ok, msg = K.show(80.0, 31.0, "2026-10-19T00:27:34", 2.0, lat=40.791, lon=-73.2, ele=30)   # already there
+assert ok and "setGPSLocation" not in methods() and "; " not in msg, msg
+
 # never raises: other systems, no tool, bad data
 K.sys.platform = "darwin"
 assert K.show(1, 2, "2026-10-19T00:00:00") == (False, "KStars control works on Linux only")
