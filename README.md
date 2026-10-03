@@ -535,6 +535,7 @@ View results table. Detail quick path view map button and star field preview (st
 <img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/1cd6d017-8be9-4046-b03f-add32d6741d2" />
 <img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/c9034a2c-4aa2-4ce4-a0dd-63d7b340edbd" />
 <img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/812c5402-e848-46ce-a9b8-f047c8f6b6c5" />
+<img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/4c4ee096-1aa5-4b91-bec2-eeac632ad135" />
 
 
 
