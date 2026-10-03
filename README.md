@@ -501,4 +501,26 @@ To import a KML file into Google Maps, you must use the Google My Maps platform 
 - Upload Your File: Drag and drop your KML files (maps folder) into the box.
 
 
-<img width="1087" height="643" alt="image" src="https://github.com/user-attachments/assets/64a4ea87-9296-4fff-bbf7-e45a472a4231" />
+### GUI Step by Step
+#### Site
+Setup site and equippment
+<img width="2196" height="1082" alt="image" src="https://github.com/user-attachments/assets/01c63171-729d-4bb2-b35a-578ded687f09" />
+
+#### Pick
+Run Auto Pick Targets for site, this narrows the number of potential target asteroids down to close encounters
+<img width="2190" height="1426" alt="image" src="https://github.com/user-attachments/assets/1b05ec4a-492f-495e-88c2-9f97d1975562" />
+
+#### Search
+Run the final precision search for observable events
+<img width="2190" height="1426" alt="image" src="https://github.com/user-attachments/assets/7b4f536b-9093-4589-935d-8f1285122801" />
+
+#### Results
+View results table. Detail quick path view map button and star field preview (stars only), use for example Kstars (Linux: use Kstars auto point button!) to further investigate and check for other potentially interesting or interfering objects like planets, etc..
+<img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/64698ea9-d617-4b54-a91f-e1f42c471a68" />
+<img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/ccdf960f-743a-4ef5-873a-42c82f71bd4c" />
+<img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/812c5402-e848-46ce-a9b8-f047c8f6b6c5" />
+
+
+
+
+
