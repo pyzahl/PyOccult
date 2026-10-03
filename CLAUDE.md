@@ -14,7 +14,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `pyoccult_paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.
 - `pyoccult_report.py`: `hits_log.csv` (+ last run of `hits_log.runs.jsonl` for the header) to HTML/Markdown with an embedded Leaflet map. Standard library only.
 - `pyoccult_pick.py`: event finder over all asteroids (OWC-style) for a window; writes `pick_events.csv` and
-  `targets.py`. Engine `pyoccult_screen.py` (site solve, OWC observability formula), orbits `pyoccult_orbits.py` (SBDB full-precision
+  `targets.py`, and saves both per site + window in `picks/` (`pyoccult_picks.py`; pyoccult.py with
+  `targets_source = "auto"` uses the newest saved pick of its site covering the search window; an explicit
+  `targets` override sets `"list"`). Engine `pyoccult_screen.py` (site solve, OWC observability formula), orbits `pyoccult_orbits.py` (SBDB full-precision
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= 15, cells sorted by G). Worker processes.
 - `pyoccult_corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
@@ -53,6 +55,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `PyOccult_sbdb_phys.json`; both SBDB caches refetched after `sbdb_max_age_days`) goes to `config.cache_path`
   (`/dev/shm` if present, else the system temp folder); never hard-code a path. Gaia is not cached: corridor mode
   reads the local catalog, the old windows mode queries the archive uncached.
+- Earth PCK coverage: `pck_comment_dates` reads "Creation date" and "UTC Epoch of last datum" (end of measured EOP)
+  from the file's comment block; `pckcov` gives the end of the prediction. Run summary key `earth_pck`; a search window
+  past the end exits at start-up.
 - SpiceyPy `surfpt` returns only the point and raises `NotFoundError` on a miss.
 - Tests use stand-ins for spiceypy/astropy/astroquery that follow the real call contracts; keep them honest when changing
   signatures.

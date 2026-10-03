@@ -62,6 +62,7 @@ def run(ref, settings):
     for k, v in settings.items():
         setattr(config, k, v)
     config.targets = [str(t) for t in ref.target_id]
+    config.targets_source = "list"
     config.hits_output_cvs_file = OUT
     if os.path.isfile(OUT):
         os.remove(OUT)

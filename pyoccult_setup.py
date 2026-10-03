@@ -21,8 +21,9 @@ an interrupted Gaia build continues where it stopped.
                its SHA-256 and unpack it (~11 / ~3 GB). Only for G <= 16 and 18. Resumable.
        esa:    build it from ESA's bulk files: 753 GB streamed, ~11 GB kept for G <= 18, about 1.5-2 h at
                1.4 Gbit/s. Any limit. Resumable.
-     --source auto (default) asks in a terminal (Enter = zenodo), else takes zenodo; it resumes an interrupted esa
-     build, and uses esa for limits Zenodo does not have.
+     In a terminal, setup first asks for the limit (Enter = 18; skipped with --gmax), then --source auto (default)
+     asks zenodo or esa (Enter = zenodo). Without a terminal: the config's limit, zenodo. auto resumes an interrupted
+     esa build, and uses esa for limits Zenodo does not have.
   3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pyoccult_pick.py. ~30 s.
 """
 import argparse, os, shutil, sys
@@ -217,13 +218,33 @@ def catalog_source(source, d, gmax, st):
     return "esa" if k.startswith("b") else "zenodo"
 
 
+def ask_gmax(default):
+    """Ask for the catalog's magnitude limit (terminal only). Returns a float G."""
+    print("   Faintest star (Gaia G) kept in the local catalog; fainter stars are never searched:")
+    print(f"     18   ~11 GB on disk; ready-made on Zenodo ({ZENODO_GB[18.0]:g} GB download)")
+    print(f"     16   ~3 GB on disk;  ready-made on Zenodo ({ZENODO_GB[16.0]:g} GB download)")
+    print("     other limits are built from ESA's files (753 GB streamed, 1.5-2 h)")
+    while True:
+        k = input(f"   limit [Enter = {default:g}]: ").strip()
+        try:
+            g = float(k) if k else default
+        except ValueError:
+            continue
+        if 6.0 <= g <= 21.0:
+            return g
+        print("   a Gaia G between 6 and 21, please")
+
+
 def catalog_target(gmax_arg, dir_arg):
-    """(folder, gmax) for the Gaia build: --gmax / --dir, else the config. A limit other than the config's goes to its
-    own folder (gaia_dr3_g<gmax>) unless --dir is given: one folder holds one limit."""
+    """(folder, gmax) for the Gaia build: --gmax / --dir, else the config. One folder holds one limit: a folder named
+    gaia_dr3_g<N> is used only for G <= N, any other limit goes to its own gaia_dr3_g<gmax> (unless --dir)."""
+    import re
     cfg_dir = getattr(config, "gaia_local_dir", None) or "gaia_dr3_g18"
     cfg_gmax = float(getattr(config, "gaia_local_gmax", 18.0))
     gmax = cfg_gmax if gmax_arg is None else float(gmax_arg)
-    d = dir_arg or (cfg_dir if gmax == cfg_gmax else f"gaia_dr3_g{gmax:g}")
+    m = re.fullmatch(r"gaia_dr3_g(\d+(?:\.\d+)?)", os.path.basename(os.path.normpath(cfg_dir)))
+    fits = float(m.group(1)) == gmax if m else gmax == cfg_gmax
+    d = dir_arg or (cfg_dir if fits else f"gaia_dr3_g{gmax:g}")
     return d, gmax
 
 
@@ -249,8 +270,15 @@ if __name__ == "__main__":
     d = None
     if not a.no_gaia:
         d, gmax = catalog_target(a.gmax, a.dir)
-        print(f"2. local Gaia catalog G <= {gmax:g} in {d}")
         st = gaia.status(d)
+        if not st["complete"] and a.gmax is None and sys.stdin.isatty():   # new catalog: ask its limit first
+            print("2. local Gaia catalog")
+            ask = st["gmax"] if st["total"] else (gmax if gmax in gaia.ZENODO_GMAX else 18.0)
+            d, gmax = catalog_target(ask_gmax(ask), a.dir)
+            st = gaia.status(d)
+            print(f"   G <= {gmax:g} in {d}")
+        else:
+            print(f"2. local Gaia catalog G <= {gmax:g} in {d}")
         if st["total"] and abs(st.get("gmax", gmax) - gmax) > 1e-9:
             sys.exit(f"   {d} already holds a catalog with G <= {st['gmax']:g}; use another --dir for G <= {gmax:g}")
         if st["complete"]:

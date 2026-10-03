@@ -44,7 +44,7 @@ spice.clpool()
 
 
 
-from pyoccult_kernels import check_file_age, download_kernels
+from pyoccult_kernels import check_file_age, download_kernels, pck_comment_dates
 
 
 # ==========================================
@@ -53,6 +53,7 @@ from pyoccult_kernels import check_file_age, download_kernels
 
 
 
+EARTH_PCK = {}                                     # coverage of the Earth orientation file (run summary)
 if download_kernels(config.earth_pck_max_age):
     try:
         print ('* Loading Compute Kernels *')
@@ -64,8 +65,15 @@ if download_kernels(config.earth_pck_max_age):
         
         cover = spice.stypes.SPICEDOUBLE_CELL(1000)
         spice.pckcov("earth_latest_high_prec.bpc", 3000, cover)      # 3000 = ITRF93 segments, verify
+        EARTH_PCK = pck_comment_dates("earth_latest_high_prec.bpc")
+        EARTH_PCK["stop"] = spice.et2utc(spice.wnfetd(cover, spice.wncard(cover) - 1)[1], 'ISOC', 0)
+        _win_end = spice.et2utc(spice.str2et(str(config.ct)) + config.days * 86400.0, 'ISOC', 0)
         print ('---------------------------------------------')
-        print ("* Earth PCK covers to", spice.et2utc(spice.wnfetd(cover, spice.wncard(cover) - 1)[1], 'ISOC', 0))
+        print (f"* Earth PCK of {EARTH_PCK['created'] or '?'}: measured to {EARTH_PCK['last_datum'] or '?'}, "
+               f"predicted to {EARTH_PCK['stop'][:10]}")
+        if _win_end > EARTH_PCK["stop"]:
+            sys.exit(f"Search window ends {_win_end[:10]}, after the Earth orientation file ({EARTH_PCK['stop'][:10]}): "
+                     f"shorten the window (days) or refresh earth_latest_high_prec.bpc (delete it, rerun)")
         print ('---------------------------------------------')
     
         print ('* Testing Compute Kernels *')
@@ -770,7 +778,8 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
                        mag_adjust=config.pick_mag_adjust, extinction=config.pick_extinction),
              limits=dict(mag_limit=config.MAG_MIN, min_star_alt=config.MIN_STAR_ALT, max_sun_alt=config.MAX_SUN_ALT,
                          reach_km=config.max_shadow_dist, min_mag_drop=getattr(config, "min_mag_drop", 0.1),
-                         min_dur_s=config.pick_min_dur_s))
+                         min_dur_s=config.pick_min_dur_s),
+             earth_pck=EARTH_PCK, targets_from=globals().get("TARGETS_FROM", ""))
     print(f"\nRun summary ({mode}): {n_targets} asteroids, {s['candidates']} candidates, {s['solves']} exact solves, "
           f"{s['hits']} hits")
     print(f"  total {s['total_s']:.1f} s = start-up {s['startup_s']:.1f} s + asteroid data {t_pass1:.1f} s + search "
@@ -815,9 +824,28 @@ def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=Non
     return n_log
 
 
+def resolve_targets():
+    """targets_source "auto": the saved pick of this site covering the search window (pyoccult_picks), else the
+    config list (targets.py or the manual one). Sets config.targets; returns a description for the run summary."""
+    if getattr(config, "targets_source", "auto") != "auto":
+        return f"list ({len(config.targets)} targets)"
+    import pyoccult_picks
+    p = pyoccult_picks.best_for(config.site_name, str(config.ct)[:10], config.days, getattr(config, "picks_dir", "picks"),
+                                config.LAT, config.LON)
+    if p is None:
+        print(f"* No saved pick for site {config.site_name} covers {str(config.ct)[:10]} + {config.days:g} d: "
+              f"using the config list / targets.py ({len(config.targets)} targets)")
+        return f"targets.py / config list ({len(config.targets)} targets)"
+    config.targets = p["targets"]
+    config.target_names = p["names"]
+    print(f"* Targets: {pyoccult_picks.describe(p)}")
+    return pyoccult_picks.describe(p)
+
+
 if __name__ == "__main__":
     t_main = time.time()
     mag_min = config.MAG_MIN
+    TARGETS_FROM = resolve_targets()
     obs_loc = EarthLocation(lat=config.LAT*u.deg, lon=config.LON*u.deg, height=config.ELE*u.m)
 
 

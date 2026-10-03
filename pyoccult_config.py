@@ -12,6 +12,10 @@ try:
 except ImportError:
     targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]  # uses this manual list if targets.py is not present
     target_names = {} # currently not required. A id: name dict
+# "auto": a search uses the saved pick (picks_dir, written by pyoccult_pick.py) of its site whose window covers the
+# search window, else the list above; "list": always the list above
+targets_source = "auto"
+picks_dir = "picks"
     
 max_shadow_dist = 20  ## in km: travel distance from observer location
 

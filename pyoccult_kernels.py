@@ -37,6 +37,21 @@ def check_file_age(file_path_str, days=-1):
     return age_since_write <= days ## older than days => False
     
 
+def pck_comment_dates(path="earth_latest_high_prec.bpc"):
+    """{'created', 'last_datum'} from the comment block of NAIF's Earth PCK (ISO strings, None if not found). Values
+    after the last datum (measured Earth orientation) up to the file's coverage end are predictions."""
+    import re
+    try:
+        with open(path, "rb") as f:
+            text = f.read(1 << 20).decode("latin-1")
+    except OSError:
+        return dict(created=None, last_datum=None)
+    m1 = re.search(r"Creation date:\s+(\d{4}-\d\d-\d\dT[\d:]+)", text)
+    m2 = re.search(r"UTC Epoch of last datum:\s+(\d{4} \w{3} \d\d)", text)
+    last = datetime.strptime(m2.group(1), "%Y %b %d").strftime("%Y-%m-%d") if m2 else None
+    return dict(created=m1.group(1) if m1 else None, last_datum=last)
+
+
 # Basic Kerenls and Data
 def download_kernels(earth_pck_max_age=7):
     urls = {

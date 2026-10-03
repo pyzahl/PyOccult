@@ -98,13 +98,36 @@ def header_info(run, lat, lon):
                       f"{L['max_sun_alt']:g}°, reach {L['reach_km']:g} km, drop ≥ {L['min_mag_drop']:g} mag, "
                       f"duration ≥ {L['min_dur_s']:g} s"),
            ("Run", f"{run['run_utc']} UT, {run['window_start'][:10]} + {run['window_days']:g} d, {run['targets']} asteroids, "
-                   f"{run['candidates']} candidates, {run['solves']} exact solves, {run['hits']} hits"),
+                   f"{run['candidates']} candidates, {run['solves']} exact solves, {run['hits']} hits"
+                   + (f"; targets: {run['targets_from']}" if run.get("targets_from") else "")),
            ("Timing", f"total {run['total_s']:.1f} s: start-up {run['startup_s']:.1f} s, asteroid data "
                       f"{run['init_s']:.1f} s, search {run['search_s']:.1f} s (maps {run['maps_s']:.1f} s); "
                       f"{run['per_asteroid_s']:.2f} s per asteroid, {run['per_solve_s'] * 1000:.0f} ms search time per "
                       f"exact solve" + (f", {run['calc_per_hit_s'] * 1000:.0f} ms calculation per hit"
                                         if "calc_per_hit_s" in run else ""))]
+    if run.get("earth_pck"):
+        out.append(("Earth orientation", earth_pck_text(run["earth_pck"], run)))
     return out
+
+
+def earth_pck_text(e, run):
+    """Coverage of the Earth orientation file the run used, and which part of it the search window falls in."""
+    from datetime import date, timedelta
+    last, stop = e.get("last_datum"), (e.get("stop") or "")[:10]
+    txt = (f"earth_latest_high_prec.bpc of {(e.get('created') or '?')[:10]}: measured to {last or '?'}, "
+           f"predicted to {stop or '?'}")
+    try:
+        w0 = date.fromisoformat(run["window_start"][:10])
+        w1 = (w0 + timedelta(days=float(run["window_days"]))).isoformat()
+    except (KeyError, ValueError):
+        return txt
+    if last and w1 <= last:
+        part = "measured values"
+    elif last and w0.isoformat() >= last:
+        part = "predicted values"
+    else:
+        part = f"measured values up to {last}, predicted after" if last else "?"
+    return txt + f"; this window ({w0.isoformat()} to {w1}) uses {part}"
 
 
 def asteroid_label(target_id, name):

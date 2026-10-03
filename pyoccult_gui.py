@@ -158,8 +158,10 @@ def index():
                 s_start = ui.input("Start (UTC date)", value=str(config.ct)[:10]).props("type=date")
                 s_days = ui.number("Days", value=config.days, min=1, step=1)
                 s_drop = ui.number("Min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1), step=0.05)
-            s_use_file = ui.switch("Targets from targets.py (written by Pick)", value=os.path.isfile("targets.py"))
-            targets_warn_s = ui.label().classes("text-sm text-amber-700 w-full")
+            s_use_file = ui.switch("Targets from the saved pick of this site (Pick tab)", value=True).tooltip(
+                "Uses the newest saved pick of the selected site whose window covers the search window; "
+                "without one, targets.py or the list in pyoccult_config.py")
+            targets_warn_s = ui.label().classes("text-sm w-full")
             s_targets = ui.textarea("Targets (asteroid numbers, comma or space separated)",
                                     value=", ".join(config.targets)).classes("w-full")
             with ui.row():
@@ -184,13 +186,15 @@ def index():
             with ui.row():
                 ui.button("Run pick", on_click=lambda: run_pick()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
-            with ui.row().classes("w-full items-center"):
-                pick_info = ui.label().classes("text-sm text-slate-600")
+            with ui.row().classes("w-full items-center gap-4"):
+                p_saved = ui.select({}, label="Saved picks of this site").classes("w-96")
+                ui.button("Use for search", on_click=lambda: use_saved()).props("outline").tooltip(
+                    "Set the search window to this pick's window and go to the Search tab")
                 ui.button("Reload", on_click=lambda: load_pick()).props("flat dense")
+            pick_info = ui.label().classes("text-sm text-slate-600 w-full")
             targets_info = ui.label().classes("text-sm text-slate-600 w-full")
-            targets_warn_p = ui.label().classes("text-sm text-amber-700 w-full")
             cols = [dict(name=k, label=lbl, field=k, sortable=True, align="left") for k, lbl in
-                    (("target", "In targets.py"), ("number", "#"), ("name", "Asteroid"), ("utc", "UT"),
+                    (("target", "Target"), ("number", "#"), ("name", "Asteroid"), ("utc", "UT"),
                      ("star_mag", "G"), ("drop", "Drop"), ("dur_s", "Dur (s)"), ("mag_margin", "Margin"),
                      ("miss_km", "Miss (km)"), ("star_alt", "Alt"))]
             p_table = ui.table(columns=cols, rows=[], row_key="key", pagination=15).classes("w-full")
@@ -223,8 +227,8 @@ def index():
         is_default.value = name == state.get("default", default_site)
         site_title.text = f"Site: {name}"
         try:
-            check_targets_site()
-        except NameError:                         # first call, while the page is built: load_pick() checks it later
+            load_pick()
+        except NameError:                         # first call, while the page is built: load_pick() runs later
             pass
         for note in (site_note_s, site_note_p):
             note.text = (f"Runs use site {name} ({s['lat']:.4f}, {s['lon']:.4f}, {s.get('aperture_cm', 25):g} cm); "
@@ -357,52 +361,72 @@ def index():
         await run_process([PY, "-u", "pyoccult_runner.py", "pyoccult.py", json.dumps(over)], log,
                           env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
 
-    def targets_site():
-        """The site targets.py was picked for (from its header line), or None."""
-        import re
+    def saved_info(*_):
+        """Search tab: which saved pick the search will use for the selected site and window."""
+        if not s_use_file.value:
+            targets_warn_s.text = "The search uses the list below."
+            targets_warn_s.classes(replace="text-sm w-full text-slate-600")
+            return
         try:
-            with open("targets.py") as f:
-                m = re.search(r"^# events .*?, site ([^,]+),", f.read(2000), re.M)
-            return m[1].strip() if m else None
-        except OSError:
-            return None
-
-    def check_targets_site():
-        t = targets_site()
-        msg = (f"Note: targets.py was picked for site {t}, runs use site {state['name']}. The search runs anyway; "
-               f"targets picked for {state['name']} usually give more events here." if t and t != state["name"] else "")
-        targets_warn_s.text = targets_warn_p.text = msg
-
-    def load_pick():
-        """Show the last pick run (pick_events.csv) and the current targets.py, e.g. after a restart. Returns #events."""
-        stamp = lambda f: time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(f)))
-        targets = []
-        if os.path.isfile("targets.py"):
-            try:
-                targets = [str(t) for t in runpy.run_path("targets.py").get("targets", [])]
-            except Exception as ex:
-                targets_info.text = f"targets.py could not be read: {ex}"
-            else:
-                targets_info.text = (f"targets.py ({stamp('targets.py')}): {len(targets)} targets: "
-                                     + ", ".join(targets[:60]) + (" ..." if len(targets) > 60 else ""))
+            s = sites.get(state["name"], {})
+            p = picks.best_for(state["name"], s_start.value, float(s_days.value or 1), picks_dir, s.get("lat"), s.get("lon"))
+        except ValueError:
+            p = None
+        if p:
+            targets_warn_s.text = f"The search uses the {picks.describe(p)}."
+            targets_warn_s.classes(replace="text-sm w-full text-slate-600")
         else:
-            targets_info.text = "no targets.py yet: the search uses the list in pyoccult_config.py"
+            targets_warn_s.text = (f"No saved pick of site {state['name']} covers this window: the search uses "
+                                   f"targets.py or the config list. Run a pick for it (Pick tab) for better targets.")
+            targets_warn_s.classes(replace="text-sm w-full text-amber-700")
+
+    def show_saved(*_):
+        """Pick tab: show the events of the selected saved pick."""
+        p = next((p for p in saved_list if p["py"] == p_saved.value), None)
         rows = []
-        if os.path.isfile("pick_events.csv"):
-            with open("pick_events.csv") as f:
-                rows = list(csv.DictReader(f))
+        if p is None:
+            pick_info.text = f"No saved pick for site {state['name']} yet: run a pick."
+            targets_info.text = ""
+        else:
+            if os.path.isfile(p["csv"]):
+                with open(p["csv"]) as f:
+                    rows = list(csv.DictReader(f))
             for r in rows:
                 for k in ("star_mag", "drop", "dur_s", "mag_margin", "miss_km", "star_alt"):
                     r[k] = f"{float(r[k]):.2f}" if r.get(k) else ""
                 r["key"] = f"{r.get('number')}_{r.get('utc')}"
-                r["target"] = "\u2713" if str(r.get("number")) in targets else ""
-            pick_info.text = f"Last pick run ({stamp('pick_events.csv')}): {len(rows)} events in pick_events.csv"
-        else:
-            pick_info.text = "No pick run yet (pick_events.csv)."
+                r["target"] = "\u2713" if str(r.get("number")) in p["targets"] else ""
+            pick_info.text = f"{picks.describe(p)}: {len(rows)} events ({p['csv']})"
+            targets_info.text = ("Targets: " + ", ".join(p["targets"][:60]) + (" ..." if len(p["targets"]) > 60 else ""))
         p_table.rows = rows
-        check_targets_site()
         return len(rows)
 
+    def load_pick(select=None):
+        """Fill the list of saved picks of the selected site (newest window first) and show one. Returns #events."""
+        saved_list[:] = picks.list_for(state["name"], picks_dir)
+        p_saved.options = {p["py"]: f"{p['start']} + {p['days']:g} d · {len(p['targets'])} targets · picked "
+                                    f"{p['picked'][:16].replace('T', ' ') or '?'}" for p in saved_list}
+        p_saved.update()
+        keep = select or p_saved.value
+        p_saved.value = keep if keep in p_saved.options else (saved_list[0]["py"] if saved_list else None)
+        n = show_saved()
+        saved_info()
+        return n
+
+    def use_saved():
+        p = next((p for p in saved_list if p["py"] == p_saved.value), None)
+        if p is None:
+            ui.notify("No saved pick selected", type="warning")
+            return
+        s_start.value, s_days.value, s_use_file.value = p["start"], p["days"], True
+        tabs.value = t_search
+
+    import pyoccult_picks as picks
+    picks_dir = getattr(config, "picks_dir", "picks")
+    saved_list = []
+    p_saved.on_value_change(show_saved)
+    for el in (s_start, s_days, s_use_file):
+        el.on_value_change(saved_info)
     load_pick()
 
     async def run_pick():
@@ -413,9 +437,9 @@ def index():
 
         async def done(rc):
             if rc == 0:
-                n = load_pick()
+                n = load_pick(select=picks.paths(state["name"], p_start.value, int(p_days.value), picks_dir)[0])
                 s_use_file.value = True
-                ui.notify(f"{n} events; targets.py written", type="positive")
+                ui.notify(f"{n} events; saved for site {state['name']}", type="positive")
         await run_process(args, log, env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
 
 

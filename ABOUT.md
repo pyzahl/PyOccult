@@ -2,7 +2,7 @@
 
 How PyOccult computes its predictions, where its data comes from, how it was validated and what is still under active development.
 Data comes from Gaia DR3 (stars), JPL Horizons and SBDB (asteroid orbits and sizes) and NAIF SPICE kernels
-(planets, Earth orientation); see Part 4. Usage is in `README.md`. Updated 2026-10-02.
+(planets, Earth orientation); see Part 4. Usage is in `README.md`. Updated 2026-10-03.
 
 PyOccult is intended as a future and portable Python replacement for the Windows occultation predictor Occult (occult.exe, the engine behind
 Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one observer site.
@@ -13,8 +13,8 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
 
 | Step | Tool | What it does |
 |---|---|---|
-| once | `pyoccult_setup.py` | downloads the SPICE kernels, builds the local Gaia catalog and the bright-star index |
-| choose | `pyoccult_pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` |
+| once | `pyoccult_setup.py` | downloads the SPICE kernels, installs the local Gaia catalog (ready-made from Zenodo, or built from ESA's files) and builds the bright-star index |
+| choose | `pyoccult_pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` and saves the pick per site and window in `picks/` |
 | predict | `pyoccult.py` | computes the events of the target asteroids exactly, appends them to `hits_log.csv`, writes KML maps |
 | present | `pyoccult_report.py` | turns `hits_log.csv` into an HTML or Markdown event list with an embedded map |
 | operate | `pyoccult_gui.py` | local web interface (NiceGUI): sites on a map, runs, live log, results |
@@ -23,7 +23,8 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
 Supporting modules: `pyoccult_corridor.py` (per-asteroid star corridor and candidate scan), `pyoccult_gaia_local.py`
 (local Gaia catalog and bright-star index), `pyoccult_screen.py` (the pick tool's event screen),
 `pyoccult_orbits.py` (fast orbit integration), `pyoccult_paths.py` (shadow ground track), `pyoccult_sbdb.py` (shared
-asteroid size cache), `pyoccult_kernels.py` (kernel download).
+asteroid size cache), `pyoccult_kernels.py` (kernel download, Earth orientation coverage), `pyoccult_picks.py` (saved
+picks: which one a search uses).
 
 ---
 
@@ -74,6 +75,10 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   About 1 s per asteroid (2 s in the Galactic bulge).
 - Why local: the Gaia archive took 12-14 min per strip query (or never answered) in October 2026 and warns it is
   unstable while DR4 is prepared.
+- Ready-made copies for G <= 16 and G <= 18 (the same files a build writes, without the bright-star index) are on
+  Zenodo, [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY 4.0): `gaia_dr3_g16.tar.xz`
+  (2.1 GB) and `gaia_dr3_g18.tar.xz` (8.2 GB), each with a `.sha256`. `fetch_zenodo` downloads one (resumable), checks
+  the SHA-256 and unpacks it into any folder name; `pyoccult_setup.py` offers it before the ESA build.
 
 ### 2.5 Candidate scan: `find_candidates`
 
@@ -141,7 +146,9 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
   (+/-r) and the 3-sigma limits (+/-(r + 3 sigma)); each plane point is projected onto the Earth ellipsoid
   (`surfpt`; a miss raises `NotFoundError` and the point is skipped), with the centre-line duration at each point.
 - 3 sigma: the JPL Horizons RSS 3-sigma position uncertainty times the distance, else `default_sigma3_km`.
-- KML for Google Earth or Google My Maps; written when the miss distance is below `r + 3 sigma`.
+- KML for Google Earth or Google My Maps; written for every logged event, i.e. when the miss distance is below
+  `r_max + max_shadow_dist` (the shadow plus the distance you can travel), also when the site lies outside the
+  3-sigma band: then the map shows where to go.
 
 ### 2.11 Event preview: `pyoccult_preview.py`
 
@@ -207,6 +214,15 @@ memory-mapped. A lookup takes 5-50 ms.
 kernels). Output: `pick_events.csv`, a ranked table (brightest star first by default) and `targets.py` with the
 asteroids of the best events; their size data goes to the shared size cache.
 
+### 3.6 Saved picks: `pyoccult_picks.py`
+
+The pick is the slow step, so each run for a named site is also saved as `picks/<site>__<start>_<days>d.py` (targets,
+names and `pick_meta`: site, position, window, settings, time of the pick) plus the `.csv` of its events. With
+`targets_source = "auto"` (default) `pyoccult.py` takes the newest saved pick of its site whose window covers the
+search window and that was made at the site's current position (within 0.01 deg); otherwise `targets.py` or the
+config list. An explicit target list (GUI text field, a run override, the OWC check) always wins. The run summary
+records which list was used, and the report header shows it.
+
 ---
 
 ## Part 4: Data sources
@@ -214,12 +230,13 @@ asteroids of the best events; their size data goes to the shared size cache.
 | Item | Source | Used for |
 |---|---|---|
 | `naif0012.tls`, `pck00010.tpc`, `de440.bsp` | NAIF generic kernels | leap seconds, Earth radii, Sun/Moon/planets |
-| `earth_latest_high_prec.bpc` | NAIF generic kernels | ITRF93 Earth orientation, refreshed after `earth_pck_max_age` days |
+| `earth_latest_high_prec.bpc` | NAIF generic kernels | ITRF93 Earth orientation, refreshed after `earth_pck_max_age` days; measured to its "last datum", predicted ~3 months beyond (both shown at start-up and in the report header; a window past the coverage is refused) |
 | Asteroid orbit files | JPL Horizons API (`EPHEM_TYPE=SPK`), cached in `cache_path` | `pyoccult.py` positions |
 | Asteroid size, H, G | SBDB API (`sbdb.api`, `phys-par=1`), cached per asteroid | `get_asteroid_size` |
 | Elements, sizes for all asteroids | SBDB Query API (`sbdb_query.api`, numbered, full precision), cached | `pyoccult_pick.py` |
 | Asteroid names | SBDB full name, from the same per-asteroid cache as the size | `get_asteroid_name` |
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
+| Stars, ready-made | Zenodo [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (G <= 16, G <= 18) | local catalog without the build |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
 | Map | Leaflet 1.9.4 (cdnjs); OpenStreetMap tiles (`--tile-url` for others) | report |
 | Reference | Occult / OWC search results, pasted as text into `owc_reference.txt` (private, not in git) | validation |

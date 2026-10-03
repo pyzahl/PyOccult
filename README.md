@@ -29,7 +29,8 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 | `sites.py` | your observing site(s) with their view and equipment; private, created by `pyoccult_setup.py` from `sites_example.py` |
 | `pyoccult_paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
 | `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
-| `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py` |
+| `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py`, and saves both per site and window in `picks/` |
+| `pyoccult_picks.py` | the saved picks: which one a search uses, `list`, `import` |
 | `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
 | `pyoccult_gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
@@ -132,7 +133,9 @@ The catalog limit defaults to `gaia_local_gmax` (18). Another limit with `--gmax
 (`gaia_dr3_g<limit>`, or `--dir`); setup then prints the two lines to set in `pyoccult_config.py` (`gaia_local_dir`,
 `gaia_local_gmax`) so the search uses it. Stars fainter than the catalog limit are never searched.
 
-Where the catalog comes from (`--source`, default `auto`): in a terminal, setup asks, and Enter takes Zenodo. Without
+In a terminal, setup first asks for the catalog's limit (Enter = 18; `--gmax` skips the question), and names the
+folder after it (`gaia_dr3_g<limit>`). Where the catalog comes from (`--source`, default `auto`): in a terminal, setup
+then asks, and Enter takes Zenodo. Without
 a terminal it takes Zenodo. It builds from ESA's files when the limit is not 16 or 18, or when an interrupted ESA
 build is already in the folder (it resumes that one). `--keep-archive` keeps the downloaded `.tar.xz`. If you already
 have the archive (downloaded by hand from the DOI page), put it next to the catalog folder, e.g.
@@ -255,6 +258,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 |---|---|---|
 | `ct, days, spn` | `"2026-10-01T00:00:00", 20, 3600` | search start (UTC) and number of days; `spn` (window length, s) is used only by the old `"windows"` mode |
 | `targets` | `["218001", "305580"]` | asteroid numbers as strings. Taken from `targets.py` when it exists (written by `pyoccult_pick.py`), else the list in the `except ImportError:` branch |
+| `targets_source`, `picks_dir` | `"auto"`, `"picks"` | `"auto"`: use the saved pick of the site covering the search window if there is one, else `targets`; `"list"`: always `targets` |
 | `max_shadow_dist` | `20` | km you can travel: an event is logged if the shadow edge passes within this of your site (0 = only from home); a site's `reach_km` overrides it |
 | `search_mode` | `"corridor"` | `"corridor"` (default, fast, needs the local Gaia catalog) or `"windows"` (old per-hour archive queries) |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
@@ -290,8 +294,16 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `default_sigma3_km` | `10.0` | path uncertainty used when JPL Horizons has none |
 | `cache_path` | `/dev/shm` or the temp folder | asteroid orbit files and SBDB downloads (RAM on Linux, emptied on reboot) |
 | `sbdb_max_age_days` | `30` | asteroid size and orbit downloads are refreshed after this many days |
-| `earth_pck_max_age` | `7` | the Earth orientation kernel is refreshed after this many days |
+| `earth_pck_max_age` | `7` | the Earth orientation kernel (`earth_latest_high_prec.bpc`) is refreshed after this many days |
 | `force_cleanup` | `False` | `True` deletes and re-downloads the SPICE kernels at start-up |
+
+**Earth orientation coverage.** `earth_latest_high_prec.bpc` holds measured Earth orientation up to its "last datum"
+(about the day NAIF made the file) and a prediction for about three months after that. At start-up `pyoccult.py`
+checks the file's age (refreshed after `earth_pck_max_age` days) and prints both dates, e.g.
+`Earth PCK of 2026-09-29T17:07:04: measured to 2026-09-29, predicted to 2026-12-26`. The report header repeats them
+and says whether the search window uses measured or predicted values. The prediction is accurate to a few
+milliseconds of Earth rotation, about a metre on the ground. A search window that ends after the file's coverage
+stops at start-up: shorten it, or delete the file and rerun to fetch a newer one.
 
 Results are appended to `hits_log.csv` (a rerun appends again; the report drops duplicates). Each hit also records
 `calc_s` (its calculation time), `airmass`, `extinction_mag` and `mag_margin` (magnitudes below OWC's observability
@@ -366,6 +378,16 @@ Output:
   `mag_margin` = magnitudes below the observability limit, distance from the centre line, altitudes, size)
 * `targets.py`: the asteroids of the best `--top` events, best first, importable; each line shows its event
 * their size data goes to the shared size cache, so the following `pyoccult.py` run needs no SBDB lookups for them
+* a saved copy per site and window in `picks/` (`<site>__<start>_<days>d.py` + `.csv`; `--picks-dir`, config
+  `picks_dir`; private, in `.gitignore`). A new pick of the same site and window replaces it.
+
+**Saved picks are reused.** Picking is the slow part, so you only need it once per site and window: `pyoccult.py`
+(with `targets_source = "auto"`, the default) takes the newest saved pick of its site whose window covers the search
+window, e.g. a pick for Oct 1 + 30 d serves any search from Oct 1 to Oct 31 at that site. It prints which one it
+uses, and the report header names it. Without one it falls back to `targets.py` or the list in `pyoccult_config.py`
+(`targets_source = "list"` always uses that list). `python pyoccult_picks.py list` shows the saved picks;
+`python pyoccult_picks.py import` saves an existing `targets.py` + `pick_events.csv` (from before saved picks) under
+the site and window in its header.
 
 `pyoccult.py` then computes these events exactly (JPL Horizons orbit, exact solver, maps). Run it over the same window
 (`ct`, `days` in `pyoccult_config.py`; the pick tool uses them as its defaults).
@@ -404,14 +426,14 @@ python pyoccult_gui.py --port 8090 --no-browser
   are shown, and "unsaved changes" while the form differs from `sites.py`. Runs read `sites.py`, so unsaved changes
   to the selected site are saved automatically when you start a run. **Save sites.py** rewrites `sites.py` (comments
   in it are not kept); "Default for command-line runs" sets `default_site`, used when the scripts run without the GUI.
-* **Search**: window, targets (from `targets.py` or typed in), minimum drop, maps and previews, then **Run search**.
+* **Search**: window, targets (the saved pick of the selected site that covers the window, or typed in), minimum
+  drop, maps and previews, then **Run search**. A line says which saved pick the search will use, or that none
+  covers the window.
   The report is rebuilt and shown under **Results** when the run finishes.
-* **Pick**: window, H limit or all asteroids, number of targets, workers and ranking, then **Run pick**; the events
-  appear in a sortable table and `targets.py` is written for the search. When the GUI starts, the tab shows the last
-  pick run (`pick_events.csv`) and the current `targets.py`, with the events of target asteroids marked;
-  **Reload** rereads them (e.g. after a pick run on the command line).
-  Targets are picked for one site: if `targets.py` was picked for another site than the one selected, the Search
-  and Pick tabs show a note. The search still runs with those targets; a new pick for the site usually finds more.
+* **Pick**: window, H limit or all asteroids, number of targets, workers and ranking, then **Run pick**; the pick is
+  saved for the selected site and window. **Saved picks of this site** lists them (newest window first); the
+  selected one's events appear in a sortable table, with the target asteroids marked. **Use for search** sets the
+  search window to that pick's window. **Reload** rereads the list (e.g. after a pick on the command line).
 * **Results**: the HTML report with its maps and previews.
 * **Log**: the live output of the running job, with **Stop**.
 
@@ -422,8 +444,8 @@ Each run is its own process. The GUI listens on this computer only (127.0.0.1), 
 ## Quick start: hits_log.csv to HTML report
 
 `pyoccult_report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, offset from the centre line) and a **Map** button for each event. Standard library only, no install needed.
-The page header shows the site, its equipment, the magnitude and observing limits, and the statistics of the run
-(from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column. The **Preview** button shows
+The page header shows the site, its equipment, the magnitude and observing limits, the statistics of the run with the
+saved pick its targets came from, and the Earth orientation data it used (from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column. The **Preview** button shows
 the event preview: the star field around the target star at the event date (local Gaia catalog), the camera frame
 (`focal_mm`, `sensor_mm` of the site), the target star, the asteroid's position and track, north up and east left.
 
