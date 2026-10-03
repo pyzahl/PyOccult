@@ -29,3 +29,6 @@ __pycache__/
 \#*\#
 .#*
 *.tmp
+# Zenodo catalog archives
+release/
+*.tar.xz

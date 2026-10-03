@@ -198,6 +198,17 @@ def build(out_dir, gmax=18.0, workers=6):
         BrightIndex(out_dir, 15.0)                                           # for pyoccult_pick.py
 
 
+def find_catalogs(root="."):
+    """Local catalogs in the sub-folders of root: list of (folder, gmax, complete, gb), brightest limit first."""
+    out = []
+    for d in sorted(os.listdir(root)):
+        p = os.path.join(root, d)
+        if os.path.isfile(os.path.join(p, "catalog.json")):
+            st = status(p)
+            out.append((d, st.get("gmax"), st["complete"], st["gb"]))
+    return sorted(out, key=lambda c: (c[1] if c[1] is not None else 99, c[0]))
+
+
 def status(out_dir):
     man_path = os.path.join(out_dir, "catalog.json")
     if not os.path.isfile(man_path):

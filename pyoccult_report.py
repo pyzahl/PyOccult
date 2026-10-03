@@ -588,7 +588,13 @@ def main(argv=None):
     if lat is None or lon is None:
         print("note: no observer position (pyoccult_config.py or --lat/--lon): compass directions omitted", file=sys.stderr)
 
-    rows, skipped = read_log(a.csv)
+    if os.path.isfile(a.csv):
+        rows, skipped = read_log(a.csv)
+    elif os.path.isfile(os.path.splitext(a.csv)[0] + ".runs.jsonl"):
+        rows, skipped = [], 0                     # the last run found no events: report it (header with the run's site)
+        print(f"note: {a.csv} does not exist: the last run logged no events", file=sys.stderr)
+    else:
+        sys.exit(f"{a.csv} not found")
     events, bad = [], 0
     for r in rows:
         try:

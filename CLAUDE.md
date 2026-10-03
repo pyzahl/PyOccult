@@ -8,6 +8,7 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `sites.py` (private, not in git; layout `sites_example.py`): named observing sites with view (min_alt, max_sun_alt,
   reach_km) and equipment (aperture_cm, frames, mag_adjust, extinction, ...); `pyoccult_config.py` derives `LAT`, `LON`,
   `ELE`, `MIN_STAR_ALT`, `MAX_SUN_ALT`, `MAG_MIN`, `pick_*` from `default_site` or env `PYOCCULT_SITE`. Never put real coordinates in tracked files.
+  Env `PYOCCULT_CATALOG=<folder>` overrides `gaia_local_dir` for one run (GUI header selector sets it).
 - `pyoccult_config.py`: run config (targets, window, site, thresholds). Optional: `map_dir`, `min_mag_drop`, `search_mode` (`corridor`/`windows`), `corridor_step_s`,
   `gaia_local_dir` (required by corridor mode), `gaia_local_gmax`.
 - `pyoccult_paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.

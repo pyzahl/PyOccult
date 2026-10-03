@@ -241,7 +241,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `search_mode` | `"corridor"` | `"corridor"` (default, fast, needs the local Gaia catalog) or `"windows"` (old per-hour archive queries) |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
 | `corridor_step_s` | `600` | path step of the corridor candidate scan, s |
-| `gaia_local_dir`, `gaia_local_gmax` | `"gaia_dr3_g18"`, `18.0` | local Gaia catalog folder and its faintest G (see "Local Gaia catalog") |
+| `gaia_local_dir`, `gaia_local_gmax` | `"gaia_dr3_g18"`, `18.0` | local Gaia catalog folder and its faintest G (see "Local Gaia catalog"); the environment variable `PYOCCULT_CATALOG=<folder>` chooses another catalog for one run |
 
 **Observer**
 
@@ -303,6 +303,9 @@ python pyoccult_gaia_local.py status
   At about 1.4 Gbit/s it takes 1.5 to 2 hours.
 * It is resumable: rerun the same command after an interruption, finished files are skipped.
 * `gaia_local_dir` in pyoccult_config.py must name that folder. pyoccult.py refuses a missing or incomplete catalog.
+* Several catalogs can sit side by side (e.g. `gaia_dr3_g16` and `gaia_dr3_g18`). Choose one per run with
+  `PYOCCULT_CATALOG=gaia_dr3_g16 ./pyoccult.py` (the pick tool follows it too), or in the GUI header;
+  `python pyoccult_setup.py --status` lists the catalogs it finds.
 * A strip lookup takes about 1 s (2 s in the Galactic bulge), no network. Gaia is not cached elsewhere any more.
 * Stars fainter than `gaia_local_gmax` are not searched, whatever `MAG_MIN` says.
 
@@ -373,13 +376,22 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
 python pyoccult_gui.py --port 8090 --no-browser
 ```
 
-* **Site**: choose or add a site, set its position by clicking the map (the elevation is looked up), by searching a
-  place or from your IP address, and edit its view and equipment; the derived star limit and camera field are shown.
-  **Save sites.py** rewrites `sites.py` (comments in it are not kept) and sets the default site.
+* **Site for all runs** and **Catalog** (top right, on every tab): the site and the local Gaia catalog the search
+  and the pick tool use (every complete catalog in the project folder is offered). The Search and Pick tabs repeat
+  the site.
+* **Site**: edit the selected site or add one: set its position by clicking the map (the elevation is looked up), by
+  searching a place or from your IP address, and edit its view and equipment; the derived star limit and camera field
+  are shown, and "unsaved changes" while the form differs from `sites.py`. Runs read `sites.py`, so unsaved changes
+  to the selected site are saved automatically when you start a run. **Save sites.py** rewrites `sites.py` (comments
+  in it are not kept); "Default for command-line runs" sets `default_site`, used when the scripts run without the GUI.
 * **Search**: window, targets (from `targets.py` or typed in), minimum drop, maps and previews, then **Run search**.
   The report is rebuilt and shown under **Results** when the run finishes.
 * **Pick**: window, H limit or all asteroids, number of targets, workers and ranking, then **Run pick**; the events
-  appear in a sortable table and `targets.py` is written for the search.
+  appear in a sortable table and `targets.py` is written for the search. When the GUI starts, the tab shows the last
+  pick run (`pick_events.csv`) and the current `targets.py`, with the events of target asteroids marked;
+  **Reload** rereads them (e.g. after a pick run on the command line).
+  Targets are picked for one site: if `targets.py` was picked for another site than the one selected, the Search
+  and Pick tabs show a note. The search still runs with those targets; a new pick for the site usually finds more.
 * **Results**: the HTML report with its maps and previews.
 * **Log**: the live output of the running job, with **Stop**.
 

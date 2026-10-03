@@ -65,14 +65,17 @@ class Job:
     proc = None
 
 
-async def run_process(args, log, env_site=None, on_done=None):
+async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
     if Job.proc and Job.proc.returncode is None:
         ui.notify("A run is already in progress", type="warning")
         return None
     env = dict(os.environ, PYTHONUNBUFFERED="1")
     if env_site:
         env["PYOCCULT_SITE"] = env_site
-    log.push(f"$ {' '.join(args)}" + (f"   (site {env_site})" if env_site else ""))
+    if env_catalog:
+        env["PYOCCULT_CATALOG"] = env_catalog
+    log.push(f"$ {' '.join(args)}" + (f"   (site {env_site})" if env_site else "")
+             + (f"   (catalog {env_catalog})" if env_catalog else ""))
     t0 = time.time()
     Job.proc = await asyncio.create_subprocess_exec(*args, cwd=ROOT, env=env, stdout=asyncio.subprocess.PIPE,
                                                    stderr=asyncio.subprocess.STDOUT)
@@ -101,6 +104,14 @@ def index():
     with ui.header().classes("items-center bg-slate-800"):
         ui.label("PyOccult").classes("text-xl font-semibold")
         ui.label("asteroid occultation search").classes("text-slate-300")
+        ui.space()
+        ui.label("Site for all runs:").classes("text-slate-300")
+        sel = ui.select(list(sites), value=state["name"]).props("dark dense options-dense standout").classes("w-48")
+        import pyoccult_gaia_local as gaia_local
+        cats = {d: f"{d} (G \u2264 {g:g})" for d, g, ok, _ in gaia_local.find_catalogs(ROOT) if ok}
+        ui.label("Catalog:").classes("text-slate-300")
+        cat_sel = ui.select(cats, value=config.gaia_local_dir if config.gaia_local_dir in cats else
+                            (next(iter(cats)) if cats else None)).props("dark dense options-dense standout").classes("w-56")
     with ui.tabs().classes("w-full") as tabs:
         t_site, t_search, t_pick, t_res = ui.tab("Site"), ui.tab("Search"), ui.tab("Pick"), ui.tab("Results")
     log_card = None
@@ -109,11 +120,13 @@ def index():
         # ------------------------------------------------ site
         with ui.tab_panel(t_site):
             with ui.row().classes("w-full items-end gap-4"):
-                sel = ui.select(list(sites), value=state["name"], label="Site").classes("w-48")
+                site_title = ui.label().classes("text-lg font-semibold")
                 new_name = ui.input("New site name").classes("w-48")
                 ui.button("Add site", on_click=lambda: add_site()).props("outline")
-                is_default = ui.checkbox("Default site")
+                is_default = ui.checkbox("Default for command-line runs").tooltip(
+                    "default_site in sites.py: used by pyoccult.py / pyoccult_pick.py run without the GUI")
                 ui.button("Save sites.py", on_click=lambda: save()).props("color=primary")
+                unsaved = ui.label().classes("text-sm text-amber-700")
             with ui.row().classes("w-full no-wrap gap-4"):
                 with ui.column().classes("w-1/2"):
                     m = ui.leaflet(center=(40.7, -74.0), zoom=9).classes("w-full").style("height: 430px")
@@ -139,11 +152,13 @@ def index():
 
         # ------------------------------------------------ search
         with ui.tab_panel(t_search):
+            site_note_s = ui.label().classes("text-sm text-slate-600")
             with ui.row().classes("items-end gap-4"):
                 s_start = ui.input("Start (UTC date)", value=str(config.ct)[:10]).props("type=date")
                 s_days = ui.number("Days", value=config.days, min=1, step=1)
                 s_drop = ui.number("Min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1), step=0.05)
             s_use_file = ui.switch("Targets from targets.py (written by Pick)", value=os.path.isfile("targets.py"))
+            targets_warn_s = ui.label().classes("text-sm text-amber-700 w-full")
             s_targets = ui.textarea("Targets (asteroid numbers, comma or space separated)",
                                     value=", ".join(config.targets)).classes("w-full")
             with ui.row():
@@ -156,6 +171,7 @@ def index():
 
         # ------------------------------------------------ pick
         with ui.tab_panel(t_pick):
+            site_note_p = ui.label().classes("text-sm text-slate-600")
             with ui.row().classes("items-end gap-4"):
                 p_start = ui.input("Start (UTC date)", value=str(config.ct)[:10]).props("type=date")
                 p_days = ui.number("Days", value=config.days, min=1, step=1)
@@ -167,10 +183,16 @@ def index():
             with ui.row():
                 ui.button("Run pick", on_click=lambda: run_pick()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
+            with ui.row().classes("w-full items-center"):
+                pick_info = ui.label().classes("text-sm text-slate-600")
+                ui.button("Reload", on_click=lambda: load_pick()).props("flat dense")
+            targets_info = ui.label().classes("text-sm text-slate-600 w-full")
+            targets_warn_p = ui.label().classes("text-sm text-amber-700 w-full")
             cols = [dict(name=k, label=lbl, field=k, sortable=True, align="left") for k, lbl in
-                    (("number", "#"), ("name", "Asteroid"), ("utc", "UT"), ("star_mag", "G"), ("drop", "Drop"),
-                     ("dur_s", "Dur (s)"), ("mag_margin", "Margin"), ("miss_km", "Miss (km)"), ("star_alt", "Alt"))]
-            p_table = ui.table(columns=cols, rows=[], row_key="utc", pagination=15).classes("w-full")
+                    (("target", "In targets.py"), ("number", "#"), ("name", "Asteroid"), ("utc", "UT"),
+                     ("star_mag", "G"), ("drop", "Drop"), ("dur_s", "Dur (s)"), ("mag_margin", "Margin"),
+                     ("miss_km", "Miss (km)"), ("star_alt", "Alt"))]
+            p_table = ui.table(columns=cols, rows=[], row_key="key", pagination=15).classes("w-full")
 
         # ------------------------------------------------ results
         with ui.tab_panel(t_res):
@@ -198,6 +220,14 @@ def index():
             else:
                 fields[key].value = s.get(key, default)
         is_default.value = name == state.get("default", default_site)
+        site_title.text = f"Site: {name}"
+        try:
+            check_targets_site()
+        except NameError:                         # first call, while the page is built: load_pick() checks it later
+            pass
+        for note in (site_note_s, site_note_p):
+            note.text = (f"Runs use site {name} ({s['lat']:.4f}, {s['lon']:.4f}, {s.get('aperture_cm', 25):g} cm); "
+                         f"change it at the top right.")
         marker.move(s["lat"], s["lon"])
         m.set_center((s["lat"], s["lon"]))
         update_derived()
@@ -215,6 +245,7 @@ def index():
 
     def update_derived(*_):
         s = collect()
+        unsaved.text = "" if saved_site(state["name"]) == effective(s, state["name"]) else "unsaved changes"
         w, h = fov(s)
         derived.text = (f"Stars searched to G {mag_limit(s):.1f} · camera field {w:.1f}′ × {h:.1f}′ "
                         f"(focal {s.get('focal_mm') or 100 * s.get('aperture_cm', 25):.0f} mm)")
@@ -268,12 +299,38 @@ def index():
         sel.value = name
         new_name.value = ""
 
+    def effective(s, name):
+        """A site with every optional key filled in with its default, for comparing form and file."""
+        e = {k: (tuple(v) if isinstance(v, list) else v) for k, v in s.items()}
+        e.setdefault("name", name)
+        e.setdefault("sensor_mm", (5.6, 3.2))
+        for key, _, default, _ in SITE_KEYS:
+            if key not in ("sensor_w_mm", "sensor_h_mm") and default is not None:
+                e.setdefault(key, default)
+        return e
+
+    def saved_site(name):
+        """The site as it is in sites.py now (what a run will use), with defaults filled in; None if not there."""
+        try:
+            s = load_sites()[0].get(name)
+        except Exception:
+            return None
+        return effective(s, name) if s else None
+
+    def ensure_saved():
+        """Runs read sites.py: save the selected site first if it was edited or is new."""
+        s = collect()
+        if not os.path.isfile("sites.py") or saved_site(state["name"]) != effective(s, state["name"]):
+            save()
+            ui.notify(f"Saved the changes to site {state['name']} for this run", type="info")
+
     def save():
         sites[state["name"]] = collect()
         if is_default.value:
             state["default"] = state["name"]
         save_sites(sites, state.get("default", default_site))
         ui.notify(f"sites.py saved (default site: {state.get('default', default_site)})", type="positive")
+        unsaved.text = ""
 
     sel.on_value_change(lambda e: show_site(e.value))
     show_site(state["name"])
@@ -284,6 +341,7 @@ def index():
         frame.props(f"src=/out/hits_report.html?t={int(time.time())}")
 
     async def run_search():
+        ensure_saved()
         over = dict(ct=f"{s_start.value}T00:00:00", days=int(s_days.value), min_mag_drop=float(s_drop.value),
                     write_maps=bool(s_maps.value), write_previews=bool(s_prev.value))
         if not s_use_file.value:
@@ -296,24 +354,68 @@ def index():
                 await build_report()
                 tabs.value = t_res
         await run_process([PY, "-u", "pyoccult_runner.py", "pyoccult.py", json.dumps(over)], log,
-                          env_site=state["name"], on_done=done)
+                          env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
+
+    def targets_site():
+        """The site targets.py was picked for (from its header line), or None."""
+        import re
+        try:
+            with open("targets.py") as f:
+                m = re.search(r"^# events .*?, site ([^,]+),", f.read(2000), re.M)
+            return m[1].strip() if m else None
+        except OSError:
+            return None
+
+    def check_targets_site():
+        t = targets_site()
+        msg = (f"Note: targets.py was picked for site {t}, runs use site {state['name']}. The search runs anyway; "
+               f"targets picked for {state['name']} usually give more events here." if t and t != state["name"] else "")
+        targets_warn_s.text = targets_warn_p.text = msg
+
+    def load_pick():
+        """Show the last pick run (pick_events.csv) and the current targets.py, e.g. after a restart. Returns #events."""
+        stamp = lambda f: time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(f)))
+        targets = []
+        if os.path.isfile("targets.py"):
+            try:
+                targets = [str(t) for t in runpy.run_path("targets.py").get("targets", [])]
+            except Exception as ex:
+                targets_info.text = f"targets.py could not be read: {ex}"
+            else:
+                targets_info.text = (f"targets.py ({stamp('targets.py')}): {len(targets)} targets: "
+                                     + ", ".join(targets[:60]) + (" ..." if len(targets) > 60 else ""))
+        else:
+            targets_info.text = "no targets.py yet: the search uses the list in pyoccult_config.py"
+        rows = []
+        if os.path.isfile("pick_events.csv"):
+            with open("pick_events.csv") as f:
+                rows = list(csv.DictReader(f))
+            for r in rows:
+                for k in ("star_mag", "drop", "dur_s", "mag_margin", "miss_km", "star_alt"):
+                    r[k] = f"{float(r[k]):.2f}" if r.get(k) else ""
+                r["key"] = f"{r.get('number')}_{r.get('utc')}"
+                r["target"] = "\u2713" if str(r.get("number")) in targets else ""
+            pick_info.text = f"Last pick run ({stamp('pick_events.csv')}): {len(rows)} events in pick_events.csv"
+        else:
+            pick_info.text = "No pick run yet (pick_events.csv)."
+        p_table.rows = rows
+        check_targets_site()
+        return len(rows)
+
+    load_pick()
 
     async def run_pick():
+        ensure_saved()
         args = [PY, "-u", "pyoccult_pick.py", "--start", p_start.value, "--days", str(int(p_days.value)),
                 "--top", str(int(p_top.value)), "--workers", str(int(p_workers.value)), "--sort", p_sort.value]
         args += ["--all"] if p_all.value else ["--hmax", str(p_hmax.value)]
 
         async def done(rc):
-            if rc == 0 and os.path.isfile("pick_events.csv"):
-                with open("pick_events.csv") as f:
-                    rows = list(csv.DictReader(f))
-                for r in rows:
-                    for k in ("star_mag", "drop", "dur_s", "mag_margin", "miss_km", "star_alt"):
-                        r[k] = f"{float(r[k]):.2f}" if r.get(k) else ""
-                p_table.rows = rows
+            if rc == 0:
+                n = load_pick()
                 s_use_file.value = True
-                ui.notify(f"{len(rows)} events; targets.py written", type="positive")
-        await run_process(args, log, env_site=state["name"], on_done=done)
+                ui.notify(f"{n} events; targets.py written", type="positive")
+        await run_process(args, log, env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
 
 
 def main():

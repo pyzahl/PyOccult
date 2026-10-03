@@ -168,6 +168,11 @@ def show_status(d=None):
     gmax = index_limit(d)
     have = os.path.isfile(os.path.join(d, f"bright_G{gmax:.1f}.v2.npy"))
     print(f"  bright-star index G <= {gmax:<5g}  {'ok' if have else 'missing'}")
+    found = gaia.find_catalogs(".")
+    if len(found) > 1 or (found and found[0][0] != d):
+        print("  catalogs found (choose with gaia_local_dir, or PYOCCULT_CATALOG=<folder> for one run):")
+        for f, g, ok, gb in found:
+            print(f"    {f:18s} G <= {g:g}, {gb:.1f} GB" + ("" if ok else ", INCOMPLETE") + ("   <- in use" if f == d else ""))
 
 
 def index_limit(d):
