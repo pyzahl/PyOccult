@@ -35,6 +35,41 @@ HIGH_PM_MAS = 1500.0                                                  # must mat
 RUWE_MAX = 1.4
 
 
+class Progress:
+    """Progress of a long step, so it never looks stuck: in a terminal one line rewritten in place (about once a
+    second), else (log file, nohup) a new line every 30 s. p(done, note) updates, p.finish(text) ends it."""
+
+    def __init__(self, label, total, fmt=lambda x: f"{x / 1e9:.2f} GB", rate=lambda r: f"{r / 1e6:.1f} MB/s", start=0):
+        self.label, self.total, self.fmt, self.rate, self.start = label, max(total, 1), fmt, rate, start
+        self.tty = sys.stdout.isatty()
+        self.every = 1.0 if self.tty else 30.0
+        self.t0 = self.last = time.time()
+        self.width = 0
+
+    def _out(self, text, end=False):
+        if self.tty:
+            print("\r" + text.ljust(self.width), end="\n" if end else "", flush=True)
+            self.width = 0 if end else len(text)
+        else:
+            print(text, flush=True)
+
+    def __call__(self, done, note="", force=False):
+        now = time.time()
+        if not force and now - self.last < self.every:
+            return
+        self.last = now
+        el = max(now - self.t0, 1e-3)
+        r = (done - self.start) / el
+        eta = (self.total - done) / r if r > 0 else float("nan")
+        eta_s = "?" if eta != eta else (f"{eta / 3600:.0f} h {eta % 3600 / 60:02.0f} min" if eta >= 3600
+                                        else f"{eta // 60:.0f} min {eta % 60:02.0f} s")
+        self._out(f"   {self.label}: {self.fmt(done)} of {self.fmt(self.total)} ({100 * done / self.total:.0f} %), "
+                  f"{self.rate(r)}, ETA {eta_s}{note}")
+
+    def finish(self, text):
+        self._out(f"   {self.label}: {text} in {(time.time() - self.t0) / 60:.1f} min", end=True)
+
+
 # ----------------------------------------------------------------------------------------------- sky cells
 def cell_of(ra_deg, dec_deg, size=1.0):
     """Plain ra/dec grid of size x size deg: cell = dec_band * n_ra + ra_band (n_ra = 360/size)."""
@@ -159,6 +194,7 @@ def process_file(name, out_dir, gmax, ruwe_max=RUWE_MAX):
 def build(out_dir, gmax=18.0, workers=6):
     os.makedirs(out_dir, exist_ok=True)
     man_path = os.path.join(out_dir, "catalog.json")
+    print("listing ESA's Gaia DR3 files ...", flush=True)
     files = list_files()
     if os.path.isfile(man_path):
         man = json.load(open(man_path))
@@ -183,14 +219,15 @@ def build(out_dir, gmax=18.0, workers=6):
     else:
         ex = ProcessPoolExecutor(max_workers=workers)
         results = (f.result() for f in as_completed([ex.submit(process_file, n, out_dir, gmax) for n in todo]))
+    prog = Progress("ESA build", len(todo), fmt=lambda x: f"{x:.0f} files", rate=lambda r: f"{r * 60:.1f} files/min")
+    prog(0, " (first files take a minute or two)", force=True)
     for name, n_in, n_keep, dt in results:
         done += 1
         if n_in is not None:
             seen, kept = seen + n_in, kept + n_keep
-        if done % 20 == 0 or done == len(todo):
-            el = time.time() - t0
-            print(f"{done}/{len(todo)} files, {kept/1e6:.1f} M of {seen/1e6:.1f} M stars kept, {el/60:.0f} min, "
-                  f"ETA {el/done*(len(todo)-done)/60:.0f} min", flush=True)
+        prog(done, f", {kept/1e6:.1f} M of {seen/1e6:.1f} M stars kept", force=done == len(todo))
+    if todo:
+        prog.finish(f"{done} files, {kept/1e6:.1f} M stars kept")
     if workers > 0:
         ex.shutdown()
     st = status(out_dir)
@@ -230,15 +267,15 @@ def _fetch_resume(url, size, dst, tries=6):
                 r.raise_for_status()
                 if have and r.status_code != 206:                            # server ignored the Range: start over
                     have = 0
-                t0, got, step = time.time(), 0, max(size // 20, 1 << 20)
+                got = 0
+                prog = Progress("download", size, start=have)
+                prog(have, " (resumed)" if have else " (starting)", force=True)
                 with open(dst, "ab" if have else "wb") as f:
                     for c in r.iter_content(1 << 20):
                         f.write(c)
                         got += len(c)
-                        if (have + got) // step != (have + got - len(c)) // step:
-                            rate = got / max(time.time() - t0, 1e-3)
-                            print(f"   {(have + got) / 1e9:.2f} / {size / 1e9:.2f} GB, {rate / 1e6:.0f} MB/s, "
-                                  f"ETA {(size - have - got) / rate / 60:.0f} min", flush=True)
+                        prog(have + got)
+                prog.finish(f"{(have + got) / 1e9:.2f} GB")
             if os.path.getsize(dst) >= size:
                 return
         except Exception as e:
@@ -251,10 +288,14 @@ def _fetch_resume(url, size, dst, tries=6):
 
 def _sha256(path):
     import hashlib
-    h = hashlib.sha256()
+    h, done = hashlib.sha256(), 0
+    prog = Progress("SHA-256 check", os.path.getsize(path))
     with open(path, "rb") as f:
         for c in iter(lambda: f.read(1 << 22), b""):
             h.update(c)
+            done += len(c)
+            prog(done)
+    prog.finish("done")
     return h.hexdigest()
 
 
@@ -265,9 +306,11 @@ def unpack_archive(archive, out_dir):
     stage = os.path.abspath(out_dir) + ".unpack"
     shutil.rmtree(stage, ignore_errors=True)
     os.makedirs(stage)
-    n, t0 = 0, time.time()
-    with tarfile.open(archive, "r|xz") as tf:                            # streaming: one pass, low memory
+    n = 0
+    prog = Progress(f"unpack into {out_dir}", os.path.getsize(archive), fmt=lambda x: f"{x / 1e9:.2f} GB", rate=lambda r: f"{r / 1e6:.1f} MB/s")
+    with open(archive, "rb") as raw, tarfile.open(fileobj=raw, mode="r|xz") as tf:   # streaming: one pass, low memory
         for m in tf:
+            prog(raw.tell(), f", {n} files")
             parts = m.name.replace("\\", "/").split("/")[1:]            # drop the archive's own top folder
             if not m.isfile() or not parts or os.path.isabs(m.name) or ".." in parts:
                 continue
@@ -277,15 +320,13 @@ def unpack_archive(archive, out_dir):
             except TypeError:                                            # Python without extraction filters
                 tf.extract(m, stage)
             n += 1
-            if n % 1000 == 0:
-                print(f"   {n} files unpacked, {time.time() - t0:.0f} s", flush=True)
+    prog.finish(f"{n} files")
     if not os.path.isfile(os.path.join(stage, "catalog.json")):
         sys.exit(f"{archive} holds no catalog.json: not a PyOccult catalog archive")
     os.makedirs(out_dir, exist_ok=True)
     for f in sorted(os.listdir(stage), key=lambda f: f == "catalog.json"):   # catalog.json last
         os.replace(os.path.join(stage, f), os.path.join(out_dir, f))
     os.rmdir(stage)
-    print(f"   {n} files unpacked into {out_dir} in {time.time() - t0:.0f} s", flush=True)
 
 
 def fetch_zenodo(out_dir, gmax=18.0, keep_archive=False):
@@ -309,7 +350,6 @@ def fetch_zenodo(out_dir, gmax=18.0, keep_archive=False):
     print(f"   Zenodo {ZENODO_DOI}: {name}, {size / 1e9:.1f} GB", flush=True)
     if not os.path.isfile(archive):
         _fetch_resume(url, size, archive + ".part")
-        print("   checking SHA-256 ...", flush=True)
         if _sha256(archive + ".part") != want:
             os.remove(archive + ".part")
             sys.exit(f"{name}: SHA-256 mismatch (corrupt download, deleted); rerun to download again")
@@ -442,9 +482,13 @@ class BrightIndex:
             raise RuntimeError(f"local Gaia catalog in {self.dir} is incomplete; run: python pyoccult_setup.py")
         t0 = time.time()
         parts = []
-        for n in man["files"]:
+        prog = Progress(f"bright-star index G <= {self.gmax:g}", len(man["files"]), fmt=lambda x: f"{x:.0f} files",
+                        rate=lambda r: f"{r:.0f} files/s")
+        for i, n in enumerate(man["files"], 1):
             a = np.load(os.path.join(self.dir, n[:-len(".csv.gz")] + ".npy"), mmap_mode="r")
             parts.append(np.asarray(a[a["phot_g_mean_mag"] <= self.gmax]))
+            prog(i)
+        prog.finish("read; sorting")
         arr = np.concatenate(parts)
         cell = cell_of(arr["ra"], arr["dec"], self.CELL)
         order = np.lexsort((arr["phot_g_mean_mag"], cell))                          # by cell, then by G
