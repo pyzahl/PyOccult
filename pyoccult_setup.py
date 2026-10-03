@@ -280,7 +280,17 @@ if __name__ == "__main__":
         else:
             print(f"2. local Gaia catalog G <= {gmax:g} in {d}")
         if st["total"] and abs(st.get("gmax", gmax) - gmax) > 1e-9:
-            sys.exit(f"   {d} already holds a catalog with G <= {st['gmax']:g}; use another --dir for G <= {gmax:g}")
+            what = (f"a {'complete' if st['complete'] else 'half-built'} catalog with G <= {st['gmax']:g} "
+                    f"({st['done']}/{st['total']} files, {st['gb']:.1f} GB)")
+            if not sys.stdin.isatty():
+                sys.exit(f"   {d} already holds {what}. Delete that folder, or use --dir for G <= {gmax:g}")
+            k = input(f"   {d} already holds {what}.\n   [d]elete it and install G <= {gmax:g} there, "
+                      f"or [Enter] cancel: ").strip().lower()
+            if k != "d":
+                sys.exit(f"   cancelled; use --dir <folder> to install G <= {gmax:g} elsewhere")
+            shutil.rmtree(d)
+            print(f"   deleted {d}")
+            st = gaia.status(d)
         if st["complete"]:
             print("   complete")
         elif catalog_source(a.source, d, gmax, st) == "zenodo":
@@ -295,3 +305,6 @@ if __name__ == "__main__":
                   f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")
     print()
     show_status(d)
+    if not a.no_gaia:
+        print("\n  Another catalog later: python pyoccult_setup.py --gmax 16   (or 18, or any limit via ESA); "
+              "it goes into its own folder\n  gaia_dr3_g<limit>, and the GUI's catalog selector lists it.")

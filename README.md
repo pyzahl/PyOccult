@@ -341,6 +341,17 @@ python pyoccult_gaia_local.py zenodo --dir gaia_dr3_g18 --gmax 18   # or the rea
 * A strip lookup takes about 1 s (2 s in the Galactic bulge), no network. Gaia is not cached elsewhere any more.
 * Stars fainter than `gaia_local_gmax` are not searched, whatever `MAG_MIN` says.
 
+**Adding a catalog later.** Run setup again with the limit you want, e.g. `python pyoccult_setup.py --gmax 16`.
+It asks Zenodo or ESA as on the first run and installs into its own folder `gaia_dr3_g<limit>`, next to the ones you
+have. The GUI's **Catalog** selector (top right) lists every catalog folder it finds after a restart; a half-built one
+is shown as "incomplete n/3386" and runs refuse it until setup has finished it (rerun the same command, it resumes).
+If a folder already holds a catalog with another limit (e.g. an interrupted build), setup asks before deleting it.
+
+**Other catalog sources.** The search does not care where a catalog comes from: any folder with a `catalog.json`
+(`gmax`, `files`) and, per listed file, the three `.npy` files described at the top of `pyoccult_gaia_local.py`
+(stars with the 7 Gaia columns, sky cells, fast movers) is found and can be selected. A converter for another source
+only has to write that layout.
+
 
 
 ## Quick start: choose targets (pick tool)

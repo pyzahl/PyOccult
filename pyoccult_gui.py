@@ -109,10 +109,16 @@ def index():
         ui.label("Site for all runs:").classes("text-slate-300")
         sel = ui.select(list(sites), value=state["name"]).props("dark dense options-dense standout").classes("w-48")
         import pyoccult_gaia_local as gaia_local
-        cats = {d: f"{d} (G \u2264 {g:g})" for d, g, ok, _ in gaia_local.find_catalogs(ROOT) if ok}
+        found = gaia_local.find_catalogs(ROOT)
+        complete = {d for d, g, ok, _ in found if ok}
+        cats = {d: f"{d} (G \u2264 {g:g})" + ("" if ok else f", incomplete {gaia_local.status(os.path.join(ROOT, d))['done']}"
+                                                         f"/{gaia_local.status(os.path.join(ROOT, d))['total']}")
+                for d, g, ok, _ in found}
         ui.label("Catalog:").classes("text-slate-300")
-        cat_sel = ui.select(cats, value=config.gaia_local_dir if config.gaia_local_dir in cats else
-                            (next(iter(cats)) if cats else None)).props("dark dense options-dense standout").classes("w-56")
+        cat_sel = ui.select(cats, value=config.gaia_local_dir if config.gaia_local_dir in complete else
+                            (min(complete) if complete else (next(iter(cats)) if cats else None))
+                            ).props("dark dense options-dense standout").classes("w-64").tooltip(
+            "Local Gaia catalogs in the project folder. Install or add one with: python pyoccult_setup.py [--gmax 16]")
     with ui.tabs().classes("w-full") as tabs:
         t_site, t_pick, t_search, t_res = ui.tab("Site"), ui.tab("Pick"), ui.tab("Search"), ui.tab("Results")
     log_card = None
@@ -345,7 +351,17 @@ def index():
         await run_process([PY, "-u", "pyoccult_report.py", config.hits_output_cvs_file], log)
         frame.props(f"src=/out/hits_report.html?t={int(time.time())}")
 
+    def catalog_ok():
+        """Runs need a complete catalog: tell the user how to get one otherwise."""
+        if cat_sel.value in complete:
+            return True
+        ui.notify(("No complete Gaia catalog yet" if not cat_sel.value else f"Catalog {cat_sel.value} is incomplete")
+                  + ": run  python pyoccult_setup.py  (it resumes), then restart the GUI", type="warning", timeout=10000)
+        return False
+
     async def run_search():
+        if not catalog_ok():
+            return
         ensure_saved()
         over = dict(ct=f"{s_start.value}T00:00:00", days=int(s_days.value), min_mag_drop=float(s_drop.value),
                     write_maps=bool(s_maps.value), write_previews=bool(s_prev.value))
@@ -430,6 +446,8 @@ def index():
     load_pick()
 
     async def run_pick():
+        if not catalog_ok():
+            return
         ensure_saved()
         args = [PY, "-u", "pyoccult_pick.py", "--start", p_start.value, "--days", str(int(p_days.value)),
                 "--top", str(int(p_top.value)), "--workers", str(int(p_workers.value)), "--sort", p_sort.value]
