@@ -9,6 +9,7 @@ Afterwards a corridor lookup reads only the few files its strip touches, in abou
     python pyoccult_gaia_local.py build                 # dir and gmax from pyoccult_config (gaia_local_dir, gaia_local_gmax)
     python pyoccult_gaia_local.py build --workers 6     # resumable: rerun after an interruption, finished files are skipped
     python pyoccult_gaia_local.py status
+    python pyoccult_gaia_local.py zenodo --gmax 16    # ready-made copy (G <= 16 or 18) from Zenodo instead of building
 
 Layout of the catalog folder:
     catalog.json                      gmax, cuts and the list of source files (written first)
@@ -19,7 +20,7 @@ The .npy of a file is written last, atomically; its presence means that file is 
 
 Network only (no SPICE), so the build uses processes freely. Standard library + numpy, pandas, requests.
 """
-import argparse, json, math, os, re, sys, tempfile, time
+import argparse, json, math, os, re, shutil, sys, tempfile, time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
@@ -198,6 +199,132 @@ def build(out_dir, gmax=18.0, workers=6):
         BrightIndex(out_dir, 15.0)                                           # for pyoccult_pick.py
 
 
+# ----------------------------------------------------------------------------------------------- ready-made copy
+ZENODO_DOI = "10.5281/zenodo.23113337"                               # concept DOI: always the newest version
+ZENODO_API = "https://zenodo.org/api/records/23113337"
+ZENODO_GMAX = (16.0, 18.0)                                            # limits published there (gaia_dr3_g16, gaia_dr3_g18)
+
+
+def zenodo_files(gmax):
+    """{name: (size, url)} of the archive for this limit and its .sha256 in the newest Zenodo version."""
+    import requests
+    stem = f"gaia_dr3_g{gmax:g}.tar.xz"
+    r = requests.get(ZENODO_API, timeout=60)
+    r.raise_for_status()
+    files = {f["key"]: (f["size"], f["links"]["self"]) for f in r.json()["files"]}
+    if stem not in files or stem + ".sha256" not in files:
+        sys.exit(f"Zenodo record {ZENODO_DOI} has no {stem}; build from ESA instead")
+    return {k: files[k] for k in (stem, stem + ".sha256")}
+
+
+def _fetch_resume(url, size, dst, tries=6):
+    """Download url to dst (resumes a partial dst with an HTTP Range request); progress every ~5 %."""
+    import requests
+    for k in range(tries):
+        have = os.path.getsize(dst) if os.path.isfile(dst) else 0
+        if have >= size:
+            return
+        try:
+            hdr = {"Range": f"bytes={have}-"} if have else {}
+            with requests.get(url, stream=True, timeout=120, headers=hdr) as r:
+                r.raise_for_status()
+                if have and r.status_code != 206:                            # server ignored the Range: start over
+                    have = 0
+                t0, got, step = time.time(), 0, max(size // 20, 1 << 20)
+                with open(dst, "ab" if have else "wb") as f:
+                    for c in r.iter_content(1 << 20):
+                        f.write(c)
+                        got += len(c)
+                        if (have + got) // step != (have + got - len(c)) // step:
+                            rate = got / max(time.time() - t0, 1e-3)
+                            print(f"   {(have + got) / 1e9:.2f} / {size / 1e9:.2f} GB, {rate / 1e6:.0f} MB/s, "
+                                  f"ETA {(size - have - got) / rate / 60:.0f} min", flush=True)
+            if os.path.getsize(dst) >= size:
+                return
+        except Exception as e:
+            if k == tries - 1:
+                raise
+            print(f"   retry: {str(e)[:100]}", flush=True)
+            time.sleep(10 * (k + 1))
+    raise RuntimeError(f"download of {url} incomplete after {tries} tries; rerun to resume")
+
+
+def _sha256(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for c in iter(lambda: f.read(1 << 22), b""):
+            h.update(c)
+    return h.hexdigest()
+
+
+def unpack_archive(archive, out_dir):
+    """Unpack a catalog .tar.xz (one top folder, any name) into out_dir. Unpacks into out_dir.unpack first, then moves
+    the files over (overwriting a partial build of the same limit), so an interruption leaves no half-written files."""
+    import tarfile
+    stage = os.path.abspath(out_dir) + ".unpack"
+    shutil.rmtree(stage, ignore_errors=True)
+    os.makedirs(stage)
+    n, t0 = 0, time.time()
+    with tarfile.open(archive, "r|xz") as tf:                            # streaming: one pass, low memory
+        for m in tf:
+            parts = m.name.replace("\\", "/").split("/")[1:]            # drop the archive's own top folder
+            if not m.isfile() or not parts or os.path.isabs(m.name) or ".." in parts:
+                continue
+            m.name = "/".join(parts)
+            try:
+                tf.extract(m, stage, filter="data")
+            except TypeError:                                            # Python without extraction filters
+                tf.extract(m, stage)
+            n += 1
+            if n % 1000 == 0:
+                print(f"   {n} files unpacked, {time.time() - t0:.0f} s", flush=True)
+    if not os.path.isfile(os.path.join(stage, "catalog.json")):
+        sys.exit(f"{archive} holds no catalog.json: not a PyOccult catalog archive")
+    os.makedirs(out_dir, exist_ok=True)
+    for f in sorted(os.listdir(stage), key=lambda f: f == "catalog.json"):   # catalog.json last
+        os.replace(os.path.join(stage, f), os.path.join(out_dir, f))
+    os.rmdir(stage)
+    print(f"   {n} files unpacked into {out_dir} in {time.time() - t0:.0f} s", flush=True)
+
+
+def fetch_zenodo(out_dir, gmax=18.0, keep_archive=False):
+    """Install the ready-made catalog for G <= gmax (16 or 18) from Zenodo instead of building it: download (resumable),
+    check the SHA-256, unpack into out_dir. The archive goes next to out_dir and is deleted afterwards unless
+    keep_archive. No bright-star index inside: BrightIndex(out_dir) builds it."""
+    import requests
+    if float(gmax) not in ZENODO_GMAX:
+        sys.exit(f"Zenodo has catalogs for G <= {', '.join(f'{g:g}' for g in ZENODO_GMAX)} only, not {gmax:g}; "
+                 f"build from ESA instead")
+    files = zenodo_files(gmax)
+    (name, (size, url)), (sha_name, (_, sha_url)) = files.items()
+    archive = os.path.join(os.path.dirname(os.path.abspath(out_dir)), name)
+    need = (0 if os.path.isfile(archive) else size - (os.path.getsize(archive + ".part")
+                                                     if os.path.isfile(archive + ".part") else 0)) + 1.4 * size
+    free = shutil.disk_usage(os.path.dirname(archive)).free
+    if free < need:
+        sys.exit(f"not enough disk space next to {out_dir}: {need / 1e9:.1f} GB needed (archive + unpacked), "
+                 f"{free / 1e9:.1f} GB free")
+    want = requests.get(sha_url, timeout=60).text.split()[0].lower()
+    print(f"   Zenodo {ZENODO_DOI}: {name}, {size / 1e9:.1f} GB", flush=True)
+    if not os.path.isfile(archive):
+        _fetch_resume(url, size, archive + ".part")
+        print("   checking SHA-256 ...", flush=True)
+        if _sha256(archive + ".part") != want:
+            os.remove(archive + ".part")
+            sys.exit(f"{name}: SHA-256 mismatch (corrupt download, deleted); rerun to download again")
+        os.replace(archive + ".part", archive)
+    elif _sha256(archive) != want:
+        sys.exit(f"{archive} exists but its SHA-256 does not match Zenodo's; delete it and rerun")
+    unpack_archive(archive, out_dir)
+    if not keep_archive:
+        os.remove(archive)
+    st = status(out_dir)
+    print(f"   done: {st['done']}/{st['total']} files, {st['gb']:.1f} GB" + ("" if keep_archive else
+                                                                          f"; {name} deleted"), flush=True)
+    return st
+
+
 def find_catalogs(root="."):
     """Local catalogs in the sub-folders of root: list of (folder, gmax, complete, gb), brightest limit first."""
     out = []
@@ -363,12 +490,16 @@ def default_dir():
 if __name__ == "__main__":
     d0, g0 = default_dir()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["build", "status"])
+    ap.add_argument("cmd", choices=["build", "status", "zenodo"])
     ap.add_argument("--dir", default=d0 or "gaia_dr3_local", help="catalog folder (default: config gaia_local_dir)")
     ap.add_argument("--gmax", type=float, default=g0, help="faintest G kept (default: config gaia_local_gmax or 18)")
     ap.add_argument("--workers", type=int, default=6, help="parallel download/parse processes")
+    ap.add_argument("--keep-archive", action="store_true", help="zenodo: keep the downloaded .tar.xz")
     a = ap.parse_args()
     if a.cmd == "build":
         build(a.dir, a.gmax, a.workers)
+    elif a.cmd == "zenodo":
+        if fetch_zenodo(a.dir, a.gmax, a.keep_archive)["complete"]:
+            BrightIndex(a.dir, 15.0)                                         # for pyoccult_pick.py
     else:
         print(status(a.dir))

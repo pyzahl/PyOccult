@@ -1,4 +1,4 @@
-# PyOccult
+# PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
 Python Occultation Searcher by PyZahl (C) 2026.
 
 Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy.
@@ -84,15 +84,23 @@ pip install -r requirements.txt
 PyOccult works offline from local data: SPICE kernels for the planets and Earth orientation, and a local copy of the
 Gaia star catalog. `pyoccult_setup.py` installs all of it.
 
+The Gaia catalog can be installed two ways, with the same result:
+
+* **zenodo** (recommended): download the ready-made catalog from Zenodo,
+  [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY 4.0). Setup checks its SHA-256 and
+  unpacks it. Available for G <= 18 (`gaia_dr3_g18.tar.xz`, 8.2 GB) and G <= 16 (`gaia_dr3_g16.tar.xz`, 2.1 GB).
+* **esa**: build it yourself from ESA's Gaia DR3 bulk files. Takes much longer, but works for any magnitude limit.
+
 **What you need**
 
-| | Kernels | Gaia catalog (G <= 18) | Bright-star index |
-|---|---|---|---|
-| Download | ~120 MB | 753 GB (streamed, not stored) | none (built from the catalog) |
-| Disk | ~120 MB | ~11 GB | ~1.3 GB |
-| Time | a minute | 1.5-2 h at ~1.4 Gbit/s, longer on slower lines | ~30 s |
+| | Kernels | Gaia catalog G <= 18, zenodo | Gaia catalog G <= 18, esa | Bright-star index |
+|---|---|---|---|---|
+| Download | ~120 MB | 8.2 GB | 753 GB (streamed, not stored) | none (built from the catalog) |
+| Disk | ~120 MB | ~11 GB (~20 GB while unpacking) | ~11 GB | ~1.3 GB |
+| Time | a minute | download time + ~5 min to check and unpack | 1.5-2 h at ~1.4 Gbit/s, longer on slower lines | ~30 s |
 
-Also needed: `curl` (for the kernels) and a few GB of free RAM while the index is built.
+For G <= 16 everything is about a quarter of that (2.1 GB download, ~3 GB disk). Also needed: `curl` (for the kernels)
+and a few GB of free RAM while the index is built.
 
 **Before you start**: your observing site goes into `sites.py` (see "Observing sites" below). If it does not exist
 yet, `pyoccult_setup.py` helps you create it: it guesses your position from your IP address (ipinfo.io; city level,
@@ -102,7 +110,8 @@ APPROXIMATE in `sites.py`, and `--status` keeps warning until you replace it wit
 a shadow can be only a few km wide). Without a terminal, setup copies `sites_example.py` instead. Also check these in
 `pyoccult_config.py`:
 
-* `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free.
+* `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free
+  (~22 GB while the Zenodo archive is unpacked; the archive is saved next to the folder and deleted afterwards).
 * `gaia_local_gmax`: faintest star kept (default 18). Fainter stars are never searched; 18 suits most small telescopes.
   A different value needs a new folder (`--gmax`, see below).
 * `cache_path`: where the smaller caches go (asteroid orbits, SBDB data). Defaults to `/dev/shm` on Linux (RAM, emptied
@@ -111,7 +120,9 @@ a shadow can be only a few km wide). Without a terminal, setup copies `sites_exa
 **Run it**
 
 ```bash
-python pyoccult_setup.py              # kernels + local Gaia catalog + bright-star index
+python pyoccult_setup.py              # kernels + local Gaia catalog + bright-star index (asks: zenodo or esa)
+python pyoccult_setup.py --source zenodo   # catalog from Zenodo without asking (G <= 16 or 18 only)
+python pyoccult_setup.py --source esa      # build the catalog from ESA's files without asking
 python pyoccult_setup.py --no-gaia    # kernels only (e.g. to try the old "windows" search mode)
 python pyoccult_setup.py --status     # what is installed
 python pyoccult_setup.py --gmax 16    # a smaller catalog to G 16 (own folder gaia_dr3_g16, ~3 GB); --dir to choose the folder
@@ -121,14 +132,21 @@ The catalog limit defaults to `gaia_local_gmax` (18). Another limit with `--gmax
 (`gaia_dr3_g<limit>`, or `--dir`); setup then prints the two lines to set in `pyoccult_config.py` (`gaia_local_dir`,
 `gaia_local_gmax`) so the search uses it. Stars fainter than the catalog limit are never searched.
 
-The Gaia download is long. On Linux you can let it run on its own and check on it later:
+Where the catalog comes from (`--source`, default `auto`): in a terminal, setup asks, and Enter takes Zenodo. Without
+a terminal it takes Zenodo. It builds from ESA's files when the limit is not 16 or 18, or when an interrupted ESA
+build is already in the folder (it resumes that one). `--keep-archive` keeps the downloaded `.tar.xz`. If you already
+have the archive (downloaded by hand from the DOI page), put it next to the catalog folder, e.g.
+`gaia_dr3_g18.tar.xz` beside `gaia_dr3_g18/`. Setup then checks it and unpacks it without downloading.
+
+The download takes a while, the ESA build much longer. On Linux you can let it run on its own and check on it later:
 
 ```bash
 nohup python pyoccult_setup.py > setup.log 2>&1 &
-tail -f setup.log                     # progress every 20 files, with an ETA
+tail -f setup.log                     # progress (Zenodo: every 5 %; ESA: every 20 files), with an ETA
 ```
 
-It is safe to stop and rerun: finished files are skipped, so the same command resumes. `--status` should end with
+It is safe to stop and rerun: a Zenodo download continues where it stopped, and an ESA build skips finished files, so
+the same command resumes. `--status` should end with
 `3386/3386 files ... (complete)` and `bright-star index ... ok`. The search (`pyoccult.py`) refuses to run on an
 incomplete catalog and tells you to rerun the setup. See "Local Gaia catalog" below for what is kept and why.
 
@@ -286,13 +304,15 @@ limits, as one line to `hits_log.runs.jsonl`; the report shows the latest one in
 
 The corridor search (the default) needs the Gaia stars along each asteroid's path. The Gaia archive took many minutes
 per asteroid for that, or hung (it warns it is unstable while DR4 is being prepared), so the stars come from a local,
-magnitude-limited copy that you build once:
+magnitude-limited copy that you build once, or download ready-made from Zenodo
+([doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337), G <= 16 and G <= 18, same files as a build):
 
 ```
 python pyoccult_setup.py                       # does all of it (kernels, catalog, bright-star index)
 python pyoccult_gaia_local.py build            # the catalog alone; folder and G limit from gaia_local_dir / gaia_local_gmax
 python pyoccult_gaia_local.py build --dir gaia_dr3_g18 --gmax 18 --workers 6
 python pyoccult_gaia_local.py status
+python pyoccult_gaia_local.py zenodo --dir gaia_dr3_g18 --gmax 18   # or the ready-made copy from Zenodo
 ```
 
 `pyoccult_setup.py --gmax N` passes another limit through to this build (see step 4).

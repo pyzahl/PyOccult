@@ -428,7 +428,8 @@ def main():
     app.add_static_files("/out/maps", os.path.join(ROOT, config.map_dir), max_cache_age=0)
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
                         strict=False, max_cache_age=0)
-    ui.run(host="127.0.0.1", port=a.port, title="PyOccult", show=not a.no_browser, reload=False)
+    ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(ROOT, "pyoccult_logo.svg"),
+           show=not a.no_browser, reload=False)
 
 
 if __name__ in {"__main__", "__mp_main__"}:

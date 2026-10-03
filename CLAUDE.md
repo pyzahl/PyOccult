@@ -22,6 +22,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   rerunnable, resumes. `pyoccult_kernels.py`: the kernel download, also called by pyoccult.py at start-up.
 - `pyoccult_gaia_local.py`: builds/reads a local G-limited Gaia DR3 copy from ESA's CDN bulk files (`build`, `status`);
   one `.npy` per source file plus `.cells.npy` (1x1 deg cell index) and `.hpm.npy` (pm > 1500 mas/yr). No healpy.
+  Ready-made copies (G <= 16, 18; no bright index) on Zenodo, concept DOI 10.5281/zenodo.23113337 (first version
+  ...338, packed by `release/pack.sh`, untracked): `fetch_zenodo` (resumable, SHA-256, unpacks into any folder name);
+  setup `--source auto|zenodo|esa` (auto: ask, Enter = zenodo; resumes a partial ESA build; esa for other limits).
 - `pyoccult_sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
   `pyoccult.sbdb_phys()` (per-object API) and by `pyoccult_pick.py` for its top targets (bulk rows); standard library only.
 - `pyoccult_gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult_runner.py`

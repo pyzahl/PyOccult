@@ -3,6 +3,8 @@
 an interrupted Gaia build continues where it stopped.
 
     python pyoccult_setup.py              # kernels + local Gaia catalog + bright-star index
+    python pyoccult_setup.py --source zenodo   # catalog: ready-made copy from Zenodo (G <= 16 or 18), no question
+    python pyoccult_setup.py --source esa      # catalog: build it from ESA's Gaia files instead
     python pyoccult_setup.py --no-gaia    # SPICE kernels only
     python pyoccult_setup.py --status     # show what is there
     python pyoccult_setup.py --no-geoip   # do not guess your site from your IP address
@@ -13,8 +15,14 @@ an interrupted Gaia build continues where it stopped.
      place name (Open-Meteo geocoding), or typed in; non-interactive runs copy sites_example.py.
 
   1. SPICE kernels (naif0012.tls, de440.bsp, pck00010.tpc, earth_latest_high_prec.bpc; ~120 MB) into this folder.
-  2. Local Gaia DR3 catalog, G <= gaia_local_gmax, into gaia_local_dir (pyoccult_config.py). Streams ESA's bulk files:
-     753 GB download, ~11 GB kept for G <= 18, about 1.5-2 h at 1.4 Gbit/s. Needed by pyoccult.py (corridor mode).
+  2. Local Gaia DR3 catalog, G <= gaia_local_gmax, into gaia_local_dir (pyoccult_config.py). Needed by pyoccult.py
+     (corridor mode). Two ways, same result:
+       zenodo: download the ready-made copy (doi:10.5281/zenodo.23113337; G <= 18: 8.2 GB, G <= 16: 2.1 GB), check
+               its SHA-256 and unpack it (~11 / ~3 GB). Only for G <= 16 and 18. Resumable.
+       esa:    build it from ESA's bulk files: 753 GB streamed, ~11 GB kept for G <= 18, about 1.5-2 h at
+               1.4 Gbit/s. Any limit. Resumable.
+     --source auto (default) asks in a terminal (Enter = zenodo), else takes zenodo; it resumes an interrupted esa
+     build, and uses esa for limits Zenodo does not have.
   3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pyoccult_pick.py. ~30 s.
 """
 import argparse, os, shutil, sys
@@ -186,6 +194,29 @@ def index_limit(d):
     return float(lim)
 
 
+ZENODO_GB = {16.0: 2.1, 18.0: 8.2}                  # download sizes, for the question only
+
+
+def catalog_source(source, d, gmax, st):
+    """'zenodo' or 'esa' for building catalog d (status st) to G <= gmax; source is the --source option."""
+    if source == "zenodo" and gmax not in gaia.ZENODO_GMAX:
+        sys.exit(f"   Zenodo has catalogs for G <= 16 and 18 only, not {gmax:g}: use --source esa")
+    if source != "auto":
+        return source
+    if gmax not in gaia.ZENODO_GMAX:
+        print(f"   no ready-made catalog for G <= {gmax:g} on Zenodo (16 and 18 only): building from ESA's files")
+        return "esa"
+    if st["done"]:
+        print(f"   resuming the ESA build ({st['done']}/{st['total']} files done); --source zenodo downloads instead")
+        return "esa"
+    if not sys.stdin.isatty():
+        return "zenodo"
+    gb = ZENODO_GB.get(gmax, 0)
+    k = input(f"   [Enter] download the ready-made catalog from Zenodo ({gb:g} GB), or [b]uild it from ESA's files "
+              f"(753 GB streamed, 1.5-2 h): ").strip().lower()
+    return "esa" if k.startswith("b") else "zenodo"
+
+
 def catalog_target(gmax_arg, dir_arg):
     """(folder, gmax) for the Gaia build: --gmax / --dir, else the config. A limit other than the config's goes to its
     own folder (gaia_dr3_g<gmax>) unless --dir is given: one folder holds one limit."""
@@ -205,6 +236,9 @@ if __name__ == "__main__":
     ap.add_argument("--gmax", type=float, help="faintest Gaia G kept in the local catalog (default: config "
                                                "gaia_local_gmax, 18); a new limit needs its own folder")
     ap.add_argument("--dir", help="catalog folder (default: config gaia_local_dir, or gaia_dr3_g<gmax> for another --gmax)")
+    ap.add_argument("--source", choices=["auto", "zenodo", "esa"], default="auto",
+                    help="catalog from Zenodo (ready-made, G <= 16 or 18) or built from ESA's files; auto asks")
+    ap.add_argument("--keep-archive", action="store_true", help="keep the downloaded Zenodo .tar.xz")
     a = ap.parse_args()
     if a.status:
         show_status(catalog_target(a.gmax, a.dir)[0] if (a.gmax is not None or a.dir) else None)
@@ -221,6 +255,8 @@ if __name__ == "__main__":
             sys.exit(f"   {d} already holds a catalog with G <= {st['gmax']:g}; use another --dir for G <= {gmax:g}")
         if st["complete"]:
             print("   complete")
+        elif catalog_source(a.source, d, gmax, st) == "zenodo":
+            gaia.fetch_zenodo(d, gmax, a.keep_archive)
         else:
             gaia.build(d, gmax, a.workers)
         print("3. bright-star index")
