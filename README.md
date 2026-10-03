@@ -426,14 +426,14 @@ python pyoccult_gui.py --port 8090 --no-browser
   are shown, and "unsaved changes" while the form differs from `sites.py`. Runs read `sites.py`, so unsaved changes
   to the selected site are saved automatically when you start a run. **Save sites.py** rewrites `sites.py` (comments
   in it are not kept); "Default for command-line runs" sets `default_site`, used when the scripts run without the GUI.
-* **Search**: window, targets (the saved pick of the selected site that covers the window, or typed in), minimum
-  drop, maps and previews, then **Run search**. A line says which saved pick the search will use, or that none
-  covers the window.
-  The report is rebuilt and shown under **Results** when the run finishes.
 * **Pick**: window, H limit or all asteroids, number of targets, workers and ranking, then **Run pick**; the pick is
   saved for the selected site and window. **Saved picks of this site** lists them (newest window first); the
   selected one's events appear in a sortable table, with the target asteroids marked. **Use for search** sets the
   search window to that pick's window. **Reload** rereads the list (e.g. after a pick on the command line).
+* **Search**: window, targets (the saved pick of the selected site that covers the window, or typed in), minimum
+  drop, maps and previews, then **Run search**. A line says which saved pick the search will use, or that none
+  covers the window.
+  The report is rebuilt and shown under **Results** when the run finishes.
 * **Results**: the HTML report with its maps and previews.
 * **Log**: the live output of the running job, with **Stop**.
 

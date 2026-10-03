@@ -114,7 +114,7 @@ def index():
         cat_sel = ui.select(cats, value=config.gaia_local_dir if config.gaia_local_dir in cats else
                             (next(iter(cats)) if cats else None)).props("dark dense options-dense standout").classes("w-56")
     with ui.tabs().classes("w-full") as tabs:
-        t_site, t_search, t_pick, t_res = ui.tab("Site"), ui.tab("Search"), ui.tab("Pick"), ui.tab("Results")
+        t_site, t_pick, t_search, t_res = ui.tab("Site"), ui.tab("Pick"), ui.tab("Search"), ui.tab("Results")
     log_card = None
 
     with ui.tab_panels(tabs, value=t_site).classes("w-full"):
