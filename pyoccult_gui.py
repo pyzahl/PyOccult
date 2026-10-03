@@ -102,6 +102,7 @@ def index():
     state = dict(name=default_site)
     ui.page_title("PyOccult")
     with ui.header().classes("items-center bg-slate-800"):
+        ui.element("img").props('src=/pyoccult_logo.svg alt=""').classes("w-9 h-9")
         ui.label("PyOccult").classes("text-xl font-semibold")
         ui.label("asteroid occultation search").classes("text-slate-300")
         ui.space()
@@ -426,6 +427,7 @@ def main():
     import pyoccult_config as config
     os.makedirs(config.map_dir, exist_ok=True)
     app.add_static_files("/out/maps", os.path.join(ROOT, config.map_dir), max_cache_age=0)
+    app.add_static_file(local_file=os.path.join(ROOT, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
                         strict=False, max_cache_age=0)
     ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(ROOT, "pyoccult_logo.svg"),
