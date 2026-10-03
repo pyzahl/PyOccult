@@ -508,7 +508,7 @@ Setup site and equippment
 
 #### Pick
 Run Auto Pick Targets for site, this narrows the number of potential target asteroids down to close encounters
-<img width="2190" height="1426" alt="image" src="https://github.com/user-attachments/assets/1b05ec4a-492f-495e-88c2-9f97d1975562" />
+<img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/97ec5c54-6c8f-4bad-a5de-b9c6937ee5fd" />
 
 #### Search
 Run the final precision search for observable events
