@@ -1,7 +1,7 @@
 # PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
 Python Occultation Searcher by PyZahl (C) 2026.
 
-Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy.
+Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy and NiceGUI for a local Webinterface to plan and run all tasks for easy event explorations.
 
 ## What is it?
 Scientific background, start here; International Occultation Timing Association (IOTA):
