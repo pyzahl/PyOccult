@@ -17,6 +17,7 @@ Stars faster than 1500 mas/yr are not searched. Final predictions: pyoccult.py w
 SPICE (not thread-safe): one process at a time per SPICE pool; screen() may run in worker processes, each loading the
 kernels itself (load_kernels).
 """
+from pyoccult_version import __version__
 import math, os
 import pandas as pd
 import numpy as np

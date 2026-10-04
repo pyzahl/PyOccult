@@ -17,6 +17,7 @@ Pipeline
 Defaults come from pyoccult_config.py (site, window ct/days, reach, altitude limits, pick_* settings).
 Needs the kernels and the local Gaia catalog with its bright-star index: python pyoccult_setup.py
 """
+from pyoccult_version import __version__
 import argparse, datetime as dt, json, math, os, sys, tempfile, time, urllib.parse, urllib.request
 from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
@@ -140,7 +141,7 @@ def write_targets(path, best, a):
         for e in best:
             f.write(f"    {str(e['number'])!r}: {e['name']!r},\n")
         f.write("}\n")
-        meta = dict(site=a.site, start=a.start, days=a.days, picked=f"{now:%Y-%m-%dT%H:%M:%S}", lat=a.lat, lon=a.lon,
+        meta = dict(site=a.site, start=a.start, days=a.days, picked=f"{now:%Y-%m-%dT%H:%M:%S}", version=__version__, lat=a.lat, lon=a.lon,
                     reach_km=a.reach, cam_limit=a.cam_limit, hmax=None if a.all else a.hmax, top=a.top, sort=a.sort)
         f.write(f"\npick_meta = {meta!r}\n")
 
@@ -165,6 +166,7 @@ def main(argv=None):
         print(f"note: pyoccult_config.py not usable ({ex}); give the site on the command line", file=sys.stderr)
     c = lambda k, d=None: cfg.get(k, d)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--start", default=c("start"), help="UTC date YYYY-MM-DD (default: config ct, else today)")
     ap.add_argument("--days", type=float, default=c("days", 30), help="window length (default: config days)")
     ap.add_argument("--hmax", type=float, default=c("hmax", 17.0), help="asteroids with H below this (default 17)")

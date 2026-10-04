@@ -1,4 +1,5 @@
 #!.venv/bin/python3
+from pyoccult_version import __version__
 import sys, base64, functools, os, re, time
 T_START = time.time()                    # run statistics: start-up time is measured from here
 from datetime import datetime
@@ -56,7 +57,7 @@ from pyoccult_kernels import check_file_age, download_kernels, pck_comment_dates
 EARTH_PCK = {}                                     # coverage of the Earth orientation file (run summary)
 if download_kernels(config.earth_pck_max_age):
     try:
-        print ('* Loading Compute Kernels *')
+        print (f'* PyOccult {__version__}: loading compute kernels *')
         # Load all required kernels
         spice.furnsh("naif0012.tls")       # Leapseconds
         spice.furnsh("pck00010.tpc")       # Planetary constants
@@ -767,6 +768,7 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
     t_end = time.time()
     n_ok = max(n_targets, 1)
     s = dict(run_utc=datetime.fromtimestamp(T_START, tz=__import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), mode=mode,
+             version=__version__,
              window_start=str(config.ct), window_days=config.days, targets=n_targets,
              candidates=RUN["candidates"], gated=RUN["gated"], solves=RUN["solves"], hits=RUN["hits"],
              total_s=t_end - T_START, startup_s=t_main - T_START, init_s=t_pass1, search_s=t_pass2,

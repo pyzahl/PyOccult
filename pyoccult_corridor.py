@@ -13,6 +13,7 @@ reach) of its path, which is a few arcseconds wide. Instead of ~200 overlapping 
 Only numpy and pandas are required at import; astropy (propagation) is imported when used, spiceypy only by
 asteroid_path() (SPICE is not thread-safe: call it serially).
 """
+from pyoccult_version import __version__
 import math
 import numpy as np
 import pandas as pd

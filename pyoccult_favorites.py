@@ -11,6 +11,7 @@ Used by pyoccult_gui.py (report star buttons, Favorites tab). Standard library o
 
     python pyoccult_favorites.py list
 """
+from pyoccult_version import __version__
 import glob, json, os, shutil, sys, tempfile
 from datetime import datetime, timezone
 
@@ -106,7 +107,8 @@ def add(record, run=None, map_dir="maps", folder=DIR, sbdb=None):
             shutil.copyfile(found[0], dst)
             files[ext] = os.path.relpath(dst, folder).replace(os.sep, "/")
     run = run or {}
-    entry = dict(key=key, added=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), status="planned", note="",
+    entry = dict(key=key, added=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), version=__version__,
+                 status="planned", note="",
                  record=record, site=run.get("site"), files=files, phys=phys_of(sbdb),
                  run={k: run.get(k) for k in ("run_utc", "window_start", "window_days", "limits", "earth_pck",
                                                "targets_from") if k in run})

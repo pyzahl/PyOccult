@@ -23,6 +23,7 @@ tiles, loaded from the internet when the button is first used) showing the shado
 limits, the 3-sigma limits and the observer. The path data is embedded in the page, so it works when the file
 is opened straight from disk. A link opens the closest centre-line point in Google Maps. --no-embed turns it off.
 """
+from pyoccult_version import __version__
 import argparse
 import csv
 import glob
@@ -97,7 +98,7 @@ def header_info(run, lat, lon):
            ("Limits", f"stars G ≤ {L['mag_limit']:g}, star altitude ≥ {L['min_star_alt']:g}°, Sun ≤ "
                       f"{L['max_sun_alt']:g}°, reach {L['reach_km']:g} km, drop ≥ {L['min_mag_drop']:g} mag, "
                       f"duration ≥ {L['min_dur_s']:g} s"),
-           ("Run", f"{run['run_utc']} UT, {run['window_start'][:10]} + {run['window_days']:g} d, {run['targets']} asteroids, "
+           ("Run", (f"PyOccult {run['version']}, " if run.get("version") else "") + f"{run['run_utc']} UT, {run['window_start'][:10]} + {run['window_days']:g} d, {run['targets']} asteroids, "
                    f"{run['candidates']} candidates, {run['solves']} exact solves, {run['hits']} hits"
                    + (f"; targets: {run['targets_from']}" if run.get("targets_from") else "")),
            ("Timing", f"total {run['total_s']:.1f} s: start-up {run['startup_s']:.1f} s, asteroid data "
@@ -698,6 +699,7 @@ def load_config_observer(csv_path):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Turn PyOccult hits_log.csv into an HTML or Markdown event list.")
+    ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("csv", help="hits_log.csv written by PyOccult")
     ap.add_argument("-o", "--output", help="output file (default: hits_report.html / .md next to the CSV)")
     ap.add_argument("--format", choices=("html", "md"), help="default: from the output extension, else html")

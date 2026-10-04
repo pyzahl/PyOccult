@@ -26,6 +26,7 @@ an interrupted Gaia build continues where it stopped.
      esa build, and uses esa for limits Zenodo does not have.
   3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pyoccult_pick.py. ~30 s.
 """
+from pyoccult_version import __version__
 import argparse, os, shutil, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -250,6 +251,7 @@ def catalog_target(gmax_arg, dir_arg):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--no-gaia", action="store_true", help="kernels only")
     ap.add_argument("--status", action="store_true", help="only show what is installed")
     ap.add_argument("--no-geoip", action="store_true", help="do not guess the site from the IP address")

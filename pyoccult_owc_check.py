@@ -16,6 +16,7 @@ Duration = diameter / shadow speed. The report shows our diameter and the one OW
 speed); when only the diameters differ, the result is "ok, size differs", not a failure. Drops above DROP_TOTAL mag
 are not compared (they differ only by the asteroid's own magnitude estimate).
 """
+from pyoccult_version import __version__
 import argparse, os, re, runpy, sys
 import pandas as pd
 
@@ -116,6 +117,7 @@ def compare(ref):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--compare-only", action="store_true")
     ap.add_argument("--ref", default=REF, help="OWC search result as text (default owc_reference.txt)")
     a = ap.parse_args()

@@ -6,6 +6,7 @@ asteroid SPK loaded, and the asteroid number string aliased with boddef (fetch_t
 v2: SpiceyPy's surfpt() returns only the point and raises NotFoundError when the ray misses the Earth
 (v1 unpacked a (point, found) tuple, which crashed near the ends of the time window).
 """
+from pyoccult_version import __version__
 import numpy as np
 import spiceypy as spice
 from spiceypy.utils.exceptions import NotFoundError

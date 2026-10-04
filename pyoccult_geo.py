@@ -4,6 +4,7 @@ and ground elevation (Open-Meteo). Used by pyoccult_setup.py and pyoccult_gui.py
 All results are approximate: IP positions are city level (10-100 km off, wrong behind a VPN), place names give the town
 centre. Use an exact position (GPS, map) for observing.
 """
+from pyoccult_version import __version__
 import json, urllib.parse, urllib.request
 
 

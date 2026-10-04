@@ -69,6 +69,8 @@ def make_stub(xi0, eta0, vxi, veta):
 
 
 def load_module():
+    import os, sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))   # for pyoccult_version
     spec = importlib.util.spec_from_file_location('pyoccult_paths', __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'pyoccult_paths.py'))
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
     return m

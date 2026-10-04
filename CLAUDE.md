@@ -4,6 +4,8 @@ Portable Python replacement for the old Windows occultation predictor (Occult / 
 occultations of Gaia stars for one observer site. Read `ABOUT.md` for the computations and sources, `README.md` for usage.
 
 ## Files
+- `pyoccult_version.py`: the one place for `__version__` (semver; keep CITATION.cff `version` and the README line in step);
+  every module imports it, tools have `--version`, GUI header, run summary/report, picks and favorites record it.
 - `pyoccult.py`: main search script. Kernel setup runs at import time (not import-safe). Driver is the `__main__` block.
 - `sites.py` (private, not in git; layout `sites_example.py`): named observing sites with view (min_alt, max_sun_alt,
   reach_km) and equipment (aperture_cm, frames, mag_adjust, extinction, ...); `pyoccult_config.py` derives `LAT`, `LON`,

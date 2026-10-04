@@ -20,6 +20,7 @@ The .npy of a file is written last, atomically; its presence means that file is 
 
 Network only (no SPICE), so the build uses processes freely. Standard library + numpy, pandas, requests.
 """
+from pyoccult_version import __version__
 import argparse, json, math, os, re, shutil, sys, tempfile, time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
@@ -534,6 +535,7 @@ def default_dir():
 if __name__ == "__main__":
     d0, g0 = default_dir()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("cmd", choices=["build", "status", "zenodo"])
     ap.add_argument("--dir", default=d0 or "gaia_dr3_local", help="catalog folder (default: config gaia_local_dir)")
     ap.add_argument("--gmax", type=float, default=g0, help="faintest G kept (default: config gaia_local_gmax or 18)")

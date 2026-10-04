@@ -10,6 +10,7 @@ size rules always apply. Entries older than sbdb_max_age_days (config, default 3
 
 Standard library only (the pick tool must not need SPICE/astropy).
 """
+from pyoccult_version import __version__
 import json, os, tempfile, time
 
 FILE = "PyOccult_sbdb_phys.json"

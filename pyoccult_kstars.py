@@ -5,6 +5,7 @@ other system, or without KStars running, available() says why not and show() doe
 Used by pyoccult_gui.py (/api/kstars/...), which the report's KStars buttons call when the GUI serves the report.
 Standard library only.
 """
+from pyoccult_version import __version__
 import json, shutil, subprocess, sys
 from datetime import datetime, timedelta, timezone
 

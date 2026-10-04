@@ -1,6 +1,7 @@
 """pyoccult_kernels.py - download the generic SPICE kernels PyOccult needs into the working folder (once; the Earth
 orientation file is refreshed after earth_pck_max_age days). Used by pyoccult.py at start-up and by pyoccult_setup.py.
 Standard library only (downloads with the system curl)."""
+from pyoccult_version import __version__
 import os, subprocess
 from datetime import datetime
 from pathlib import Path

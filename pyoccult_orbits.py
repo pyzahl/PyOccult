@@ -11,6 +11,7 @@ non-gravitational forces. Not for close Earth approaches (flagged).
 
 Needs spiceypy with an LSK and de440.bsp loaded (call serially: SPICE is not thread-safe).
 """
+from pyoccult_version import __version__
 import numpy as np
 
 AU_KM = 149597870.7

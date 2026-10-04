@@ -12,6 +12,7 @@ pick of its site whose window covers the search window; without one it falls bac
 
 Standard library only.
 """
+from pyoccult_version import __version__
 import argparse, os, re, runpy, shutil, sys
 from datetime import date, timedelta
 
@@ -100,6 +101,7 @@ def import_current(targets_py="targets.py", events_csv="pick_events.csv", folder
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("cmd", choices=["list", "import"])
     ap.add_argument("site", nargs="?")
     a = ap.parse_args()

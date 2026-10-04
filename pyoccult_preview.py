@@ -7,6 +7,7 @@ on the sky (a telescope may flip or rotate this).
 
 Standard library + numpy; the caller supplies the stars and the asteroid track (pyoccult.py does, with SPICE).
 """
+from pyoccult_version import __version__
 import math
 import numpy as np
 

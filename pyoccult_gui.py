@@ -9,6 +9,7 @@ It listens on this computer only (127.0.0.1), because it can start programs. Eve
 (pyoccult_runner.py), so SPICE stays out of the GUI; settings chosen here apply to that run only, pyoccult_config.py is
 not changed. Saving a site rewrites sites.py (comments in it are not kept).
 """
+from pyoccult_version import __version__
 import argparse, asyncio, csv, json, math, os, pprint, runpy, sys, time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -105,6 +106,7 @@ def index():
     with ui.header().classes("items-center bg-slate-800"):
         ui.element("img").props('src=/pyoccult_logo.svg alt=""').classes("w-9 h-9")
         ui.label("PyOccult").classes("text-xl font-semibold")
+        ui.label(f"v{__version__}").classes("text-xs text-slate-400 self-end mb-1").tooltip("PyOccult version")
         ui.label("asteroid occultation search").classes("text-slate-300")
         ui.space()
         ui.label("Site for all runs:").classes("text-slate-300")
@@ -636,6 +638,7 @@ KSTARS_OPT = dict(set_location=True)                   # Results tab option, rea
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
