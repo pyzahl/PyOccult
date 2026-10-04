@@ -49,6 +49,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   diameter_sigma, extent, albedo as (value, ref)) copied at add time (/dev/shm cache is volatile); GUI start
   backfills it for older entries. `favorites.csv` is rewritten by every `_save` (flat: key/status/note/added/site,
   all record columns, sbdb_*, file paths).
+- OWC twilight events carry the Sun altitude after the time ("☼ -5°"); `read_owc` parses it (`sun_alt_deg`) and then
+  sets MAX_SUN_ALT to the brightest + 1 (fixed 2026-10-04: before, such lines were silently skipped).
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for

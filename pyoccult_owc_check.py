@@ -23,8 +23,9 @@ REF = "owc_reference.txt"
 OUT = "owc_check_hits.csv"
 TOL_T, TOL_DROP, TOL_DUR = 10.0, 0.25, 0.10
 DROP_TOTAL = 5.0          # drops above this are total occultations either way: not compared
-EVENT = re.compile(r"\((\d+)\)\s*([^\t]*)\t\s*(\d{4}-[A-Za-z]{3}-\d{2}),\s*(\d{2}:\d{2}:\d{2})\s*\t\s*([\d.]+)\s*\t\s*([\d.]+)"
-                   r"\s*\t\s*([\d.]+)\s*\t\s*(\d+)")
+EVENT = re.compile(r"\((\d+)\)\s*([^\t]*)\t\s*(\d{4}-[A-Za-z]{3}-\d{2}),\s*(\d{2}:\d{2}:\d{2})"
+                   r"\s*(?:\u263c\s*(-?\d+(?:\.\d+)?)\s*\u00b0?)?"           # twilight events: "\u263c -5\u00b0" = Sun altitude
+                   r"\s*\t\s*([\d.]+)\s*\t\s*([\d.]+)\s*\t\s*([\d.]+)\s*\t\s*(\d+)")
 
 
 def _clean_name(text):
@@ -39,8 +40,9 @@ def read_owc(path):
     """(events DataFrame, settings dict) from an OWC search result pasted as text."""
     text = open(path, encoding="utf-8").read()
     rows = [dict(target_id=int(m[1]), name=_clean_name(m[2]),
-                 event_utc=pd.Timestamp(f"{m[3]} {m[4]}").strftime("%Y-%m-%dT%H:%M:%S"), star_mag_v=float(m[5]),
-                 mag_drop_v=float(m[6]), max_dur_s=float(m[7]), altitude_deg=float(m[8])) for m in EVENT.finditer(text)]
+                 event_utc=pd.Timestamp(f"{m[3]} {m[4]}").strftime("%Y-%m-%dT%H:%M:%S"),
+                 sun_alt_deg=float(m[5]) if m[5] else float("nan"), star_mag_v=float(m[6]),
+                 mag_drop_v=float(m[7]), max_dur_s=float(m[8]), altitude_deg=float(m[9])) for m in EVENT.finditer(text)]
     if not rows:
         sys.exit(f"no OWC events found in {path}")
     ref = pd.DataFrame(rows)
@@ -53,6 +55,8 @@ def read_owc(path):
                     pick_min_dur_s=num(r"MinDur:\s*([\d.]+)", 0.4), pick_aperture_cm=num(r"Aperture:\s*([\d.]+)", 25.0),
                     pick_frames=int(num(r"DetectionFrames:\s*(\d+)", 4)), MIN_STAR_ALT=num(r"MinStarAltitude:\s*([\d.]+)", 10.0),
                     ct=t0.strftime("%Y-%m-%dT%H:%M:%S"), days=(t1 - t0).days, write_maps=False, search_mode="corridor")
+    if ref.sun_alt_deg.notna().any():               # OWC lists twilight events: allow the Sun up to the brightest one
+        settings["MAX_SUN_ALT"] = float(ref.sun_alt_deg.max()) + 1.0
     return ref, settings
 
 

@@ -385,10 +385,39 @@ shrinks.
   includes light deflection (to be confirmed); then OWC paths of events away from opposition would differ from ours
   by the amounts above.
 
-**Plan.** At each event, shift the star direction by (star deflection - asteroid deflection) with the formula above,
-using the Sun's and the observer's positions from SPICE (a few lines in the solver's star-direction step, and the
-same in the pick screen); add Jupiter and Saturn when the star is within a few arc-minutes of them. Test with a
-stand-in against the table values; then compare event paths across the track with OWC for events at low elongation.
+**Real events.** For an OWC search at the second site (50 events, Oct 4-7 2026, with twilight events) the expected
+shift was computed for every event: 16556 at elongation 65 deg (morning twilight) 4.6 km, 22336 at 79 deg (evening
+twilight) 3.1 km, four events at 87-92 deg about 2.3 km, and below 0.1 km from elongation 150 deg on. So it is not
+only twilight: events around elongation 90 deg in the dark evening or morning sky shift by about 2 km. These are the
+events for a cross-track comparison with OWC.
+
+**Occult applies it (checked 2026-10-04 on 16556).** Occult's plot of 16556 (Oct 4 2026, elongation 65 deg; Occult's
+1-sigma error (0.9 x 0.2) mas) gives the star's "astrometric" position. It differs from PyOccult's (Gaia DR3,
+proper motion only) by 4.5 mas at PA 280, nearly the direction away from the Sun (PA 286). Expected if Occult
+applies the light deflection (6.34 mas away from the Sun) and the stellar parallax (Gaia parallax 1.198 mas x
+sin 65.4 deg = 1.09 mas towards the Sun): 5.25 mas at PA 286. The residual 0.75 mas is within Occult's 1-sigma.
+So Occult includes both, PyOccult neither. What moves the path is the star relative to the asteroid (whose light is
+bent too, 3.71 mas): 2.63 mas differential deflection minus 1.09 mas parallax = 1.54 mas, about 2.7 km across the
+track at 2.42 AU, about 1.7 of Occult's 1-sigma. Stellar parallax (the open item above) and light deflection should be added together.
+To confirm, repeat with an event near opposition (both effects small).
+
+**Plan: astrometric corrections (agreed 2026-10-04, not started).** Built in, not as post-processing: the star
+direction feeds time, miss distance, shadow path, KML and preview at once, so it must be right before the solve.
+1. New module `pyoccult_astrometry.py` (pure math, no network): one function that turns a star's Gaia direction into
+   its corrected direction at the event: stellar parallax (Gaia parallax x the observer's offset from the Sun; the
+   unused `geocentric_star_dir` in pyoccult.py already does this part), the Sun's light deflection as the difference
+   star minus asteroid (formula above, asteroid direction from SPICE), and optionally Jupiter and Saturn when the
+   star is within a few arc-minutes of them.
+2. Called at the one place where the search forms the star direction (`handle_star`); everything after it (time,
+   offset, maps, preview) then uses the corrected direction. The pick screen gets the same correction later as a
+   second step (its ~2 km screening accuracy is less critical).
+3. Switches in pyoccult_config.py: `star_parallax = True`, `light_deflection = True`; off reproduces the old results
+   exactly (for comparisons).
+4. Shown like the Earth orientation data: run summary (`corrections`) and a report header line.
+5. Checks: a stand-in test against the values above (4.07 mas at elongation 90 deg, 1.75" at the solar limb, the
+   Jupiter table); rerun the stored OWC sets (times should barely change; for 16556 the star position should then
+   agree with Occult's within ~0.75 mas and the offset move by ~2.7 km); an Occult plot of an event near opposition
+   (e.g. 19714, Oct 4 2026, elongation 156 deg) as the control case where both effects are small.
 
 ---
 
