@@ -223,14 +223,22 @@ def index():
             with ui.row().classes("w-full items-center gap-4"):
                 fav_info = ui.label().classes("text-sm text-slate-600")
                 ui.button("Reload", on_click=lambda: load_favs()).props("flat dense")
+                ui.link("Open in a new tab", "/fav/favorites.html", new_tab=True)
             ui.label("Add events with the ☆ button in the Results report (opened from this GUI). Each favorite keeps "
-                     "its own copy of map and preview, so later searches do not change it.").classes(
-                "text-xs text-slate-500")
-            fcols = [dict(name=k, label=lbl, field=k, sortable=True, align="left") for k, lbl in
-                     (("name", "Asteroid"), ("utc", "Event (UT)"), ("site", "Site"), ("mag", "G"), ("drop", "Drop"),
-                      ("dur", "Dur (s)"), ("miss", "Miss (km)"), ("status", "Status"), ("note", "Note"),
-                      ("added", "Added (UT)"))]
-            f_table = ui.table(columns=fcols, rows=[], row_key="key", selection="single", pagination=15).classes("w-full")
+                     "its own copy of map and preview, so later searches do not change it. Click a row for its preview, "
+                     "map and note below; check rows for the actions above the table. Drag the table's bottom-right corner to make "
+                     "it taller or shorter (remembered).").classes("text-xs text-slate-500")
+            with ui.element("div").classes("w-full favbox").style(       # drag the corner to resize
+                    "height: 60vh; min-height: 160px; resize: vertical; overflow: hidden; padding-bottom: 14px; "
+                    "border: 1px solid #ddd; background: #f1f5f9"):
+                f_frame = ui.element("iframe").style("width: 100%; height: 100%; border: 0; display: block")
+            ui.add_body_html("""<script>
+(function(){function go(){var b=document.querySelector('.favbox');if(!b){return setTimeout(go,300);}
+ try{var h=localStorage.getItem('pyoccult_favbox_h');if(h)b.style.height=h;}catch(e){}
+ if(window.ResizeObserver)new ResizeObserver(function(){if(b.offsetHeight>0){
+  try{localStorage.setItem('pyoccult_favbox_h',b.offsetHeight+'px');}catch(e){}}}).observe(b);}
+ go();})();
+</script>""")
             with ui.column().classes("w-full gap-3") as f_detail:
                 with ui.row().classes("w-full no-wrap gap-4 items-stretch"):
                     f_img = ui.element("img").style("width: 420px; max-width: 45vw; border: 1px solid #ddd")
@@ -490,29 +498,22 @@ def index():
         el.on_value_change(saved_info)
     load_pick()
 
-    def fav_rows():
-        rows = []
-        for e in favorites.load():
-            r, site = e["record"], e.get("site") or {}
-            f = lambda k, n=2: f"{float(r[k]):.{n}f}" if r.get(k) not in (None, "") else ""
-            rows.append(dict(key=e["key"], name=(r.get("target_name") or r.get("target_id", "")).strip(),
-                             utc=str(r.get("best_utc", ""))[:19].replace("T", " "), site=site.get("name", "?"),
-                             mag=f("mag"), drop=f("mag_drop"), dur=f("max_duration_s"), miss=f("min_distance", 1),
-                             status=e.get("status", ""), note=e.get("note", "")[:60],
-                             added=e.get("added", "").replace("T", " ")[:16]))
-        return rows
+    fav_cur = {"key": None}
 
     def load_favs(select=None):
-        f_table.rows = fav_rows()
-        fav_info.text = f"{len(f_table.rows)} favorite event{'s' if len(f_table.rows) != 1 else ''}"
-        keep = select or (f_table.selected[0]["key"] if f_table.selected else None)
-        f_table.selected = [r for r in f_table.rows if r["key"] == keep]
+        """Rebuild the favorites page (report table) and show it; keep or set the selected favorite."""
+        favorites.write_page()
+        items = favorites.load()
+        fav_info.text = f"{len(items)} favorite event{'s' if len(items) != 1 else ''}"
+        f_frame.props(f"src=/fav/favorites.html?t={time.time():.0f}")
+        if select:
+            fav_cur["key"] = select
+        if fav_cur["key"] not in {e["key"] for e in items}:
+            fav_cur["key"] = None
         show_fav()
 
     def current_fav():
-        if not f_table.selected:
-            return None
-        return next((e for e in favorites.load() if e["key"] == f_table.selected[0]["key"]), None)
+        return next((e for e in favorites.load() if e["key"] == fav_cur["key"]), None)
 
     def show_fav(*_):
         e = current_fav()
@@ -593,10 +594,20 @@ def index():
         if await dlg:
             ok, msg = favorites.remove(e["key"])
             ui.notify(msg, type="positive" if ok else "warning")
-            f_table.selected = []
+            fav_cur["key"] = None
             load_favs()
 
-    f_table.on("selection", show_fav)
+    def on_fav_select(e):
+        fav_cur["key"] = e.args if isinstance(e.args, str) else (e.args or [None])[0]
+        show_fav()
+
+    def on_fav_changed(_):                        # the page changed favorites (mass actions): refresh the panel
+        if fav_cur["key"] not in set(favorites.keys()):
+            fav_cur["key"] = None
+        show_fav()
+
+    ui.on("fav_select", on_fav_select)
+    ui.on("fav_changed", on_fav_changed)
     tabs.on_value_change(lambda e: load_favs() if e.value == t_fav or e.value == "Favorites" else None)
     load_favs()
 
@@ -636,6 +647,24 @@ def main():
     def favorites_keys():
         return {"keys": favorites.keys()}
 
+    @app.get("/api/favorites/update")
+    def favorites_update(keys: str, status: str):
+        ok, msg = favorites.update_many([k for k in keys.split(",") if k], status=status)
+        favorites.write_page()
+        return {"ok": ok, "msg": msg}
+
+    @app.get("/api/favorites/remove")
+    def favorites_remove(keys: str):
+        ok, msg = favorites.remove_many([k for k in keys.split(",") if k])
+        favorites.write_page()
+        return {"ok": ok, "msg": msg}
+
+    @app.get("/api/favorites/cleanup")
+    def favorites_cleanup():
+        ok, msg = favorites.cleanup()
+        favorites.write_page()
+        return {"ok": ok, "msg": msg}
+
     @app.get("/api/favorites/add")
     def favorites_add(tid: str, utc: str):
         import pyoccult_config as cfg, pyoccult_report
@@ -643,6 +672,7 @@ def main():
         if rec is None:
             return {"ok": False, "msg": f"event {tid} {utc[:19]} not found in {cfg.hits_output_cvs_file}"}
         ok, msg = favorites.add(rec, pyoccult_report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir)
+        favorites.write_page()
         return {"ok": ok, "msg": msg}
 
     @app.get("/api/kstars/status")

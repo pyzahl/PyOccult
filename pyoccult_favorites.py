@@ -101,6 +101,81 @@ def remove(key, folder=DIR):
     return True, f"{key} removed"
 
 
+def update_many(keys_, folder=DIR, **fields):
+    """Set status and/or note of several favorites. Returns (ok, message)."""
+    if "status" in fields and fields["status"] not in STATUSES:
+        return False, f"status must be one of {', '.join(STATUSES)}"
+    items, want, n = load(folder), set(keys_), 0
+    for e in items:
+        if e["key"] in want:
+            e.update({k: v for k, v in fields.items() if k in ("status", "note")})
+            n += 1
+    if n:
+        _save(items, folder)
+    return n > 0, f"{n} favorite{'s' if n != 1 else ''} updated" if n else "none of these is a favorite"
+
+
+def remove_many(keys_, folder=DIR):
+    """Drop several favorites and their copied files. Returns (ok, message)."""
+    items, want = load(folder), set(keys_)
+    rest = [e for e in items if e["key"] not in want]
+    n = len(items) - len(rest)
+    if n:
+        _save(rest, folder)
+        for k in want:
+            shutil.rmtree(os.path.join(folder, k), ignore_errors=True)
+    return n > 0, f"{n} favorite{'s' if n != 1 else ''} removed" if n else "none of these is a favorite"
+
+
+def cleanup(before=None, folder=DIR):
+    """Remove every favorite whose event is before `before` (ISO date, default: today UTC). Returns (ok, message)."""
+    day = before or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    old = [e["key"] for e in load(folder) if str(e["record"].get("best_utc", ""))[:10] < day]
+    if not old:
+        return True, f"no favorites before {day}"
+    ok, msg = remove_many(old, folder)
+    return ok, f"{msg} (events before {day})"
+
+
+def write_page(folder=DIR, tiles="https://tile.openstreetmap.org/{z}/{x}/{y}.png"):
+    """favorites/favorites.html: the favorites as a report table (as the Results page, plus select box, site, status,
+    note, added) with the same tools, using each favorite's own map and preview copies. Returns the path."""
+    import pyoccult_report as R
+    events, paths, sites = [], {}, set()
+    for f in load(folder):
+        r, site = f["record"], f.get("site") or {}
+        own = os.path.join(folder, f["key"])
+        try:
+            e = R.build_event(r, site.get("lat"), site.get("lon"), own, folder)
+        except (KeyError, ValueError):
+            continue
+        e.update(fav=dict(key=f["key"], status=f.get("status", ""), note=f.get("note", ""), added=f.get("added", "")),
+                 site=site)
+        if e["kml_abs"]:
+            try:
+                paths[f["key"]] = R.kml_to_data(e["kml_abs"])
+                e["pkey"] = f["key"]
+            except Exception:
+                pass
+        sites.add(site.get("name", "?"))
+        events.append(e)
+    events.sort(key=lambda e: e["when"])
+    span = (f" from {min(e['when'] for e in events):%Y-%m-%d} to {max(e['when'] for e in events):%Y-%m-%d}"
+            if events else "")
+    meta = dict(title="PyOccult favorites", span=span, sort="date", info=None,
+                observer=f"{len(sites)} site{'s' if len(sites) != 1 else ''}: {', '.join(sorted(sites))}" if sites
+                else "no favorites yet: add events with the star button in the Results report",
+                generated=datetime.now().strftime("%Y-%m-%d %H:%M"), paths=paths, tiles=tiles, obs=None, site=None,
+                favorites=True, statuses=STATUSES)
+    os.makedirs(folder, exist_ok=True)
+    out = os.path.join(folder, "favorites.html")
+    fd, tmp = tempfile.mkstemp(dir=folder, suffix=".tmp")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(R.to_html(events, meta))
+    os.replace(tmp, out)
+    return out
+
+
 def find_record(csv_path, target_id, best_utc):
     """The hits_log row (dict) of this event, matched by target and event minute, or None."""
     import csv

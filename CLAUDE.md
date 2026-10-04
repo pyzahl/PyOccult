@@ -41,7 +41,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `pyoccult_favorites.py`: favorites in `favorites/` (private, gitignored): `favorites.json` (entry = hits_log record,
   site and run context from the run summary, status, note) and `favorites/<target>_<YYYYMMDDTHHMM>/` with copies of
   KML and preview SVG. Report: hidden `.favbtn` stars, shown only via the GUI (`/api/favorites/keys|add`; add looks
-  the event up in hits_log.csv by target + minute, site from the last run summary). GUI tab Favorites.
+  the event up in hits_log.csv by target + minute, site from the last run summary). GUI tab Favorites: iframe of
+  `favorites/favorites.html` (`write_page`: report `to_html` with `meta["favorites"]`, rows get `e["fav"]`/`e["site"]`;
+  select boxes, Site/Status/Note/Added, per-row KStars site) rebuilt after every change; mass actions call
+  `/api/favorites/update|remove|cleanup`; row click -> `parent.emitEvent('fav_select', key)` -> detail panel (preview,
+  map from the KML copy, status, note).
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for

@@ -388,12 +388,46 @@ fetch('/api/favorites/keys').then(function(r){return r.json();}).then(function(j
    .catch(function(){pyoToast('Favorites: no answer from the GUI',true);});});});}).catch(function(){});})();
 </script>"""
 
+FAVPAGE_JS = """<style>
+.favbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 10px;font-size:.9rem}
+.favbar select{font:inherit;padding:2px 4px}
+th,td{padding:8px 6px} tr.favrow{cursor:pointer} tr.favrow.cur td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+td.note{max-width:12em;overflow:hidden;text-overflow:ellipsis}
+tr.favrow td:last-child{white-space:normal;min-width:12.5em} tr.favrow td:last-child .mapbtn{margin:2px 0}
+</style><script>
+(function(){
+var boxes=[].slice.call(document.querySelectorAll('.favsel')),all=document.getElementById('favall'),
+    cnt=document.getElementById('favcount');
+function sel(){return boxes.filter(function(b){return b.checked;}).map(function(b){return b.value;});}
+function upd(){cnt.textContent=sel().length+' selected';if(all)all.checked=boxes.length>0&&sel().length===boxes.length;}
+boxes.forEach(function(b){b.addEventListener('change',upd);});
+if(all)all.addEventListener('change',function(){boxes.forEach(function(b){b.checked=all.checked;});upd();});
+function tell(n,a){try{if(parent&&parent!==window&&parent.emitEvent)parent.emitEvent(n,a);}catch(e){}}
+function call(url,done){fetch(url).then(function(r){return r.json();}).then(function(j){pyoToast(j.msg,!j.ok);
+  tell('fav_changed','');if(j.ok)setTimeout(function(){location.reload();},700);})
+ .catch(function(){pyoToast('Favorites: no answer from the GUI (open this page from the GUI)',true);});}
+function need(){var k=sel();if(!k.length){pyoToast('Select events first (check boxes on the left)');return null;}return k;}
+document.getElementById('favsetst').addEventListener('click',function(){var k=need();if(!k)return;
+ call('/api/favorites/update?'+new URLSearchParams({keys:k.join(','),status:document.getElementById('favstatus').value}));});
+document.getElementById('favdel').addEventListener('click',function(){var k=need();if(!k)return;
+ if(confirm('Remove '+k.length+' favorite(s) with their copied maps and previews?'))
+  call('/api/favorites/remove?'+new URLSearchParams({keys:k.join(',')}));});
+document.getElementById('favpast').addEventListener('click',function(){
+ if(confirm('Remove every favorite whose event is before today (UTC)?'))call('/api/favorites/cleanup');});
+document.querySelectorAll('tr.favrow').forEach(function(tr){tr.addEventListener('click',function(ev){
+ if(ev.target.closest('input,button,a'))return;
+ document.querySelectorAll('tr.favrow.cur').forEach(function(x){x.classList.remove('cur');});
+ tr.classList.add('cur');tell('fav_select',tr.dataset.key);});});
+upd();})();
+</script>"""
+
 KSTARS_JS = """<script>
 (function(){var site=__SITE__,bs=document.querySelectorAll('.ksbtn');if(!bs.length||location.protocol==='file:')return;
 fetch('/api/kstars/status').then(function(r){return r.json();}).then(function(j){if(!j.ok)return;
  bs.forEach(function(b){b.hidden=false;b.addEventListener('click',function(){
   var q=new URLSearchParams({ra:b.dataset.ra,dec:b.dataset.dec,utc:b.dataset.utc,fov:b.dataset.fov});
-  if(site){q.set('lat',site.lat);q.set('lon',site.lon);q.set('ele',site.ele||0);}
+  var st=b.dataset.lat?{lat:b.dataset.lat,lon:b.dataset.lon,ele:b.dataset.ele}:site;
+  if(st){q.set('lat',st.lat);q.set('lon',st.lon);q.set('ele',st.ele||0);}
   b.textContent='KStars …';
   fetch('/api/kstars/show?'+q).then(function(r){return r.json();}).then(function(j){
    b.textContent=j.ok?'KStars ✓':'KStars ✗';b.title=j.msg;pyoToast(j.msg,!j.ok||j.msg.indexOf('; ')>0);
@@ -504,11 +538,15 @@ def shadow_cell(e):
 
 
 def map_cell(e):
-    fav = (f'<button class="mapbtn favbtn" type="button" hidden data-tid="{esc(e["tid"])}" data-utc="{esc(e["utc"])}" '
+    fav = ("" if e.get("fav") else
+           f'<button class="mapbtn favbtn" type="button" hidden data-tid="{esc(e["tid"])}" data-utc="{esc(e["utc"])}" '
            f'data-key="{esc(e["tid"])}_{e["when"]:%Y%m%dT%H%M}" aria-label="Favorite">☆</button> ')
+    site = e.get("site") or {}                                   # favorites: each row has its own site
+    ks_site = (f'data-lat="{site["lat"]}" data-lon="{site["lon"]}" data-ele="{site.get("ele") or 0}" '
+               if site.get("lat") is not None and site.get("lon") is not None else "")
     ks = fav + (f'<button class="mapbtn ksbtn" type="button" hidden data-ra="{e["ra"]:.7f}" data-dec="{e["dec"]:.7f}" '
-          f'data-utc="{esc(e["utc"])}" data-fov="{e["fov"]:.3f}" title="Point KStars at the star at the event time, '
-          f'seen from the site (Linux, KStars running, report opened from the GUI)">KStars</button> '
+          f'data-utc="{esc(e["utc"])}" data-fov="{e["fov"]:.3f}" {ks_site}title="Point KStars at the star at the event '
+          f'time, seen from the site (Linux, KStars running, report opened from the GUI)">KStars</button> '
           if e.get("ra") is not None and e.get("dec") is not None else "")
     if not e["kml"] and not e.get("preview"):
         return f"<td>{ks}—</td>" if ks else "<td>—</td>"
@@ -541,17 +579,30 @@ def html_row(e):
     moon = e["moon"]
     moon_tip = esc(f"Moon {moon['alt']:.0f}° above horizon, {moon['illum']:.0f}% lit") if moon and moon["illum"] is not None else ""
     s = lambda v, nd=3: "" if v is None else f"{v:.{nd}f}"
+    f = e.get("fav")
+    if f:                                                        # favorites page: select box, site; no calc time
+        site = (e.get("site") or {}).get("name", "?")
+        lead = (f'<tr class="favrow" data-key="{esc(f["key"])}"><td><input type="checkbox" class="favsel" '
+                f'value="{esc(f["key"])}" aria-label="Select {esc(e["label"])}"></td>')
+        mid = f'<td data-s="{esc(site)}">{esc(site)}</td>'
+        calc = ""
+        tail = (f'<td data-s="{esc(f["status"])}">{esc(f["status"])}</td>'
+                f'<td data-s="{esc(f["note"])}" class="note" title="{esc(f["note"])}">{esc(f["note"][:40])}'
+                f'{"…" if len(f["note"]) > 40 else ""}</td>'
+                f'<td data-s="{esc(f["added"])}" title="{esc(f["added"])} UTC">{esc(f["added"][5:16].replace("T", " "))}</td>')
+    else:
+        lead, mid, tail = "<tr>", "", ""
+        calc = f'<td class="num" data-s="{s(e["calc"])}">{fmt(e["calc"])}</td>'
     return (
-        "<tr>"
-        f'<td data-s="{esc(e["label"])}" title="{tip_ast}">{esc(e["label"])}</td>'
+        lead +
+        f'<td data-s="{esc(e["label"])}" title="{tip_ast}">{esc(e["label"])}</td>' + mid +
         f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)">{esc(fmt_time(e["when"]))}</td>'
         f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">{fmt(e["mag"])}</td>'
         f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}</td>'
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
         f'<td data-s="{s(moon["sep"], 1) if moon else ""}" title="{moon_tip}">{esc(moon_text(e))}</td>'
-        f"{shadow_cell(e)}"
-        f'<td class="num" data-s="{s(e["calc"])}">{fmt(e["calc"])}</td>'
+        f"{shadow_cell(e)}" + calc + tail +
         f"{map_cell(e)}"
         "</tr>"
     )
@@ -565,7 +616,9 @@ def info_html(info):
 
 def to_html(events, meta):
     on = lambda key: ' sorted-asc' if meta.get("sort", "date") == key else ""
-    head = ('<th data-k>Asteroid</th>'
+    fav = meta.get("favorites")
+    head = (('<th><input type="checkbox" id="favall" aria-label="Select all"></th><th data-k>Asteroid</th>'
+             '<th data-k title="Site the event was predicted for">Site</th>') if fav else '<th data-k>Asteroid</th>') + (
             f'<th class="{on("date").strip()}" data-k>Event time (UT)</th>'
             f'<th class="num{on("mag")}" data-k title="Gaia G magnitude of the star">Star mag</th>'
             '<th class="num" data-k title="Magnitude drop with the star fully covered">Mag drop</th>'
@@ -573,12 +626,21 @@ def to_html(events, meta):
             '<th data-k title="Star altitude and compass direction at closest approach">Altitude</th>'
             '<th data-k title="Moon distance from the star; shown while the Moon is up">Moon dist</th>'
             '<th class="num" data-k title="Distance of the observer from the shadow centre line">Offset</th>'
-            '<th class="num" data-k title="Calculation time for this event (exact solve and metrics), seconds">Calc (s)</th>'
-            '<th title="☆ favorites and KStars (when opened from the GUI), Map: shadow path, Preview: star field, '
+            + ('<th data-k>Status</th><th data-k>Note</th><th data-k>Added (UT)</th>' if fav else
+               '<th class="num" data-k title="Calculation time for this event (exact solve and metrics), seconds">Calc (s)</th>')
+            + '<th title=""☆ favorites and KStars (when opened from the GUI), Map: shadow path, Preview: star field, '
             'KML: ground track for Google Earth">Tools</th>')
     body = "".join(html_row(e) for e in events)
     table = (f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
              if events else '<div class="wrap"><div class="empty">No events match.</div></div>')
+    if fav:
+        opts = "".join(f"<option>{esc(x)}</option>" for x in meta.get("statuses", ()))
+        table = (f'<div class="favbar"><span id="favcount">0 selected</span>'
+                 f'<label>status <select id="favstatus">{opts}</select></label>'
+                 f'<button class="mapbtn" id="favsetst" type="button">Set status</button>'
+                 f'<button class="mapbtn" id="favdel" type="button">Remove selected</button>'
+                 f'<button class="mapbtn" id="favpast" type="button" title="Remove every favorite whose event is '
+                 f'before today (UTC)">Remove past events</button></div>' + table)
     n_kml = sum(1 for e in events if e["kml"])
     n_prev = sum(1 for e in events if e.get("preview"))
     paths = meta.get("paths") or {}
@@ -596,7 +658,7 @@ def to_html(events, meta):
 <li>Altitude is the star's altitude at closest approach. The Moon is shown only while above the horizon. Click a column heading to sort.</li>
 <li>Map shows the path on an interactive map (needs internet for the map tiles) and links the closest centre-line point in Google Maps. Google Maps itself cannot load a local KML file: use the KML link with Google Earth, or import it in My Maps (Create a new map, then Import).</li>
 </ul>
-</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}{PREVIEW_DIALOG if n_prev else ''}{TOAST_JS}{FAV_JS}{KSTARS_JS.replace("__SITE__", json.dumps(meta.get("site")))}</body></html>
+</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}{PREVIEW_DIALOG if n_prev else ''}{TOAST_JS}{FAVPAGE_JS if fav else FAV_JS}{KSTARS_JS.replace("__SITE__", json.dumps(meta.get("site")))}</body></html>
 """
 
 

@@ -178,9 +178,12 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    running also a **KStars** button that points KStars at the event, and a **☆** button that adds the event to
    your favorites.
 5. **Favorites**: the events you starred, from any search and any site, each with its own copy of map and preview
-   (later searches do not change them). Selecting one shows its star-field preview and, next to it, its shadow
-   path map (centre line, shadow, 1- and 3-sigma limits, your site); set a status (planned / observed / cancelled /
-   clouded), write a note, or remove it.
+   (later searches do not change them). The table is the Results table (same columns, sorting and tools: KStars,
+   Map, Preview, KML) plus a select box, the site, status, note and when it was added. Check rows to set their
+   status (planned / observed / cancelled / clouded) or remove them; **Remove past events** drops every favorite
+   whose event is before today (UTC). Click a row to see its star-field preview and shadow path map side by side
+   below the table, and to edit its note. Drag the bottom-right corner of the table to resize it (remembered
+   in your browser).
 
 Settings changed in the GUI apply to that run only; `pyoccult_config.py` is not changed. Details: "Web interface
 (GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.

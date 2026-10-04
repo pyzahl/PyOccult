@@ -33,4 +33,20 @@ assert not F.update("17834_20261003T0253", fav, status="bogus")[0]
 assert F.load(fav)[1]["status"] == "observed" and F.load(fav)[1]["note"] == "clear, positive"
 assert F.remove("17834_20261003T0253", fav)[0] and not F.remove("17834_20261003T0253", fav)[0]
 assert not os.path.isdir(os.path.join(fav, "17834_20261003T0253")) and F.keys(fav) == ["19714_20261004T0638"]
+# several at once, cleanup of past events, the page
+open(log, "a").write("70141,70141 (1999 NE18),2099-01-03T07:07:42.5,14.06\n")
+F.add(F.find_record(log, "17834", "2026-10-03T02:53:07"), run, maps, fav)
+F.add(F.find_record(log, "70141", "2099-01-03T07:07:42"), run, maps, fav)
+assert len(F.keys(fav)) == 3
+assert F.update_many(["17834_20261003T0253", "70141_20990103T0707"], fav, status="clouded")[0]
+assert not F.update_many(["17834_20261003T0253"], fav, status="bogus")[0]
+assert sorted(e["status"] for e in F.load(fav)) == ["clouded", "clouded", "planned"]
+ok, msg = F.cleanup("2050-01-01", fav)                                       # 2026 events are past, 2099 is not
+assert ok and "2 favorites removed" in msg and F.keys(fav) == ["70141_20990103T0707"], (msg, F.keys(fav))
+assert F.cleanup("2050-01-01", fav)[1].startswith("no favorites before")
+page = F.write_page(fav)
+html = open(page, encoding="utf-8").read()
+assert 'class="favrow" data-key="70141_20990103T0707"' in html and 'id="favall"' in html and "favsetst" in html
+assert 'class="mapbtn favbtn"' not in html, "no star buttons on the favorites page"
+assert F.remove_many(["70141_20990103T0707", "nope"], fav)[0] and F.keys(fav) == []
 print("FAVORITES TESTS PASSED")
