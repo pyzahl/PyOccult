@@ -1,5 +1,5 @@
 # PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
-Python Occultation Searcher by PyZahl (C) 2026, version 0.9.0. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.10.0. Free software under the GNU GPL v3 or later (see License below).
 The version is kept in `pyoccult_version.py`; the GUI header, the report and `--version` of every tool show it.
 
 Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy and NiceGUI for a local Webinterface to plan and run all tasks for easy event explorations.
@@ -208,7 +208,7 @@ Everything the GUI does is also available on the command line (scripts, automati
 | choose | `python pyoccult_pick.py --start 2026-10-01 --days 20` | screen all asteroids for events at the site; writes `pick_events.csv`, `targets.py` and the saved pick in `picks/` |
 | predict | `./pyoccult.py` | exact search for the targets (the saved pick of the site covering the window, else `targets.py`); appends to `hits_log.csv`, writes `maps/` |
 | present | `python pyoccult_report.py hits_log.csv` | HTML event list with maps and previews (`hits_report.html`) |
-| check | `python pyoccult_owc_check.py --ref owc_reference.txt` | rerun an OWC search result you saved as text and compare event by event |
+| check | `python pyoccult_owc_check.py --ref owc_reference.txt` | rerun an OWC search result you saved as text and compare event by event (`--sea-level`: compute at elevation 0, as OWC online does) |
 
 Useful options: `pyoccult_pick.py --hmax 18 --reach 30 --frames 4 --top 40 --workers 4` (see "Quick start: choose
 targets" below), `python pyoccult_picks.py list` (saved picks), `PYOCCULT_CATALOG=gaia_dr3_g16 ./pyoccult.py`
@@ -310,6 +310,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `targets_source`, `picks_dir` | `"auto"`, `"picks"` | `"auto"`: use the saved pick of the site covering the search window if there is one, else `targets`; `"list"`: always `targets` |
 | `max_shadow_dist` | `20` | km you can travel: an event is logged if the shadow edge passes within this of your site (0 = only from home); a site's `reach_km` overrides it |
 | `search_mode` | `"corridor"` | `"corridor"` (default, fast, needs the local Gaia catalog) or `"windows"` (old per-hour archive queries) |
+| `star_parallax`, `light_deflection` | `True`, `True` | astrometric corrections of the star: seen from the Earth (Gaia parallax), and the light bending by Sun, Jupiter and Saturn (ABOUT.md Part 6). Off reproduces the results before 0.10.0 |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
 | `corridor_step_s` | `600` | path step of the corridor candidate scan, s |
 | `gaia_local_dir`, `gaia_local_gmax` | `"gaia_dr3_g18"`, `18.0` | local Gaia catalog folder and its faintest G (see "Local Gaia catalog"); the environment variable `PYOCCULT_CATALOG=<folder>` chooses another catalog for one run |
@@ -506,7 +507,8 @@ python pyoccult_gui.py --port 8090 --no-browser
   selected one's events appear in a sortable table, with the target asteroids marked. **Use for search** sets the
   search window to that pick's window. **Reload** rereads the list (e.g. after a pick on the command line).
 * **Search**: window, targets (the saved pick of the selected site that covers the window, or typed in), minimum
-  drop, maps and previews, then **Run search**. A line says which saved pick the search will use, or that none
+  drop, maps and previews, the astrometric corrections (stellar parallax, light deflection; both on by default),
+  then **Run search**. A line says which saved pick the search will use, or that none
   covers the window.
   The report is rebuilt and shown under **Results** when the run finishes.
 * **Results**: the HTML report with its maps and previews. On Linux with KStars running, each event also gets a

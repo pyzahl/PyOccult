@@ -11,6 +11,7 @@ pyoccult_config.py is not changed: the settings override it for this run only. H
     python pyoccult_owc_check.py                 # search + compare
     python pyoccult_owc_check.py --compare-only  # compare an existing owc_check_hits.csv
     python pyoccult_owc_check.py --ref other_owc_result.txt
+    python pyoccult_owc_check.py --sea-level     # our side at elevation 0, as OWC online (it ignores the site height)
 
 Duration = diameter / shadow speed. The report shows our diameter and the one OWC's duration implies (OWC duration x our
 speed); when only the diameters differ, the result is "ok, size differs", not a failure. Drops above DROP_TOTAL mag
@@ -120,8 +121,13 @@ if __name__ == "__main__":
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--compare-only", action="store_true")
     ap.add_argument("--ref", default=REF, help="OWC search result as text (default owc_reference.txt)")
+    ap.add_argument("--sea-level", action="store_true",
+                    help="compute at elevation 0 like OWC online (it ignores the site's height); for high sites")
     a = ap.parse_args()
     ref, settings = read_owc(a.ref)
+    if a.sea_level:
+        settings["ELE"] = 0.0
+        print("site elevation set to 0 m (sea level), as OWC online computes", flush=True)
     print(f"{len(ref)} OWC events, {settings['ct'][:10]} + {settings['days']} d, reach {settings['max_shadow_dist']:g} km, "
           f"G <= {settings['MAG_MIN']:g}, min alt {settings['MIN_STAR_ALT']:g}, {settings['pick_aperture_cm']:g} cm, "
           f"{settings['pick_frames']} frames", flush=True)

@@ -27,6 +27,7 @@ warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 import pyoccult_config as config
 from pyoccult_paths import shadow_path, path_sigma3_km, write_shadow_kml
 import pyoccult_corridor as corridor
+import pyoccult_astrometry as astrometry
 import pyoccult_sbdb as sbdb_cache
 import pyoccult_screen as screen          # OWC observability formula, extinction
 
@@ -694,6 +695,14 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     t_start = t_start or time.time()
     RUN["solves"] += 1
     ra, dec = np.radians(getattr(row, ra_col)), np.radians(getattr(row, dec_col))
+    corr = {"parallax_mas": 0.0, "deflection_mas": 0.0}
+    if getattr(config, "star_parallax", True) or getattr(config, "light_deflection", True):
+        # corrected direction at the estimated event time: both change by micro-arcseconds within the solver window
+        u0 = np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+        u1, corr = astrometry.corrected_star_dir(spice, u0, float(getattr(row, "parallax", np.nan)), et_guess, target_id,
+                                                 parallax=getattr(config, "star_parallax", True),
+                                                 deflection=getattr(config, "light_deflection", True))
+        ra, dec = np.arctan2(u1[1], u1[0]) % (2*np.pi), np.arcsin(np.clip(u1[2], -1.0, 1.0))
     res = star_test(loc, spice.et2utc(et_guess, "ISOC", 3), bracket_s, ra, dec, target_id, r_search, config.max_shadow_dist)
     if res is None:
         print (f" --- miss --- ")
@@ -729,7 +738,8 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
                   star=row.source_id, mag=row.phot_g_mean_mag,
                   star_ra=np.degrees(ra), star_dec=np.degrees(dec),
                   star_alt=star_alt, sun_alt=sun_alt, m_ast=m_ast, **met, **moon,
-                  observable=res['observable'])
+                  observable=res['observable'],
+                  corr_parallax_mas=corr["parallax_mas"], corr_deflection_mas=corr["deflection_mas"])
     dx, dy = besselian_offsets(res['best_et'], star_dir, obs_geo, target_id)
     record.update(offset_east_km=dx, offset_north_km=dy,
                   max_duration_s=2*size['r_km']/met['speed_kms'])
@@ -781,7 +791,9 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
              limits=dict(mag_limit=config.MAG_MIN, min_star_alt=config.MIN_STAR_ALT, max_sun_alt=config.MAX_SUN_ALT,
                          reach_km=config.max_shadow_dist, min_mag_drop=getattr(config, "min_mag_drop", 0.1),
                          min_dur_s=config.pick_min_dur_s),
-             earth_pck=EARTH_PCK, targets_from=globals().get("TARGETS_FROM", ""))
+             earth_pck=EARTH_PCK, targets_from=globals().get("TARGETS_FROM", ""),
+             corrections=dict(star_parallax=bool(getattr(config, "star_parallax", True)),
+                              light_deflection=bool(getattr(config, "light_deflection", True))))
     print(f"\nRun summary ({mode}): {n_targets} asteroids, {s['candidates']} candidates, {s['solves']} exact solves, "
           f"{s['hits']} hits")
     print(f"  total {s['total_s']:.1f} s = start-up {s['startup_s']:.1f} s + asteroid data {t_pass1:.1f} s + search "

@@ -106,6 +106,10 @@ def header_info(run, lat, lon):
                       f"{run['per_asteroid_s']:.2f} s per asteroid, {run['per_solve_s'] * 1000:.0f} ms search time per "
                       f"exact solve" + (f", {run['calc_per_hit_s'] * 1000:.0f} ms calculation per hit"
                                         if "calc_per_hit_s" in run else ""))]
+    if run.get("corrections"):
+        c = run["corrections"]
+        out.append(("Astrometry", f"stellar parallax {'on' if c.get('star_parallax') else 'off'}, light deflection by "
+                                  f"Sun, Jupiter, Saturn {'on' if c.get('light_deflection') else 'off'}"))
     if run.get("earth_pck"):
         out.append(("Earth orientation", earth_pck_text(run["earth_pck"], run)))
     return out

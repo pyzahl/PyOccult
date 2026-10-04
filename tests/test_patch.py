@@ -13,9 +13,10 @@ class Loc: lon, lat, height = Q(-1.27), Q(0.71), Q(0.04)
 class Cfg:
     max_shadow_dist = 200.0; hits_output_cvs_file = out_csv; min_mag_drop = 0.1; cache_path = tempfile.mkdtemp()
     write_maps = False; default_sigma3_km = 10.0
+    star_parallax = False; light_deflection = False      # covered by test_astrometry (needs SPICE positions)
     pick_aperture_cm = 25.0; pick_frames = 4; pick_mag_adjust = 0.0; pick_extinction = 0.2       # site equipment
-import time, json, datetime, pyoccult_screen
-ns = dict(np=np, pd=pd, os=os, time=time, json=json, datetime=datetime.datetime, screen=pyoccult_screen, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
+import time, json, datetime, pyoccult_screen, pyoccult_astrometry
+ns = dict(np=np, pd=pd, os=os, time=time, json=json, datetime=datetime.datetime, screen=pyoccult_screen, astrometry=pyoccult_astrometry, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
 ns['spice'] = types.SimpleNamespace(et2utc=lambda et, f, p: "ET:%r" % float(et))
 def star_test(loc, utc, span, ra, dec, tid, r, reach):
     calls['star_test'] += 1

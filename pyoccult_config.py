@@ -20,6 +20,8 @@ picks_dir = "picks"
 max_shadow_dist = 20  ## in km: travel distance from observer location
 
 search_mode = "corridor"   # "corridor": stars along each path from the local Gaia copy (fast); "windows": old per-window archive cones
+star_parallax = True       # astrometric corrections of the star direction (ABOUT.md Part 6): the star seen from the
+light_deflection = True    # Earth (Gaia parallax), and the light bending by Sun, Jupiter, Saturn (star minus asteroid)
 min_mag_drop = 0.1         # mag; events with a smaller drop are not logged (also sets the Gaia magnitude cap per asteroid)
 corridor_step_s = 600      # s, coarse path step for the corridor candidate scan
 gaia_local_dir = "gaia_dr3_g18"  # folder of the local Gaia copy, required by corridor mode (python pyoccult_gaia_local.py build)

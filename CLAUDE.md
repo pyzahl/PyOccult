@@ -53,6 +53,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   all record columns, sbdb_*, file paths).
 - OWC twilight events carry the Sun altitude after the time ("☼ -5°"); `read_owc` parses it (`sun_alt_deg`) and then
   sets MAX_SUN_ALT to the brightest + 1 (fixed 2026-10-04: before, such lines were silently skipped).
+- OWC online computes at sea level (ignores the site elevation); `pyoccult_owc_check.py --sea-level` sets ELE = 0 for
+  a like-for-like check. Effect up to h x cos(star alt) across the track (958 m: up to 0.9 km).
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for
@@ -64,6 +66,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 
 ## Conventions that matter
 - Asteroid position: `spkpos(id, et, 'J2000', 'CN', '399')`. Earth centre is 399, not 3. `CN` is astrometric (matches Gaia).
+- Star direction (0.10.0): `pyoccult_astrometry.corrected_star_dir` in `handle_star`, once per candidate at et_guess:
+  Gaia (propagated) + stellar parallax + light deflection by Sun/Jupiter/Saturn as star MINUS asteroid (asteroid stays
+  SPICE 'CN'). Switches `star_parallax`, `light_deflection` (off = old results exactly). Log `star_ra/star_dec` are the
+  corrected direction; `corr_parallax_mas`, `corr_deflection_mas`. Not in the pick screen yet.
 - Fundamental plane: z toward the star, x east = (0,0,1) x z, y north. Miss distance = hypot(dx, dy) in km.
 - Observer longitude is east-positive, geodetic, radians inside the solver.
 - Target ids are strings of the asteroid number ('218001'); the SPK is aliased with `boddef` in `fetch_target_orbit`.
@@ -117,10 +123,7 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 
 ## Ideas not built yet
 - Star angular-diameter model for the drop and duration.
-- Gravitational light deflection (ABOUT.md Part 6, estimated 2026-10-04): not modelled ('CN' and Gaia directions are
-  both undeflected). The Sun's differential deflection (star minus asteroid) shifts paths 0.5-6 km at elongation
-  < ~120 deg; Jupiter matters within a few arcmin (7 km at 1'). Plan: shift the star direction per event; then
-  compare cross-track paths with OWC at low elongation.
+- Astrometric corrections in the pick screen (built for the search in 0.10.0; pick screen still without).
 - Process-level parallelism by target (`ProcessPoolExecutor`; parent does kernel checks, Horizons SPKs and opens the local Gaia catalog;
   workers return records, parent writes the CSV).
 - `m_before` / `m_during` columns in the log.

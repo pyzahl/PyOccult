@@ -178,6 +178,14 @@ def index():
                 s_fresh = ui.checkbox("Start a fresh hits_log.csv", value=True)
                 s_maps = ui.checkbox("KML maps", value=bool(config.write_maps))
                 s_prev = ui.checkbox("Previews", value=bool(getattr(config, "write_previews", True)))
+            with ui.row().classes("items-center"):
+                ui.label("Astrometric corrections of the star:").classes("text-sm text-slate-600")
+                s_plx = ui.checkbox("Stellar parallax", value=bool(getattr(config, "star_parallax", True))).tooltip(
+                    "The star as seen from the Earth, not the Sun (Gaia parallax); up to several km on the path")
+                s_defl = ui.checkbox("Light deflection (Sun, Jupiter, Saturn)",
+                                     value=bool(getattr(config, "light_deflection", True))).tooltip(
+                    "Gravitational light bending, star minus asteroid; up to ~6 km away from opposition. "
+                    "Both off reproduce results before version 0.10.0")
             with ui.row():
                 ui.button("Run search", on_click=lambda: run_search()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
@@ -422,7 +430,8 @@ def index():
             return
         ensure_saved()
         over = dict(ct=f"{s_start.value}T00:00:00", days=int(s_days.value), min_mag_drop=float(s_drop.value),
-                    write_maps=bool(s_maps.value), write_previews=bool(s_prev.value))
+                    write_maps=bool(s_maps.value), write_previews=bool(s_prev.value),
+                    star_parallax=bool(s_plx.value), light_deflection=bool(s_defl.value))
         if not s_use_file.value:
             over["targets"] = [t for t in s_targets.value.replace(",", " ").split() if t]
         if s_fresh.value and os.path.isfile(config.hits_output_cvs_file):
