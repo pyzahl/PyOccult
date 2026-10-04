@@ -113,6 +113,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 
 ## Ideas not built yet
 - Star angular-diameter model for the drop and duration.
+- Gravitational light deflection (ABOUT.md Part 6, estimated 2026-10-04): not modelled ('CN' and Gaia directions are
+  both undeflected). The Sun's differential deflection (star minus asteroid) shifts paths 0.5-6 km at elongation
+  < ~120 deg; Jupiter matters within a few arcmin (7 km at 1'). Plan: shift the star direction per event; then
+  compare cross-track paths with OWC at low elongation.
 - Process-level parallelism by target (`ProcessPoolExecutor`; parent does kernel checks, Horizons SPKs and opens the local Gaia catalog;
   workers return records, parent writes the CSV).
 - `m_before` / `m_during` columns in the log.

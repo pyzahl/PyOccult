@@ -330,6 +330,66 @@ records which list was used, and the report header shows it.
   Referer, so the tiles are refused); `--tile-url` selects another tile server.
 - **Ideas**: `m_before` / `m_during` columns in the log; process-level parallelism by target in `pyoccult.py`.
 
+### Gravitational light deflection (not modelled; estimated 2026-10-04)
+
+**What PyOccult does now.** The asteroid comes from `spkpos(..., 'CN', '399')`: light-time corrected, astrometric,
+with no stellar aberration and no gravitational light deflection. The star direction is the Gaia DR3 catalog
+direction, propagated with its proper motion; Gaia directions are by definition free of light deflection (the
+catalog removes it). Aberration is consistent: neither source gets it, and it would shift both the same way, so it
+cancels. Light deflection does not cancel: the star's light and the asteroid's reflected light are bent by
+different amounts, because the asteroid is much closer.
+
+**Size.** For a source in direction u seen from an observer at distance E from the Sun (unit vector e from the Sun
+to the observer), with q the unit vector from the Sun to the source (q = u for a star):
+
+    deflection = (2GM/c^2) / E * |e - (u.e) u| / (1 + q.e)          (2GM/c^2 = 2.95 km for the Sun)
+
+For a star this is 4.07 mas x (1 + cos eps) / sin eps at elongation eps (1.75" at the solar limb). What moves the
+shadow path is the difference between the star's and the asteroid's deflection, times the asteroid's distance.
+
+Sun, typical main-belt asteroid (2.5 AU from the Sun), observer at 1 AU:
+
+| Elongation | Star | Asteroid | Difference | Asteroid distance | Shift of the path on the ground |
+|---|---|---|---|---|---|
+| 60 deg (twilight) | 7.05 mas | 4.24 mas | 2.81 mas | 2.85 AU | 5.8 km |
+| 90 deg | 4.07 mas | 2.91 mas | 1.16 mas | 2.29 AU | 1.9 km |
+| 120 deg | 2.35 mas | 1.99 mas | 0.36 mas | 1.85 AU | 0.5 km |
+| 150 deg | 1.09 mas | 1.04 mas | 0.05 mas | 1.58 AU | 0.05 km |
+| 170 deg and beyond | <= 0.36 mas | about the same | ~0 | 1.5 AU | negligible |
+
+Jupiter (2GM/c^2 = 2.8 m, 4.2 AU away), a star at angular distance chi from Jupiter's centre, asteroid at 1.5 AU
+(much closer than Jupiter, so its light is not bent by Jupiter):
+
+| chi | Star deflection | Shift of the path |
+|---|---|---|
+| 20" (Jupiter's limb) | 19.1 mas | 21 km |
+| 30" | 12.7 mas | 14 km |
+| 1' | 6.4 mas | 7 km |
+| 5' | 1.3 mas | 1.4 km |
+| 10' | 0.6 mas | 0.7 km |
+| 1 deg | 0.1 mas | 0.1 km |
+
+Saturn gives about a third of Jupiter's effect at the same angle; Earth and Moon only micro-arcseconds. For an
+asteroid beyond the deflecting planet (for Jupiter: Trojans, outer objects) both lights are bent and the difference
+shrinks.
+
+**What this means.**
+- The Sun term is not an extreme case: away from opposition (morning and evening sky, elongation below ~120 deg)
+  the path shifts by 0.5 to 6 km, the size of a small asteroid's shadow and of the 1-sigma band of a well-known
+  orbit. Near opposition, where most good events are, it is negligible.
+- The planet term matters only within a few arc-minutes of Jupiter (or closer for Saturn). Such events are rare,
+  and the planet's glare makes them hard to observe, but they are scientifically interesting (appulses, the
+  deflection itself) and should then be predicted correctly.
+- The OWC comparison (Part 5) compared times (agreement 1-5 s); a few km along the track is well under a second.
+  The cross-track position of the path, where this shift shows, has not been compared. As far as known, Occult
+  includes light deflection (to be confirmed); then OWC paths of events away from opposition would differ from ours
+  by the amounts above.
+
+**Plan.** At each event, shift the star direction by (star deflection - asteroid deflection) with the formula above,
+using the Sun's and the observer's positions from SPICE (a few lines in the solver's star-direction step, and the
+same in the pick screen); add Jupiter and Saturn when the star is within a few arc-minutes of them. Test with a
+stand-in against the table values; then compare event paths across the track with OWC for events at low elongation.
+
 ---
 
 ## Part 7: Future plans
