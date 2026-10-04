@@ -146,12 +146,18 @@ build is already in the folder (it resumes that one). `--keep-archive` keeps the
 have the archive (downloaded by hand from the DOI page), put it next to the catalog folder, e.g.
 `gaia_dr3_g18.tar.xz` beside `gaia_dr3_g18/`. Setup then checks it and unpacks it without downloading.
 
-The download takes a while, the ESA build much longer. On Linux you can let it run on its own and check on it later:
+The download takes a while, the ESA build much longer. To let it run on its own and check on it later (Linux,
+macOS), answer setup's questions first and then start only the catalog in the background, with your answers given as
+options. In the background setup cannot ask: it would take the example site (New York) and the catalog limit from
+`pyoccult_config.py`.
 
 ```bash
-nohup python pyoccult_setup.py > setup.log 2>&1 &
-tail -f setup.log                     # progress (Zenodo: every 5 %; ESA: every 20 files), with an ETA
+python pyoccult_setup.py --no-gaia                                           # in the terminal: your site and the kernels
+nohup python pyoccult_setup.py --gmax 18 --source zenodo > setup.log 2>&1 &  # then the catalog in the background
+tail -f setup.log                     # progress with speed and ETA: a new line every 30 s
 ```
+
+`--gmax 16` for the smaller catalog; `--source esa` to build it from ESA's files instead.
 
 It is safe to stop and rerun: a Zenodo download continues where it stopped, and an ESA build skips finished files, so
 the same command resumes. `--status` should end with

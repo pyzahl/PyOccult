@@ -281,6 +281,9 @@ if __name__ == "__main__":
             print(f"   G <= {gmax:g} in {d}")
         else:
             print(f"2. local Gaia catalog G <= {gmax:g} in {d}")
+            if not st["complete"] and a.gmax is None and not sys.stdin.isatty():
+                print(f"   note: no terminal (background run), so no questions: catalog limit G <= {gmax:g} from "
+                      f"pyoccult_config.py; give --gmax (and --source) to choose")
         if st["total"] and abs(st.get("gmax", gmax) - gmax) > 1e-9:
             what = (f"a {'complete' if st['complete'] else 'half-built'} catalog with G <= {st['gmax']:g} "
                     f"({st['done']}/{st['total']} files, {st['gb']:.1f} GB)")
