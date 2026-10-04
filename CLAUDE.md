@@ -103,4 +103,21 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - Process-level parallelism by target (`ProcessPoolExecutor`; parent does kernel checks, Horizons SPKs and opens the local Gaia catalog;
   workers return records, parent writes the CSV).
 - `m_before` / `m_during` columns in the log.
+- Favorites event list (planned 2026-10-03, not started): events picked by hand from any search and any site, kept
+  with everything known. Design notes:
+  - Store: private (site names), e.g. `favorites.json` (gitignored); one entry per event, key = target + Gaia star +
+    event minute (as the report's dedupe). Keep the full hits_log record, the site (name, lat/lon/ele, equipment),
+    the run context (catalog, Earth PCK, targets_from, run_utc), plus added time, notes and a status (planned /
+    observed / cancelled).
+  - Map and preview are kept with the favorite, never only linked: copy the event's KML (ground track with shadow,
+    1- and 3-sigma lines) and preview SVG into its own folder, e.g. `favorites/<target>_<YYYYMMDDTHHMM>/` (fresh
+    search runs overwrite or delete files in maps/). A re-prediction adds new versions next to the old ones.
+  - Add: a star button per report row, calling a GUI endpoint like the KStars button (`/api/favorites/add`; hidden
+    when the report is not served by the GUI).
+  - New GUI tab "Favorites": table, drop, notes/status, re-predict one event with the latest orbit (single-target
+    search; orbits change, so store the inputs), export (CSV, KML bundle, report page).
+  - Share/pull with Occult Watcher Cloud (campaign events, multi-site chords): how is TBD; no known public OWC
+    interface, ask the IOTA contacts.
+  - Later: observation data per favorite (result positive/negative/clouded, D/R times, chord, link to the SODIS
+    report that DVTI+CAM / ASTRID generate).
 
