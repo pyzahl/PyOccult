@@ -237,10 +237,13 @@ def index():
                     f_map = ui.leaflet(center=(40.7, -74.0), zoom=9).classes("grow").style(   # as tall as the
                         "height: calc(min(420px, 45vw) * 634 / 560); border: 1px solid #ddd")    # preview (560x634)
                     f_nomap = ui.label("No map copied for this event.").classes("text-sm text-slate-500")
-                f_legend = ui.html('<span style="font-size:.8rem;color:#475569">'
-                                   '<b style="color:#15803d">━</b> centre line &nbsp; <b style="color:#dc2626">━</b> '
-                                   'shadow limits &nbsp; <b style="color:#7c3aed">┄</b> 1σ &nbsp; '
-                                   '<b style="color:#d97706">╌</b> 3σ &nbsp; marker: site</span>')
+                with ui.row().classes("gap-3 items-center text-xs text-slate-600") as f_legend:   # no ui.html:
+                    for sym, col, txt in (("━", "#15803d", "centre line"), ("━", "#dc2626", "shadow limits"),  # its
+                                          ("┄", "#7c3aed", "1σ"), ("╌", "#d97706", "3σ")):         # signature differs
+                        with ui.row().classes("gap-1 items-center"):                              # across versions
+                            ui.label(sym).style(f"color: {col}; font-weight: 700")
+                            ui.label(txt)
+                    ui.label("marker: site")
                 with ui.column().classes("w-full"):
                     f_title = ui.label().classes("text-lg font-semibold")
                     f_facts = ui.label().classes("text-sm text-slate-600")
