@@ -574,7 +574,7 @@ View results table. Detail quick path view map button and star field preview (st
 <img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/4c4ee096-1aa5-4b91-bec2-eeac632ad135" />
 
 
-## Refefrences
+## References
 - [Spiceypy] Annex et al., (2020). SpiceyPy: a Pythonic Wrapper for the SPICE Toolkit. Journal of Open Source Software, 5(46), 2050, https://doi.org/10.21105/joss.02050
 
 - [NAIF] https://naif.jpl.nasa.gov/naif
