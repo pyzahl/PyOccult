@@ -29,7 +29,7 @@ includes all reported timings of observed asteroid occultation events:
 
 - https://science.unistellar.com/asteroid-occultations/results/
 
-And for predicting events for observation planning with the goal of improving our knowledge/data about the so many small bodies is where this tool comes to use.
+This is where PyOccult comes in: it predicts such events for observation planning, so that more of them get observed and every timed event adds to our knowledge of the many small bodies of the Solar System.
 
 # Tools in this project:
 
