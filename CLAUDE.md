@@ -45,7 +45,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `favorites/favorites.html` (`write_page`: report `to_html` with `meta["favorites"]`, rows get `e["fav"]`/`e["site"]`;
   select boxes, Site/Status/Note/Added, per-row KStars site) rebuilt after every change; mass actions call
   `/api/favorites/update|remove|cleanup`; row click -> `parent.emitEvent('fav_select', key)` -> detail panel (preview,
-  map from the KML copy, status, note).
+  map from the KML copy, size line, status, note). Entry key `phys`: the pyoccult_sbdb cache data (H, G, diameter,
+  diameter_sigma, extent, albedo as (value, ref)) copied at add time (/dev/shm cache is volatile); GUI start
+  backfills it for older entries. `favorites.csv` is rewritten by every `_save` (flat: key/status/note/added/site,
+  all record columns, sbdb_*, file paths).
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for

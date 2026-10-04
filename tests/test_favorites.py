@@ -49,4 +49,25 @@ html = open(page, encoding="utf-8").read()
 assert 'class="favrow" data-key="70141_20990103T0707"' in html and 'id="favall"' in html and "favsetst" in html
 assert 'class="mapbtn favbtn"' not in html, "no star buttons on the favorites page"
 assert F.remove_many(["70141_20990103T0707", "nope"], fav)[0] and F.keys(fav) == []
+# size data kept with a favorite, the size line, the CSV, filling in old favorites
+import csv
+open(log, "a").write("")
+rec = dict(target_id="21641", target_name="21641 Tiffanyko", best_utc="2026-10-06T04:26:25.5", mag="8.1",
+           r_km="1.52", r_min_km="0.49", r_max_km="2.555",
+           size_source="SBDB diameter (ref urn:nasa:pds:neowise_diameters_albedos::2.0 (http://x))")
+cache = {"fetched": 1.0, "phys": {"H": {"value": "14.92", "ref": "MPC"}, "albedo": {"value": "0.209", "ref": "N"},
+                                  "diameter": {"value": "3.04", "ref": "N"}}}
+assert F.add(rec, run, maps, fav, sbdb=cache)[0]
+e = F.load(fav)[0]
+assert e["phys"]["H"] == ["14.92", "MPC"] or e["phys"]["H"] == ("14.92", "MPC")
+assert F.size_text(e) == "D 3.04 km (0.98-5.11 km, SBDB diameter, NEOWISE) · H 14.92 · albedo 0.209", F.size_text(e)
+rows = list(csv.DictReader(open(os.path.join(fav, "favorites.csv"), encoding="utf-8")))
+assert len(rows) == 1 and rows[0]["key"] == "21641_20261006T0426" and rows[0]["sbdb_H"] == "14.92"
+assert rows[0]["site"] == "S" and rows[0]["r_km"] == "1.52" and rows[0]["status"] == "planned"
+F.update("21641_20261006T0426", fav, status="observed")                    # every change rewrites the CSV
+assert list(csv.DictReader(open(os.path.join(fav, "favorites.csv"))))[0]["status"] == "observed"
+rec2 = dict(rec, target_id="17834", best_utc="2026-10-03T02:53:07")
+F.add(rec2, run, maps, fav)                                                 # added without size data
+assert F.backfill_phys(lambda t: cache if t == "17834" else None, fav) == 1
+assert F.backfill_phys(lambda t: cache, fav) == 0, "only entries without size data"
 print("FAVORITES TESTS PASSED")

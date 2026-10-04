@@ -224,6 +224,8 @@ def index():
                 fav_info = ui.label().classes("text-sm text-slate-600")
                 ui.button("Reload", on_click=lambda: load_favs()).props("flat dense")
                 ui.link("Open in a new tab", "/fav/favorites.html", new_tab=True)
+                ui.link("CSV", "/fav/favorites.csv").props("download").tooltip(
+                    "favorites/favorites.csv: all favorites as a table (rewritten with every change)")
             ui.label("Add events with the ☆ button in the Results report (opened from this GUI). Each favorite keeps "
                      "its own copy of map and preview, so later searches do not change it. Click a row for its preview, "
                      "map and note below; check rows for the actions above the table. Drag the table's bottom-right corner to make "
@@ -255,6 +257,7 @@ def index():
                 with ui.column().classes("w-full"):
                     f_title = ui.label().classes("text-lg font-semibold")
                     f_facts = ui.label().classes("text-sm text-slate-600")
+                    f_size = ui.label().classes("text-sm text-slate-600")
                     with ui.row().classes("items-end gap-4"):
                         f_status = ui.select(list(favorites.STATUSES), label="Status").classes("w-40")
                         f_kml = ui.link("KML (ground track)", "#")
@@ -526,6 +529,7 @@ def index():
                         f"Gaia {r.get('star', '')} G {float(r.get('mag') or 0):.2f} · drop {float(r.get('mag_drop') or 0):.2f} "
                         f"mag · max {float(r.get('max_duration_s') or 0):.2f} s · miss {float(r.get('min_distance') or 0):.1f} km · "
                         f"added {e.get('added', '')[:16].replace('T', ' ')} UT")
+        f_size.text = "size: " + (favorites.size_text(e) or "not recorded")
         f_status.value, f_note.value = e.get("status", "planned"), e.get("note", "")
         f_img.set_visibility("svg" in files)
         if "svg" in files:
@@ -641,6 +645,9 @@ def main():
     app.add_static_file(local_file=os.path.join(ROOT, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
     import pyoccult_kstars                                      # report's KStars buttons (Linux; hidden elsewhere)
     os.makedirs(os.path.join(ROOT, favorites.DIR), exist_ok=True)
+    import pyoccult_sbdb                                        # size data for favorites added before it was kept
+    favorites.backfill_phys(lambda t: pyoccult_sbdb.get(t, config.cache_path)[0])
+    favorites.write_csv()
     app.add_static_files("/fav", os.path.join(ROOT, favorites.DIR), max_cache_age=0)
 
     @app.get("/api/favorites/keys")
@@ -671,7 +678,9 @@ def main():
         rec = favorites.find_record(cfg.hits_output_cvs_file, tid, utc)
         if rec is None:
             return {"ok": False, "msg": f"event {tid} {utc[:19]} not found in {cfg.hits_output_cvs_file}"}
-        ok, msg = favorites.add(rec, pyoccult_report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir)
+        import pyoccult_sbdb
+        ok, msg = favorites.add(rec, pyoccult_report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir,
+                                sbdb=pyoccult_sbdb.get(tid, cfg.cache_path)[0])
         favorites.write_page()
         return {"ok": ok, "msg": msg}
 

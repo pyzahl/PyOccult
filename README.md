@@ -182,7 +182,9 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    Map, Preview, KML) plus a select box, the site, status, note and when it was added. Check rows to set their
    status (planned / observed / cancelled / clouded) or remove them; **Remove past events** drops every favorite
    whose event is before today (UTC). Click a row to see its star-field preview and shadow path map side by side
-   below the table, and to edit its note. Drag the bottom-right corner of the table to resize it (remembered
+   below the table, with its size (the diameter and range the search used, its source, H and albedo), and to
+   edit its note. **CSV** downloads all favorites as a table: `favorites/favorites.csv` is rewritten with every
+   change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
    in your browser).
 
 Settings changed in the GUI apply to that run only; `pyoccult_config.py` is not changed. Details: "Web interface

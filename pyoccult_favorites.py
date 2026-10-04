@@ -1,6 +1,7 @@
 """pyoccult_favorites.py - a hand-picked list of events from any search and any site, kept with everything known.
 
     favorites/favorites.json                    the list (one entry per event, newest first)
+    favorites/favorites.csv                     the same as a flat table (rewritten with every change; for sharing)
     favorites/<target>_<YYYYMMDDTHHMM>/          the event's own copies of its KML ground track and preview SVG
 
 An entry holds the full hits_log record, the site and the run context of the search it came from, when it was added,
@@ -40,15 +41,54 @@ def _save(items, folder):
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(items, f, indent=1)
     os.replace(tmp, _path(folder))
+    write_csv(items, folder)
+
+
+PHYS_KEYS = ("H", "G", "diameter", "diameter_sigma", "extent", "albedo")
+
+
+def phys_of(entry):
+    """{name: (value, ref)} of the size-cache entry (pyoccult_sbdb) kept with a favorite, for H, G, diameter, ..."""
+    out = {}
+    for k in PHYS_KEYS:
+        v = ((entry or {}).get("phys") or {}).get(k)
+        if v and v.get("value") not in (None, ""):
+            out[k] = (v["value"], v.get("ref") or "")
+    return out
+
+
+def write_csv(items=None, folder=DIR):
+    """favorites/favorites.csv: one row per favorite (status, note, added, site, the search record, size data)."""
+    import csv
+    items = load(folder) if items is None else items
+    rec_cols = []
+    for e in items:
+        rec_cols += [k for k in e["record"] if k not in rec_cols]
+    cols = (["key", "status", "note", "added", "site", "site_lat", "site_lon", "site_ele"] + rec_cols
+            + [f"sbdb_{k}" for k in PHYS_KEYS] + ["kml", "preview_svg"])
+    fd, tmp = tempfile.mkstemp(dir=folder, suffix=".tmp")
+    with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        for e in items:
+            site, files, ph = e.get("site") or {}, e.get("files") or {}, e.get("phys") or {}
+            row = dict(key=e["key"], status=e.get("status", ""), note=e.get("note", ""), added=e.get("added", ""),
+                       site=site.get("name", ""), site_lat=site.get("lat", ""), site_lon=site.get("lon", ""),
+                       site_ele=site.get("ele", ""), kml=files.get("kml", ""), preview_svg=files.get("svg", ""))
+            row.update({k: v for k, v in e["record"].items() if k in rec_cols})
+            row.update({f"sbdb_{k}": (ph.get(k) or ["", ""])[0] for k in PHYS_KEYS})
+            w.writerow(row)
+    os.replace(tmp, os.path.join(folder, "favorites.csv"))
 
 
 def keys(folder=DIR):
     return [e["key"] for e in load(folder)]
 
 
-def add(record, run=None, map_dir="maps", folder=DIR):
-    """Add an event (record: a hits_log row as a dict; run: the run summary of its search, or None). Copies its KML
-    and preview from map_dir. Returns (ok, message)."""
+def add(record, run=None, map_dir="maps", folder=DIR, sbdb=None):
+    """Add an event (record: a hits_log row as a dict; run: the run summary of its search, or None; sbdb: the
+    asteroid's size-cache entry from pyoccult_sbdb, kept with the favorite). Copies its KML and preview from map_dir.
+    Returns (ok, message)."""
     try:
         key = key_of(record["target_id"], record["best_utc"])
     except KeyError as ex:
@@ -67,7 +107,7 @@ def add(record, run=None, map_dir="maps", folder=DIR):
             files[ext] = os.path.relpath(dst, folder).replace(os.sep, "/")
     run = run or {}
     entry = dict(key=key, added=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), status="planned", note="",
-                 record=record, site=run.get("site"), files=files,
+                 record=record, site=run.get("site"), files=files, phys=phys_of(sbdb),
                  run={k: run.get(k) for k in ("run_utc", "window_start", "window_days", "limits", "earth_pck",
                                                "targets_from") if k in run})
     items.insert(0, entry)
@@ -174,6 +214,39 @@ def write_page(folder=DIR, tiles="https://tile.openstreetmap.org/{z}/{x}/{y}.png
         fh.write(R.to_html(events, meta))
     os.replace(tmp, out)
     return out
+
+
+def backfill_phys(lookup, folder=DIR):
+    """Give favorites added before size data was kept their size-cache data: lookup(target_id) -> cache entry or
+    None. Saves (and rewrites the CSV) only if something changed. Returns the number filled in."""
+    items, n = load(folder), 0
+    for e in items:
+        if not e.get("phys"):
+            ph = phys_of(lookup(str(e["record"].get("target_id", "")).strip()))
+            if ph:
+                e["phys"], n = ph, n + 1
+    if n:
+        _save(items, folder)
+    return n
+
+
+def size_text(entry):
+    """'D 3.04 km (2.81-3.27 km, SBDB diameter, NEOWISE) · H 14.03 · albedo 0.06': the size the search used (from
+    its record: radius and range, source) and the cached SBDB data kept with the favorite."""
+    r, ph = entry["record"], entry.get("phys") or {}
+    parts = []
+    try:
+        d, lo, hi = (2 * float(r[k]) for k in ("r_km", "r_min_km", "r_max_km"))
+        src = (r.get("size_source") or "").split(" (ref")[0].strip()
+        if "neowise" in (r.get("size_source") or "").lower():
+            src += ", NEOWISE"
+        parts.append(f"D {d:.2f} km ({lo:.2f}-{hi:.2f} km" + (f", {src})" if src else ")"))
+    except (KeyError, TypeError, ValueError):
+        pass
+    for k, label in (("H", "H"), ("albedo", "albedo"), ("extent", "extent")):
+        if k in ph:
+            parts.append(f"{label} {ph[k][0]}" + (" km" if k == "extent" else ""))
+    return " · ".join(parts)
 
 
 def find_record(csv_path, target_id, best_utc):
