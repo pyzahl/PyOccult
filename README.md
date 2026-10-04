@@ -38,8 +38,8 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 | `pyoccult_owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
 | supporting modules | `pyoccult_corridor.py` (star corridor), `pyoccult_screen.py` + `pyoccult_orbits.py` (pick tool engine), `pyoccult_preview.py` (event preview image), `pyoccult_sbdb.py` (asteroid size cache), `pyoccult_kernels.py` (kernel download), `pyoccult_geo.py` (place and IP lookup), `pyoccult_runner.py` (runs with per-run settings) |
 
-See `ABOUT.md` for the computations, data sources and open points.
-
+See `ABOUT.md` for the computations, data sources and open points:
+https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 # Install
 
