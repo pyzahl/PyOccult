@@ -70,4 +70,21 @@ rec2 = dict(rec, target_id="17834", best_utc="2026-10-03T02:53:07")
 F.add(rec2, run, maps, fav)                                                 # added without size data
 assert F.backfill_phys(lambda t: cache if t == "17834" else None, fav) == 1
 assert F.backfill_phys(lambda t: cache, fav) == 0, "only entries without size data"
+# preview and globe plot kept apart (report lookup, favorite copies, filling in later globes)
+import pyoccult_report as R
+from datetime import datetime, timezone
+when = datetime(2026, 10, 3, 2, 53, 7, tzinfo=timezone.utc)
+open(os.path.join(maps, "17834_20261003T0253_globe.svg"), "w").write("<svg id='globe'/>")
+assert R.find_kml(maps, "17834", when, "svg") is None, "only a globe there: no preview"
+assert R.find_kml(maps, "17834", when, "globe").endswith("_globe.svg")
+open(os.path.join(maps, "17834_20261003T0253.svg"), "w").write("<svg id='preview'/>")
+assert R.find_kml(maps, "17834", when, "svg").endswith("17834_20261003T0253.svg")
+F.remove_many(F.keys(fav), fav)
+assert F.add(F.find_record(log, "17834", "2026-10-03T02:53:07"), run, maps, fav)[0]
+e = F.load(fav)[0]
+assert e["files"]["svg"].endswith("T0253.svg") and e["files"]["globe"].endswith("_globe.svg"), e["files"]
+F.add(F.find_record(log, "19714", "2026-10-04T06:38:06"), run, maps, fav)          # no globe in maps for it
+open(os.path.join(maps, "19714_20261004T0638_globe.svg"), "w").write("<svg/>")      # ... until a later search
+assert F.backfill_globes(maps, fav) == 1 and F.backfill_globes(maps, fav) == 0
+assert "globe" in F.load(fav)[0]["files"]
 print("FAVORITES TESTS PASSED")

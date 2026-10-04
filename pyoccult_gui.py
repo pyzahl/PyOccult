@@ -271,6 +271,7 @@ def index():
                     with ui.row().classes("items-end gap-4"):
                         f_status = ui.select(list(favorites.STATUSES), label="Status").classes("w-40")
                         f_kml = ui.link("KML (ground track)", "#")
+                        f_globe = ui.link("Globe (Occult-style plot)", "#", new_tab=True)
                     f_note = ui.textarea("Note").classes("w-full")
                     with ui.row():
                         ui.button("Save", on_click=lambda: save_fav()).props("color=primary")
@@ -545,6 +546,9 @@ def index():
         f_img.set_visibility("svg" in files)
         if "svg" in files:
             f_img.props(f'src=/fav/{files["svg"]}?t={int(time.time())} alt="Event preview"')
+        f_globe.set_visibility("globe" in files)
+        if "globe" in files:
+            f_globe.props(f'href=/fav/{files["globe"]}')
         f_kml.set_visibility("kml" in files)
         if "kml" in files:
             f_kml.props(f'href=/fav/{files["kml"]} download')
@@ -659,6 +663,7 @@ def main():
     os.makedirs(os.path.join(ROOT, favorites.DIR), exist_ok=True)
     import pyoccult_sbdb                                        # size data for favorites added before it was kept
     favorites.backfill_phys(lambda t: pyoccult_sbdb.get(t, config.cache_path)[0])
+    favorites.backfill_globes(config.map_dir)                   # globe plots of later searches for older favorites
     favorites.write_csv()
     app.add_static_files("/fav", os.path.join(ROOT, favorites.DIR), max_cache_age=0)
 

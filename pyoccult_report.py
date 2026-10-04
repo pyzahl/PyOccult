@@ -196,6 +196,10 @@ def find_kml(kml_dir, target_id, when, ext="kml"):
         return None
     stamp = when.strftime("%Y%m%dT%H%M")
     found = sorted(glob.glob(os.path.join(glob.escape(kml_dir), f"{glob.escape(str(target_id))}_{stamp}*.{ext}")))
+    if ext == "globe":                                           # the Occult-style plot <stem>_globe.svg
+        found = sorted(glob.glob(os.path.join(glob.escape(kml_dir), f"{glob.escape(str(target_id))}_{stamp}*_globe.svg")))
+    elif ext == "svg":                                           # the preview, not the globe plot
+        found = [f for f in found if not f.endswith("_globe.svg")]
     return found[0] if found else None
 
 
@@ -261,6 +265,8 @@ def build_event(r, lat, lon, kml_dir, out_dir):
         except OSError:
             pass
     preview = urllib.parse.quote(os.path.relpath(prev_abs, out_dir).replace(os.sep, "/")) if prev_abs else None
+    globe_abs = find_kml(kml_dir, tid, when, "globe")
+    globe = urllib.parse.quote(os.path.relpath(globe_abs, out_dir).replace(os.sep, "/")) if globe_abs else None
     kml = urllib.parse.quote(os.path.relpath(kml_abs, out_dir).replace(os.sep, "/")) if kml_abs else None
     miss, margin = num(r.get("min_distance")), num(r.get("margin_km"))
     if margin is None and miss is not None and rad is not None:
@@ -271,7 +277,8 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs, preview=preview,
                 m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")), calc=num(r.get("calc_s")),
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
-                size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(), ra=ra, dec=dec, fov=fov)
+                size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(), ra=ra, dec=dec, fov=fov,
+                globe=globe)
 
 
 def dedupe(events, tol=300.0):
@@ -447,7 +454,8 @@ PREVIEW_DIALOG = """<dialog id="prevdlg" aria-label="Event preview" style="width
 <script>
 (function(){var d=document.getElementById('prevdlg'),img=document.getElementById('previmg');
 document.querySelectorAll('.prevbtn').forEach(function(b){b.addEventListener('click',function(){
-  d.querySelector('h2').textContent=b.dataset.t;img.src=b.dataset.src;if(!d.open)d.showModal();});});
+  d.querySelector('h2').textContent=b.dataset.t;img.src=b.dataset.src;
+  img.style.maxWidth=b.dataset.wide?'min(1024px,94vw)':'min(560px,94vw)';if(!d.open)d.showModal();});});
 document.getElementById('prevclose').addEventListener('click',function(){d.close();});
 d.addEventListener('click',function(ev){if(ev.target===d)d.close();});})();
 </script>"""
@@ -553,7 +561,7 @@ def map_cell(e):
           f'data-utc="{esc(e["utc"])}" data-fov="{e["fov"]:.3f}" {ks_site}title="Point KStars at the star at the event '
           f'time, seen from the site (Linux, KStars running, report opened from the GUI)">KStars</button> '
           if e.get("ra") is not None and e.get("dec") is not None else "")
-    if not e["kml"] and not e.get("preview"):
+    if not e["kml"] and not e.get("preview") and not e.get("globe"):
         return f"<td>{ks}—</td>" if ks else "<td>—</td>"
     title = f'{e["label"]} · {fmt_time(e["when"])} UT'
     out = ks
@@ -562,6 +570,10 @@ def map_cell(e):
     if e.get("preview"):
         out += (f'<button class="mapbtn prevbtn" type="button" data-src="{e["preview"]}" data-t="{esc(title)}" '
                 f'title="Star field at the event: camera frame, target star, asteroid track">Preview</button> ')
+    if e.get("globe"):
+        out += (f'<button class="mapbtn prevbtn" type="button" data-src="{e["globe"]}" data-t="{esc(title)}" '
+                f'data-wide="1" title="Occult-style plot: the whole Earth seen from the star with the shadow path, '
+                f'minute marks and the event parameters">Globe</button> ')
     if e["kml"]:
         out += f'<a href="{e["kml"]}" download title="KML for Google Earth or My Maps">KML</a>'
     return f"<td>{out}</td>"

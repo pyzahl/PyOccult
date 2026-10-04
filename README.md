@@ -1,5 +1,5 @@
 # PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
-Python Occultation Searcher by PyZahl (C) 2026, version 0.10.0. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.11.0. Free software under the GNU GPL v3 or later (see License below).
 The version is kept in `pyoccult_version.py`; the GUI header, the report and `--version` of every tool show it.
 
 Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy and NiceGUI for a local Webinterface to plan and run all tasks for easy event explorations.
@@ -181,7 +181,8 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
 3. **Search**: the exact prediction for the picked targets (JPL Horizons orbits, local Gaia catalog): event times,
    drops, durations, shadow paths (KML maps) and star-field previews.
 4. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
-   a **Preview** (star field and camera frame) and the **KML** for Google Earth for each event; on Linux with KStars
+   a **Preview** (star field and camera frame), a **Globe** (the whole Earth seen from the star with the path and
+   minute marks, and the event parameters as on Occult's plot) and the **KML** for Google Earth for each event; on Linux with KStars
    running also a **KStars** button that points KStars at the event, and a **☆** button that adds the event to
    your favorites.
 5. **Favorites**: the events you starred, from any search and any site, each with its own copy of map and preview
@@ -310,6 +311,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `targets_source`, `picks_dir` | `"auto"`, `"picks"` | `"auto"`: use the saved pick of the site covering the search window if there is one, else `targets`; `"list"`: always `targets` |
 | `max_shadow_dist` | `20` | km you can travel: an event is logged if the shadow edge passes within this of your site (0 = only from home); a site's `reach_km` overrides it |
 | `search_mode` | `"corridor"` | `"corridor"` (default, fast, needs the local Gaia catalog) or `"windows"` (old per-hour archive queries) |
+| `write_globes`, `globe_style` | `True`, `"color"` | Occult-style whole-Earth plot per event (`maps/<event>_globe.svg`, needs `write_maps`): `"color"` (sea, land, night side, like OWC's globe) or `"lines"` (black on white, like Occult's plot) |
 | `star_parallax`, `light_deflection` | `True`, `True` | astrometric corrections of the star: seen from the Earth (Gaia parallax), and the light bending by Sun, Jupiter and Saturn (ABOUT.md Part 6). Off reproduces the results before 0.10.0 |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
 | `corridor_step_s` | `600` | path step of the corridor candidate scan, s |

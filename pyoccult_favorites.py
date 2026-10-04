@@ -66,7 +66,7 @@ def write_csv(items=None, folder=DIR):
     for e in items:
         rec_cols += [k for k in e["record"] if k not in rec_cols]
     cols = (["key", "status", "note", "added", "site", "site_lat", "site_lon", "site_ele"] + rec_cols
-            + [f"sbdb_{k}" for k in PHYS_KEYS] + ["kml", "preview_svg"])
+            + [f"sbdb_{k}" for k in PHYS_KEYS] + ["kml", "preview_svg", "globe_svg"])
     fd, tmp = tempfile.mkstemp(dir=folder, suffix=".tmp")
     with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=cols)
@@ -75,7 +75,8 @@ def write_csv(items=None, folder=DIR):
             site, files, ph = e.get("site") or {}, e.get("files") or {}, e.get("phys") or {}
             row = dict(key=e["key"], status=e.get("status", ""), note=e.get("note", ""), added=e.get("added", ""),
                        site=site.get("name", ""), site_lat=site.get("lat", ""), site_lon=site.get("lon", ""),
-                       site_ele=site.get("ele", ""), kml=files.get("kml", ""), preview_svg=files.get("svg", ""))
+                       site_ele=site.get("ele", ""), kml=files.get("kml", ""), preview_svg=files.get("svg", ""),
+                       globe_svg=files.get("globe", ""))
             row.update({k: v for k, v in e["record"].items() if k in rec_cols})
             row.update({f"sbdb_{k}": (ph.get(k) or ["", ""])[0] for k in PHYS_KEYS})
             w.writerow(row)
@@ -100,8 +101,10 @@ def add(record, run=None, map_dir="maps", folder=DIR, sbdb=None):
     own = os.path.join(folder, key)
     os.makedirs(own, exist_ok=True)
     files = {}
-    for ext in ("kml", "svg"):
-        found = sorted(glob.glob(os.path.join(glob.escape(map_dir), f"{glob.escape(key)}*.{ext}")))
+    for ext, pat in (("kml", "*.kml"), ("svg", "*.svg"), ("globe", "*_globe.svg")):
+        found = sorted(glob.glob(os.path.join(glob.escape(map_dir), f"{glob.escape(key)}{pat}")))
+        if ext == "svg":
+            found = [f for f in found if not f.endswith("_globe.svg")]    # the preview, not the globe plot
         if found:
             dst = os.path.join(own, os.path.basename(found[0]))
             shutil.copyfile(found[0], dst)
@@ -227,6 +230,26 @@ def backfill_phys(lookup, folder=DIR):
             ph = phys_of(lookup(str(e["record"].get("target_id", "")).strip()))
             if ph:
                 e["phys"], n = ph, n + 1
+    if n:
+        _save(items, folder)
+    return n
+
+
+def backfill_globes(map_dir="maps", folder=DIR):
+    """Give favorites added before globe plots existed the plot of a later search (<key>*_globe.svg in map_dir),
+    copied into their own folder. Returns the number added."""
+    items, n = load(folder), 0
+    for e in items:
+        files = e.setdefault("files", {})
+        if "globe" in files:
+            continue
+        found = sorted(glob.glob(os.path.join(glob.escape(map_dir), f"{glob.escape(e['key'])}*_globe.svg")))
+        if found:
+            own = os.path.join(folder, e["key"])
+            os.makedirs(own, exist_ok=True)
+            dst = os.path.join(own, os.path.basename(found[0]))
+            shutil.copyfile(found[0], dst)
+            files["globe"], n = os.path.relpath(dst, folder).replace(os.sep, "/"), n + 1
     if n:
         _save(items, folder)
     return n

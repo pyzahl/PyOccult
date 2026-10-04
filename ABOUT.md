@@ -174,6 +174,23 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
 - Camera field `2 atan(sensor / 2 focal)` from the site's `focal_mm` and `sensor_mm`; asteroid track from the SPK
   (`CN`, geocentric) over a span chosen so it covers about a quarter of the field (30 min to 12 h each side).
 
+### 2.12 Globe plot: `pyoccult_globe.py` (0.11.0)
+
+- The whole Earth as seen from the star at the event time (orthographic, east right, north up), as on Occult's
+  plot: the shadow path from `shadow_path` (centre line, shadow limits, 1- and 3-sigma limits) with dots and labels
+  at whole minutes, the shadow axis beyond the Earth (fundamental plane, dashed, minute ticks), the site, and either
+  sea, land and the night side (`globe_style = "color"`, like OWC's globe) or a line drawing with the day side
+  (`"lines"`). Land polygons crossing the limb are drawn with the hidden points pushed onto the limb.
+- Header with Occult's parameter set: star (Gaia id, G, RA/Dec as used and of date via astropy TETE, the applied
+  parallax and deflection), maximum duration, time per km and per mas, drop, Sun and Moon distance and Moon
+  illumination, 1-sigma error (Horizons RSS, in km and mas), asteroid magnitude, diameter (range, mas), horizontal
+  parallax, hourly motion in RA (s) and Dec ("), distance. Inset: 2 deg chart to star G + 1.5 with the asteroid's
+  motion in 24 h steps.
+- Checked on 30819 (Oct 11 2026) against Occult's plot: star position, asteroid parallax 8.227" (equal), hourly
+  motion -2.083 s / -28.67" (Occult -2.087 s / -28.62"), 1 km and 1 mas times, diameter, Sun and Moon all agree;
+  the path crosses the same countries at the same minutes.
+- Coastlines, borders and land: `data/ne_110m_earth.json` (Natural Earth 1:110m, public domain, 166 KB).
+
 ---
 
 ## Part 3: Choosing targets (`pyoccult_pick.py`)
@@ -429,7 +446,19 @@ Checks:
 - 16556 against Occult: the star moved by 1.55 mas (predicted 2.63 - 1.09 = 1.54). Occult's printed star position
   minus ours (Gaia + parallax + full star deflection, Occult's "astrometric" place) went from 4.52 mas to 0.90 mas,
   within Occult's 1-sigma; the rest may be Occult's star catalog or propagation (to ask the IOTA experts).
-- Still open: an Occult plot of an event near opposition as a control case.
+- Control case near opposition, 30819 (Oct 11 2026, elongation 164 deg, star parallax 3.34 mas), against Occult's
+  printed star position, with 16556 for the four hypotheses (Occult minus ours, mas):
+
+  | Hypothesis | 16556 (65 deg) | 30819 (164 deg) |
+  |---|---|---|
+  | Gaia only | 4.52 | 0.09 |
+  | Gaia + parallax | 5.60 | 0.87 |
+  | Gaia + deflection | 1.91 | 0.66 |
+  | Gaia + parallax + deflection (0.10.0) | 0.90 | 0.29 |
+
+  Only parallax plus deflection fits both within sub-mas and within Occult's 1-sigma (0.9 and 4.0 mas). 30819 alone
+  is a weak test: near opposition the parallax (towards the Sun) and the deflection (away from it) partly cancel.
+  A sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 
 ---
 

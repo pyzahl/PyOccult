@@ -681,6 +681,30 @@ def write_preview(record, target_id, stem):
         f.write(svg)
 
 
+def write_globe(record, target_id, stem, star_dir, paths, sigma3, size, corr):
+    """Occult-style whole-Earth event plot (pyoccult_globe.py) as <map_dir>/<stem>_globe.svg."""
+    import pyoccult_globe as globe
+    stars = None
+    if LOCAL is not None:
+        cat = LOCAL.cone(record["star_ra"], record["star_dec"], 1.42, min(float(record["mag"]) + 1.5, 13.0))
+        ra, de = corridor.propagate_linear(cat, 2000.0 + record["best_et"] / (365.25 * 86400) - corridor.GAIA_EPOCH_YEAR)
+        stars = (ra, de, cat.phot_g_mean_mag.to_numpy())
+    of_date = None
+    try:
+        from astropy.coordinates import TETE
+        c = SkyCoord(ra=record["star_ra"] * u.deg, dec=record["star_dec"] * u.deg, frame="icrs").transform_to(
+            TETE(obstime=Time(record["best_utc"], scale="utc")))
+        of_date = (float(c.ra.deg), float(c.dec.deg))
+    except Exception:
+        pass
+    d = globe.globe_data(spice, record, target_id, star_dir, paths, sigma3,
+                         site=(config.LON, config.LAT, config.site.get("name", config.site_name)), stars=stars,
+                         size=size, run_utc=datetime.fromtimestamp(T_START).strftime("%Y-%m-%dT%H:%M:%S"),
+                         corrections=corr, of_date=of_date, style=getattr(config, "globe_style", "color"))
+    with open(f"{config.map_dir}/{stem}_globe.svg", "w", encoding="utf-8") as f:
+        f.write(globe.render_svg(d))
+
+
 def owc_opt():
     """The chosen site's equipment for screen.owc_limit / extinction_loss (from pyoccult_config, i.e. sites.py)."""
     return dict(aperture=config.pick_aperture_cm, frames=config.pick_frames, mag_adjust=config.pick_mag_adjust,
@@ -763,6 +787,11 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
         paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
         write_shadow_kml(paths, f"{config.map_dir}/{stem}.kml",
                          f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
+        if getattr(config, "write_globes", True):
+            try:
+                write_globe(record, target_id, stem, star_dir, paths, sigma3, size, corr)
+            except Exception as ex:                                   # a plot must never stop the search
+                print(f" --- no globe plot: {ex}")
     if getattr(config, "write_previews", False) and LOCAL is not None:
         try:
             write_preview(record, target_id, stem)
