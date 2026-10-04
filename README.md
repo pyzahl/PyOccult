@@ -1,5 +1,5 @@
 # PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
-Python Occultation Searcher by PyZahl (C) 2026.
+Python Occultation Searcher by PyZahl (C) 2026. Free software under the GNU GPL v3 or later (see License below).
 
 Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy and NiceGUI for a local Webinterface to plan and run all tasks for easy event explorations.
 
@@ -581,6 +581,29 @@ View results table. Detail quick path view map button and star field preview (st
 #### Favorites
 <img width="1905" height="2007" alt="image" src="https://github.com/user-attachments/assets/5fcfcb8c-24f8-4384-a858-8e244b880bf4" />
 
+
+## License
+
+PyOccult is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any
+later version (`GPL-3.0-or-later`). It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE)
+for the full text.
+
+The licence covers the code. The data PyOccult downloads or uses keep their own terms, in particular Gaia DR3
+(CC BY-NC 3.0 IGO, see References), and so does the ready-made catalog on Zenodo.
+
+To cite PyOccult, use [CITATION.cff](CITATION.cff) (GitHub: "Cite this repository").
+
+## Acknowledgements
+
+Parts of the code and documentation were developed with the help of Claude (Anthropic), an AI model, using
+Claude Code. All results were reviewed and validated by the author, among others against Occult Watcher Cloud
+(see ABOUT.md, Part 5: Validation). Commits made with this help carry a
+`Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` line.
+
+Thanks to the IOTA community and the authors of Occult and Occult Watcher Cloud, on whose work and reference
+predictions this project builds.
 
 ## References
 - [Spiceypy] Annex et al., (2020). SpiceyPy: a Pythonic Wrapper for the SPICE Toolkit. Journal of Open Source Software, 5(46), 2050, https://doi.org/10.21105/joss.02050
