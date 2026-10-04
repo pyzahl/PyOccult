@@ -92,7 +92,7 @@ Gaia star catalog. `pyoccult_setup.py` installs all of it.
 The Gaia catalog can be installed two ways, with the same result:
 
 * **zenodo** (recommended): download the ready-made catalog from Zenodo,
-  [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY 4.0). Setup checks its SHA-256 and
+  [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it contains). Setup checks its SHA-256 and
   unpacks it. Available for G <= 18 (`gaia_dr3_g18.tar.xz`, 8.2 GB) and G <= 16 (`gaia_dr3_g16.tar.xz`, 2.1 GB).
 * **esa**: build it yourself from ESA's Gaia DR3 bulk files. Takes much longer, but works for any magnitude limit.
 

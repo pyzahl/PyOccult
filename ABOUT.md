@@ -77,7 +77,7 @@ comparison; it shares the per-star solve and checks (`handle_star`).
 - Why local: the Gaia archive took 12-14 min per strip query (or never answered) in October 2026 and warns it is
   unstable while DR4 is prepared.
 - Ready-made copies for G <= 16 and G <= 18 (the same files a build writes, without the bright-star index) are on
-  Zenodo, [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY 4.0): `gaia_dr3_g16.tar.xz`
+  Zenodo, [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it contains): `gaia_dr3_g16.tar.xz`
   (2.1 GB) and `gaia_dr3_g18.tar.xz` (8.2 GB), each with a `.sha256`. `fetch_zenodo` downloads one (resumable), checks
   the SHA-256 and unpacks it into any folder name; `pyoccult_setup.py` offers it before the ESA build.
 
