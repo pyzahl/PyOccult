@@ -23,6 +23,7 @@ pick_candidates.csv
 owc_check_hits.csv
 targets.py
 picks/
+favorites/
 *.log
 # python and editor leftovers
 __pycache__/

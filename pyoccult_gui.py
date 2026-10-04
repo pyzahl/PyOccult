@@ -16,6 +16,7 @@ sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 from nicegui import app, run, ui
 import pyoccult_geo as geo
+import pyoccult_favorites as favorites
 
 PY = sys.executable
 SITE_KEYS = [  # key, label, default, step  (optional site keys, see sites_example.py)
@@ -121,6 +122,7 @@ def index():
             "Local Gaia catalogs in the project folder. Install or add one with: python pyoccult_setup.py [--gmax 16]")
     with ui.tabs().classes("w-full") as tabs:
         t_site, t_pick, t_search, t_res = ui.tab("Site"), ui.tab("Pick"), ui.tab("Search"), ui.tab("Results")
+        t_fav = ui.tab("Favorites")
     log_card = None
 
     with ui.tab_panels(tabs, value=t_site).classes("w-full"):
@@ -215,6 +217,42 @@ def index():
                     "The report's KStars buttons (Linux, KStars running). Off: KStars keeps its location; "
                     "you are told if that is far from the site.")
             frame = ui.element("iframe").classes("w-full").style("height: 75vh; border: 1px solid #ddd")
+
+        # ------------------------------------------------ favorites
+        with ui.tab_panel(t_fav):
+            with ui.row().classes("w-full items-center gap-4"):
+                fav_info = ui.label().classes("text-sm text-slate-600")
+                ui.button("Reload", on_click=lambda: load_favs()).props("flat dense")
+            ui.label("Add events with the ☆ button in the Results report (opened from this GUI). Each favorite keeps "
+                     "its own copy of map and preview, so later searches do not change it.").classes(
+                "text-xs text-slate-500")
+            fcols = [dict(name=k, label=lbl, field=k, sortable=True, align="left") for k, lbl in
+                     (("name", "Asteroid"), ("utc", "Event (UT)"), ("site", "Site"), ("mag", "G"), ("drop", "Drop"),
+                      ("dur", "Dur (s)"), ("miss", "Miss (km)"), ("status", "Status"), ("note", "Note"),
+                      ("added", "Added (UT)"))]
+            f_table = ui.table(columns=fcols, rows=[], row_key="key", selection="single", pagination=15).classes("w-full")
+            with ui.column().classes("w-full gap-3") as f_detail:
+                with ui.row().classes("w-full no-wrap gap-4 items-stretch"):
+                    f_img = ui.element("img").style("width: 420px; max-width: 45vw; border: 1px solid #ddd")
+                    f_map = ui.leaflet(center=(40.7, -74.0), zoom=9).classes("grow").style(   # as tall as the
+                        "height: calc(min(420px, 45vw) * 634 / 560); border: 1px solid #ddd")    # preview (560x634)
+                    f_nomap = ui.label("No map copied for this event.").classes("text-sm text-slate-500")
+                f_legend = ui.html('<span style="font-size:.8rem;color:#475569">'
+                                   '<b style="color:#15803d">━</b> centre line &nbsp; <b style="color:#dc2626">━</b> '
+                                   'shadow limits &nbsp; <b style="color:#7c3aed">┄</b> 1σ &nbsp; '
+                                   '<b style="color:#d97706">╌</b> 3σ &nbsp; marker: site</span>')
+                with ui.column().classes("w-full"):
+                    f_title = ui.label().classes("text-lg font-semibold")
+                    f_facts = ui.label().classes("text-sm text-slate-600")
+                    with ui.row().classes("items-end gap-4"):
+                        f_status = ui.select(list(favorites.STATUSES), label="Status").classes("w-40")
+                        f_kml = ui.link("KML (ground track)", "#")
+                    f_note = ui.textarea("Note").classes("w-full")
+                    with ui.row():
+                        ui.button("Save", on_click=lambda: save_fav()).props("color=primary")
+                        ui.button("Remove from favorites", on_click=lambda: remove_fav()).props(
+                            "outline color=negative")
+            f_detail.set_visibility(False)
 
     with ui.card().classes("w-full") as log_card:
         with ui.row().classes("w-full items-center"):
@@ -449,6 +487,116 @@ def index():
         el.on_value_change(saved_info)
     load_pick()
 
+    def fav_rows():
+        rows = []
+        for e in favorites.load():
+            r, site = e["record"], e.get("site") or {}
+            f = lambda k, n=2: f"{float(r[k]):.{n}f}" if r.get(k) not in (None, "") else ""
+            rows.append(dict(key=e["key"], name=(r.get("target_name") or r.get("target_id", "")).strip(),
+                             utc=str(r.get("best_utc", ""))[:19].replace("T", " "), site=site.get("name", "?"),
+                             mag=f("mag"), drop=f("mag_drop"), dur=f("max_duration_s"), miss=f("min_distance", 1),
+                             status=e.get("status", ""), note=e.get("note", "")[:60],
+                             added=e.get("added", "").replace("T", " ")[:16]))
+        return rows
+
+    def load_favs(select=None):
+        f_table.rows = fav_rows()
+        fav_info.text = f"{len(f_table.rows)} favorite event{'s' if len(f_table.rows) != 1 else ''}"
+        keep = select or (f_table.selected[0]["key"] if f_table.selected else None)
+        f_table.selected = [r for r in f_table.rows if r["key"] == keep]
+        show_fav()
+
+    def current_fav():
+        if not f_table.selected:
+            return None
+        return next((e for e in favorites.load() if e["key"] == f_table.selected[0]["key"]), None)
+
+    def show_fav(*_):
+        e = current_fav()
+        f_detail.set_visibility(e is not None)
+        if e is None:
+            return
+        r, site, files = e["record"], e.get("site") or {}, e.get("files") or {}
+        f_title.text = f"{(r.get('target_name') or r.get('target_id')).strip()} · {str(r.get('best_utc'))[:19].replace('T', ' ')} UT"
+        f_facts.text = (f"site {site.get('name', '?')} ({site.get('lat', 0):.4f}, {site.get('lon', 0):.4f}) · "
+                        f"Gaia {r.get('star', '')} G {float(r.get('mag') or 0):.2f} · drop {float(r.get('mag_drop') or 0):.2f} "
+                        f"mag · max {float(r.get('max_duration_s') or 0):.2f} s · miss {float(r.get('min_distance') or 0):.1f} km · "
+                        f"added {e.get('added', '')[:16].replace('T', ' ')} UT")
+        f_status.value, f_note.value = e.get("status", "planned"), e.get("note", "")
+        f_img.set_visibility("svg" in files)
+        if "svg" in files:
+            f_img.props(f'src=/fav/{files["svg"]}?t={int(time.time())} alt="Event preview"')
+        f_kml.set_visibility("kml" in files)
+        if "kml" in files:
+            f_kml.props(f'href=/fav/{files["kml"]} download')
+        draw_fav_map(e)
+
+    fav_layers = []
+
+    def draw_fav_map(e):
+        """The favorite's own KML copy on the map: shadow path lines and the site, zoomed to the nearest path part."""
+        import pyoccult_report
+        for layer in fav_layers:
+            f_map.remove_layer(layer)
+        fav_layers.clear()
+        kml = (e.get("files") or {}).get("kml")
+        try:
+            data = pyoccult_report.kml_to_data(os.path.join(favorites.DIR, kml)) if kml else None
+        except Exception:
+            data = None
+        for el in (f_map, f_legend):
+            el.set_visibility(data is not None)
+        f_nomap.set_visibility(data is None)
+        if data is None:
+            return
+        for ln in data["lines"]:
+            if len(ln["pts"]) > 1:
+                opts = {"color": ln["color"], "weight": ln["width"]}
+                if ln.get("dash"):
+                    opts["dashArray"] = ln["dash"]
+                fav_layers.append(f_map.generic_layer(name="polyline", args=[ln["pts"], opts]))
+        site = e.get("site") or {}
+        centre = next((ln["pts"] for ln in data["lines"] if ln["name"].startswith("Centre")), [])
+        if site.get("lat") is not None and site.get("lon") is not None:
+            obs = [site["lat"], site["lon"]]
+            fav_layers.append(f_map.marker(latlng=tuple(obs)))
+            near = min(centre, key=lambda p: (p[0] - obs[0]) ** 2 + ((p[1] - obs[1]) * math.cos(math.radians(obs[0]))) ** 2,
+                       default=obs)
+            bounds = [obs, near]
+        else:
+            bounds = centre or [[0, 0]]
+
+        def fit():
+            f_map.run_map_method("invalidateSize")
+            f_map.run_map_method("fitBounds", bounds, {"padding": [50, 50], "maxZoom": 11})
+        ui.timer(0.3, fit, once=True)
+
+    def save_fav():
+        e = current_fav()
+        if e:
+            ok, msg = favorites.update(e["key"], status=f_status.value, note=f_note.value or "")
+            ui.notify(msg, type="positive" if ok else "warning")
+            load_favs(select=e["key"])
+
+    async def remove_fav():
+        e = current_fav()
+        if not e:
+            return
+        with ui.dialog() as dlg, ui.card():
+            ui.label(f"Remove {f_title.text} and its copied map and preview?")
+            with ui.row():
+                ui.button("Remove", on_click=lambda: dlg.submit(True)).props("color=negative")
+                ui.button("Cancel", on_click=lambda: dlg.submit(False)).props("flat")
+        if await dlg:
+            ok, msg = favorites.remove(e["key"])
+            ui.notify(msg, type="positive" if ok else "warning")
+            f_table.selected = []
+            load_favs()
+
+    f_table.on("selection", show_fav)
+    tabs.on_value_change(lambda e: load_favs() if e.value == t_fav or e.value == "Favorites" else None)
+    load_favs()
+
     async def run_pick():
         if not catalog_ok():
             return
@@ -478,6 +626,21 @@ def main():
     app.add_static_files("/out/maps", os.path.join(ROOT, config.map_dir), max_cache_age=0)
     app.add_static_file(local_file=os.path.join(ROOT, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
     import pyoccult_kstars                                      # report's KStars buttons (Linux; hidden elsewhere)
+    os.makedirs(os.path.join(ROOT, favorites.DIR), exist_ok=True)
+    app.add_static_files("/fav", os.path.join(ROOT, favorites.DIR), max_cache_age=0)
+
+    @app.get("/api/favorites/keys")
+    def favorites_keys():
+        return {"keys": favorites.keys()}
+
+    @app.get("/api/favorites/add")
+    def favorites_add(tid: str, utc: str):
+        import pyoccult_config as cfg, pyoccult_report
+        rec = favorites.find_record(cfg.hits_output_cvs_file, tid, utc)
+        if rec is None:
+            return {"ok": False, "msg": f"event {tid} {utc[:19]} not found in {cfg.hits_output_cvs_file}"}
+        ok, msg = favorites.add(rec, pyoccult_report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir)
+        return {"ok": ok, "msg": msg}
 
     @app.get("/api/kstars/status")
     def kstars_status():

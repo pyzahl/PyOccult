@@ -24,7 +24,8 @@ Supporting modules: `pyoccult_corridor.py` (per-asteroid star corridor and candi
 (local Gaia catalog and bright-star index), `pyoccult_screen.py` (the pick tool's event screen),
 `pyoccult_orbits.py` (fast orbit integration), `pyoccult_paths.py` (shadow ground track), `pyoccult_sbdb.py` (shared
 asteroid size cache), `pyoccult_kernels.py` (kernel download, Earth orientation coverage), `pyoccult_picks.py` (saved
-picks: which one a search uses), `pyoccult_kstars.py` (points KStars at an event over D-Bus, Linux).
+picks: which one a search uses), `pyoccult_kstars.py` (points KStars at an event over D-Bus, Linux), `pyoccult_favorites.py` (starred events with their
+own copies of map and preview).
 
 ---
 

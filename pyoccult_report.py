@@ -367,6 +367,27 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 LEAFLET_TAGS = ('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">'
                 '<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>')
 
+TOAST_JS = """<script>
+function pyoToast(msg,stay){var t=document.getElementById('pyotoast');if(!t){t=document.createElement('div');t.id='pyotoast';
+ t.setAttribute('role','status');t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);'+
+ 'max-width:min(720px,92vw);padding:10px 14px;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:.9rem;'+
+ 'box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:1000';document.body.appendChild(t);}
+ t.textContent=msg;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(function(){t.hidden=true;},stay?9000:4000);}
+</script>"""
+
+FAV_JS = """<script>
+(function(){var bs=document.querySelectorAll('.favbtn');if(!bs.length||location.protocol==='file:')return;
+fetch('/api/favorites/keys').then(function(r){return r.json();}).then(function(j){
+ var have=new Set(j.keys||[]);
+ bs.forEach(function(b){b.hidden=false;var on=have.has(b.dataset.key);b.textContent=on?'★':'☆';
+  b.title=on?'In the favorites (GUI tab Favorites)':'Add to the favorites (with its map and preview)';
+  b.addEventListener('click',function(){if(b.textContent==='★'){pyoToast('Already a favorite: manage it in the GUI tab Favorites');return;}
+   var q=new URLSearchParams({tid:b.dataset.tid,utc:b.dataset.utc});
+   fetch('/api/favorites/add?'+q).then(function(r){return r.json();}).then(function(j){
+    if(j.ok){b.textContent='★';b.title='In the favorites (GUI tab Favorites)';}pyoToast(j.msg,!j.ok);})
+   .catch(function(){pyoToast('Favorites: no answer from the GUI',true);});});});}).catch(function(){});})();
+</script>"""
+
 KSTARS_JS = """<script>
 (function(){var site=__SITE__,bs=document.querySelectorAll('.ksbtn');if(!bs.length||location.protocol==='file:')return;
 fetch('/api/kstars/status').then(function(r){return r.json();}).then(function(j){if(!j.ok)return;
@@ -375,14 +396,9 @@ fetch('/api/kstars/status').then(function(r){return r.json();}).then(function(j)
   if(site){q.set('lat',site.lat);q.set('lon',site.lon);q.set('ele',site.ele||0);}
   b.textContent='KStars …';
   fetch('/api/kstars/show?'+q).then(function(r){return r.json();}).then(function(j){
-   b.textContent=j.ok?'KStars ✓':'KStars ✗';b.title=j.msg;toast(j.msg,!j.ok||j.msg.indexOf('; ')>0);
+   b.textContent=j.ok?'KStars ✓':'KStars ✗';b.title=j.msg;pyoToast(j.msg,!j.ok||j.msg.indexOf('; ')>0);
    setTimeout(function(){b.textContent='KStars';},4000);})
-  .catch(function(){b.textContent='KStars ✗';toast('KStars: no answer from the GUI',true);});});});}).catch(function(){});
-function toast(msg,stay){var t=document.getElementById('kstoast');if(!t){t=document.createElement('div');t.id='kstoast';
- t.setAttribute('role','status');t.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);'+
- 'max-width:min(720px,92vw);padding:10px 14px;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:.9rem;'+
- 'box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:1000';document.body.appendChild(t);}
- t.textContent=msg;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(function(){t.hidden=true;},stay?9000:4000);}})();
+  .catch(function(){b.textContent='KStars ✗';pyoToast('KStars: no answer from the GUI',true);});});});}).catch(function(){});})();
 </script>"""
 
 PREVIEW_DIALOG = """<dialog id="prevdlg" aria-label="Event preview" style="width:auto;height:auto;max-width:96vw;max-height:96vh">
@@ -488,7 +504,9 @@ def shadow_cell(e):
 
 
 def map_cell(e):
-    ks = (f'<button class="mapbtn ksbtn" type="button" hidden data-ra="{e["ra"]:.7f}" data-dec="{e["dec"]:.7f}" '
+    fav = (f'<button class="mapbtn favbtn" type="button" hidden data-tid="{esc(e["tid"])}" data-utc="{esc(e["utc"])}" '
+           f'data-key="{esc(e["tid"])}_{e["when"]:%Y%m%dT%H%M}" aria-label="Favorite">☆</button> ')
+    ks = fav + (f'<button class="mapbtn ksbtn" type="button" hidden data-ra="{e["ra"]:.7f}" data-dec="{e["dec"]:.7f}" '
           f'data-utc="{esc(e["utc"])}" data-fov="{e["fov"]:.3f}" title="Point KStars at the star at the event time, '
           f'seen from the site (Linux, KStars running, report opened from the GUI)">KStars</button> '
           if e.get("ra") is not None and e.get("dec") is not None else "")
@@ -556,7 +574,8 @@ def to_html(events, meta):
             '<th data-k title="Moon distance from the star; shown while the Moon is up">Moon dist</th>'
             '<th class="num" data-k title="Distance of the observer from the shadow centre line">Offset</th>'
             '<th class="num" data-k title="Calculation time for this event (exact solve and metrics), seconds">Calc (s)</th>'
-            '<th title="Shadow path map, star-field preview and KML ground track">Map</th>')
+            '<th title="☆ favorites and KStars (when opened from the GUI), Map: shadow path, Preview: star field, '
+            'KML: ground track for Google Earth">Tools</th>')
     body = "".join(html_row(e) for e in events)
     table = (f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
              if events else '<div class="wrap"><div class="empty">No events match.</div></div>')
@@ -577,7 +596,7 @@ def to_html(events, meta):
 <li>Altitude is the star's altitude at closest approach. The Moon is shown only while above the horizon. Click a column heading to sort.</li>
 <li>Map shows the path on an interactive map (needs internet for the map tiles) and links the closest centre-line point in Google Maps. Google Maps itself cannot load a local KML file: use the KML link with Google Earth, or import it in My Maps (Create a new map, then Import).</li>
 </ul>
-</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}{PREVIEW_DIALOG if n_prev else ''}{KSTARS_JS.replace("__SITE__", json.dumps(meta.get("site")))}</body></html>
+</main>{DIALOG if paths else ''}<script>{JS}</script>{map_script(paths, meta) if paths else ''}{PREVIEW_DIALOG if n_prev else ''}{TOAST_JS}{FAV_JS}{KSTARS_JS.replace("__SITE__", json.dumps(meta.get("site")))}</body></html>
 """
 
 
@@ -587,7 +606,7 @@ def to_markdown(events, meta):
     out = [f"# {meta['title']}", "",
            f"{len(events)} events{meta['span']} · {meta['observer']} · times in UT · generated {meta['generated']}", ""]
     out += [f"- **{k}:** {v}" for k, v in (meta.get("info") or [])] + ([""] if meta.get("info") else [])
-    out += ["| Asteroid | Event time (UT) | Star mag (G) | Mag drop | Max dur (s) | Altitude | Moon dist | Offset | Calc (s) | Map |",
+    out += ["| Asteroid | Event time (UT) | Star mag (G) | Mag drop | Max dur (s) | Altitude | Moon dist | Offset | Calc (s) | Files |",
             "|---|---|---:|---:|---:|---|---|---:|---:|---|"]
     for e in events:
         if e["miss"] is None:

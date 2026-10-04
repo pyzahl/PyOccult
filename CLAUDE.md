@@ -38,6 +38,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `KSTARS_OPT`): move KStars to the site (message names the old place) or keep it (warn if > 50 km). KStars ignores
   the tz passed to setGPSLocation and picks its own (Long Island got -6): label only, UT is right. GUI routes `/api/kstars/status|show`; the report's
   hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
+- `pyoccult_favorites.py`: favorites in `favorites/` (private, gitignored): `favorites.json` (entry = hits_log record,
+  site and run context from the run summary, status, note) and `favorites/<target>_<YYYYMMDDTHHMM>/` with copies of
+  KML and preview SVG. Report: hidden `.favbtn` stars, shown only via the GUI (`/api/favorites/keys|add`; add looks
+  the event up in hits_log.csv by target + minute, site from the last run summary). GUI tab Favorites.
 - `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
   text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
 - `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for
@@ -103,21 +107,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - Process-level parallelism by target (`ProcessPoolExecutor`; parent does kernel checks, Horizons SPKs and opens the local Gaia catalog;
   workers return records, parent writes the CSV).
 - `m_before` / `m_during` columns in the log.
-- Favorites event list (planned 2026-10-03, not started): events picked by hand from any search and any site, kept
-  with everything known. Design notes:
-  - Store: private (site names), e.g. `favorites.json` (gitignored); one entry per event, key = target + Gaia star +
-    event minute (as the report's dedupe). Keep the full hits_log record, the site (name, lat/lon/ele, equipment),
-    the run context (catalog, Earth PCK, targets_from, run_utc), plus added time, notes and a status (planned /
-    observed / cancelled).
-  - Map and preview are kept with the favorite, never only linked: copy the event's KML (ground track with shadow,
-    1- and 3-sigma lines) and preview SVG into its own folder, e.g. `favorites/<target>_<YYYYMMDDTHHMM>/` (fresh
-    search runs overwrite or delete files in maps/). A re-prediction adds new versions next to the old ones.
-  - Add: a star button per report row, calling a GUI endpoint like the KStars button (`/api/favorites/add`; hidden
-    when the report is not served by the GUI).
-  - New GUI tab "Favorites": table, drop, notes/status, re-predict one event with the latest orbit (single-target
-    search; orbits change, so store the inputs), export (CSV, KML bundle, report page).
-  - Share/pull with Occult Watcher Cloud (campaign events, multi-site chords): how is TBD; no known public OWC
-    interface, ask the IOTA contacts.
-  - Later: observation data per favorite (result positive/negative/clouded, D/R times, chord, link to the SODIS
-    report that DVTI+CAM / ASTRID generate).
+- Favorites, next steps (simple version built 2026-10-04, see Files): re-predict one favorite with the latest orbit
+  (single-target search; keep old map/preview versions next to new ones), export (CSV, KML bundle, report page),
+  share/pull with Occult Watcher Cloud (campaign events, multi-site chords; how TBD, no known public OWC interface),
+  observation data per favorite (result, D/R times, chord, link to the SODIS report from DVTI+CAM / ASTRID).
 

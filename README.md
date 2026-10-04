@@ -32,6 +32,7 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py`, and saves both per site and window in `picks/` |
 | `pyoccult_picks.py` | the saved picks: which one a search uses, `list`, `import` |
 | `pyoccult_kstars.py` | points a running KStars at an event (Linux, D-Bus); used by the report's KStars button in the GUI |
+| `pyoccult_favorites.py` | the favorites list (`favorites/`, private): events starred in the report, with copies of map and preview; `list` |
 | `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
 | `pyoccult_gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
@@ -172,7 +173,12 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    drops, durations, shadow paths (KML maps) and star-field previews.
 4. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
    a **Preview** (star field and camera frame) and the **KML** for Google Earth for each event; on Linux with KStars
-   running also a **KStars** button that points KStars at the event.
+   running also a **KStars** button that points KStars at the event, and a **☆** button that adds the event to
+   your favorites.
+5. **Favorites**: the events you starred, from any search and any site, each with its own copy of map and preview
+   (later searches do not change them). Selecting one shows its star-field preview and, next to it, its shadow
+   path map (centre line, shadow, 1- and 3-sigma limits, your site); set a status (planned / observed / cancelled /
+   clouded), write a note, or remove it.
 
 Settings changed in the GUI apply to that run only; `pyoccult_config.py` is not changed. Details: "Web interface
 (GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.
