@@ -577,17 +577,15 @@ View results table. Detail quick path view map button and star field preview (st
 ## Refefrences
 - [Spiceypy] Annex et al., (2020). SpiceyPy: a Pythonic Wrapper for the SPICE Toolkit. Journal of Open Source Software, 5(46), 2050, https://doi.org/10.21105/joss.02050
 
-- https://naif.jpl.nasa.gov/naif
+- [NAIF] https://naif.jpl.nasa.gov/naif
 
 - Acton, C.H.; "Ancillary Data Services of NASA's Navigation and Ancillary Information Facility;" Planetary and Space Science, Vol. 44, No. 1, pp. 65-70, 1996.
 DOI 10.1016/0032-0633(95)00107-7
-
-https://doi.org/10.1016/0032-0633(95)00107-7
+   https://doi.org/10.1016/0032-0633(95)00107-7
 
 - Charles Acton, Nathaniel Bachman, Boris Semenov, Edward Wright; A look toward the future in the handling of space science mission geometry; Planetary and Space Science (2017);
 DOI 10.1016/j.pss.2017.02.013
-
-https://doi.org/10.1016/j.pss.2017.02.013
+   https://doi.org/10.1016/j.pss.2017.02.013
 
 
 
