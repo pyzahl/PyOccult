@@ -154,16 +154,45 @@ the same command resumes. `--status` should end with
 `3386/3386 files ... (complete)` and `bright-star index ... ok`. The search (`pyoccult.py`) refuses to run on an
 incomplete catalog and tells you to rerun the setup. See "Local Gaia catalog" below for what is kept and why.
 
-## 5. Configure and run
-Check your site in `sites.py` and set the search window and targets in `pyoccult_config.py` (see "Site Configuration
-and Run Setup" below), then:
+## 5. Run it: the web interface
+
+Start the GUI and work through its tabs from left to right:
 
 ```bash
-./pyoccult.py                         # search; results appended to hits_log.csv, maps in maps/
-python pyoccult_report.py hits_log.csv    # HTML event list with maps
+python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your browser (local only)
 ```
 
-Or do all of it in the browser: `python pyoccult_gui.py` (see "Web interface (GUI)" below).
+1. **Site**: set your observing site on the map (or by place name / IP address) and enter its equipment: aperture,
+   focal length, sensor size, detection frames, reach (how far you can travel), minimum star altitude, Sun limit.
+   The site and the Gaia catalog used by all runs are chosen at the top right.
+2. **Pick**: choose a window (start date, days) and run the pick: it screens all asteroids (H below 17 by default)
+   for actual events at your site and saves the best targets for this site and window. This is the slow step
+   (several minutes); a saved pick is reused by every later search of the same site and window.
+3. **Search**: the exact prediction for the picked targets (JPL Horizons orbits, local Gaia catalog): event times,
+   drops, durations, shadow paths (KML maps) and star-field previews.
+4. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
+   a **Preview** (star field and camera frame) and the **KML** for Google Earth for each event; on Linux with KStars
+   running also a **KStars** button that points KStars at the event.
+
+Settings changed in the GUI apply to that run only; `pyoccult_config.py` is not changed. Details: "Web interface
+(GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.
+
+### The core command-line tools
+
+Everything the GUI does is also available on the command line (scripts, automation, a remote machine). The site is
+`default_site` in `sites.py`, or `PYOCCULT_SITE=<name>` for one run; settings come from `pyoccult_config.py`.
+
+| Step | Command | What it does |
+|---|---|---|
+| once | `python pyoccult_setup.py` | SPICE kernels, local Gaia catalog (Zenodo download or ESA build), bright-star index, `sites.py` |
+| choose | `python pyoccult_pick.py --start 2026-10-01 --days 20` | screen all asteroids for events at the site; writes `pick_events.csv`, `targets.py` and the saved pick in `picks/` |
+| predict | `./pyoccult.py` | exact search for the targets (the saved pick of the site covering the window, else `targets.py`); appends to `hits_log.csv`, writes `maps/` |
+| present | `python pyoccult_report.py hits_log.csv` | HTML event list with maps and previews (`hits_report.html`) |
+| check | `python pyoccult_owc_check.py --ref owc_reference.txt` | rerun an OWC search result you saved as text and compare event by event |
+
+Useful options: `pyoccult_pick.py --hmax 18 --reach 30 --frames 4 --top 40 --workers 4` (see "Quick start: choose
+targets" below), `python pyoccult_picks.py list` (saved picks), `PYOCCULT_CATALOG=gaia_dr3_g16 ./pyoccult.py`
+(another catalog for one run), `python pyoccult_setup.py --status` (what is installed).
 
 A small script does a fresh run and publishes the report on a local web server (here nginx; the map tiles need a
 web server, see the report section). Save it as `run.sh` (it is in `.gitignore`, adjust the paths) and make it
@@ -193,9 +222,8 @@ To include the maps' KML links in the published page, also copy the `maps` folde
   python -m venv .venv
   source .venv/bin/activate
   pip install -r requirements.txt
-  python pyoccult_setup.py            # one-time: kernels + local Gaia catalog (long download, resumable)
-  echo 'EDIT SITES AND CONFIG, RUN IT:'
-  ./pyoccult.py
+  python pyoccult_setup.py            # one-time: kernels + local Gaia catalog (Zenodo download, resumable)
+  python pyoccult_gui.py              # then: Site -> Pick -> Search -> Results in the browser
   ```
 
 
