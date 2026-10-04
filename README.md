@@ -594,4 +594,59 @@ DOI 10.1016/j.pss.2017.02.013
 
 - [NiceGUI] https://nicegui.io/
 
+### Data
+
+- [Gaia DR3] Gaia Collaboration, Vallenari, A., et al. (2023). Gaia Data Release 3. Summary of the content and survey properties. Astronomy & Astrophysics, 674, A1.
+   https://doi.org/10.1051/0004-6361/202243940
+
+- [Gaia] Gaia Collaboration, Prusti, T., et al. (2016). The Gaia mission. Astronomy & Astrophysics, 595, A1.
+   https://doi.org/10.1051/0004-6361/201629272
+
+- Gaia acknowledgement, as requested by ESA: "This work has made use of data from the European Space Agency (ESA) mission Gaia (https://www.cosmos.esa.int/gaia), processed by the Gaia Data Processing and Analysis Consortium (DPAC, https://www.cosmos.esa.int/web/gaia/dpac/consortium). Funding for the DPAC has been provided by national institutions, in particular the institutions participating in the Gaia Multilateral Agreement."
+  Gaia data are distributed under the CC BY-NC 3.0 IGO licence (https://www.cosmos.esa.int/web/gaia-users/license).
+
+- [PyOccult Gaia catalog] Local G-limited Gaia DR3 catalog in PyOccult's format (G <= 16, G <= 18), Zenodo.
+   https://doi.org/10.5281/zenodo.23113337
+
+- [DE440] Park, R. S., Folkner, W. M., Williams, J. G., Boggs, D. H. (2021). The JPL Planetary and Lunar Ephemerides DE440 and DE441. The Astronomical Journal, 161, 105.
+   https://doi.org/10.3847/1538-3881/abd414
+
+- [Horizons] Giorgini, J. D., et al. (1996). JPL's On-Line Solar System Data Service. Bulletin of the American Astronomical Society, 28, 1158. Service: https://ssd.jpl.nasa.gov/horizons/
+
+- [SBDB] JPL Small-Body Database and its APIs (orbital elements, H, G, diameters, albedos): https://ssd.jpl.nasa.gov/tools/sbdb_query.html
+
+- [NEOWISE] Masiero, J. R., et al. (2014). Main-belt asteroids with WISE/NEOWISE: near-infrared albedos. The Astrophysical Journal, 791, 121 (diameters via SBDB; see also the PDS NEOWISE diameters and albedos dataset, Mainzer et al.).
+   https://doi.org/10.1088/0004-637X/791/2/121
+
+- [OpenStreetMap] Map data © OpenStreetMap contributors, ODbL: https://www.openstreetmap.org/copyright
+
+### Methods
+
+- [Occult] Herald, D., Occult (occultation prediction software, the engine behind Occult Watcher Cloud): http://www.lunar-occultations.com/iota/occult4.htm
+
+- [OWC] Pavlov, H., Occult Watcher Cloud (used for validation): https://cloud.occultwatcher.net
+
+- [H, G] Bowell, E., et al. (1989). Application of photometric models to asteroids. In: Binzel, R. P., Gehrels, T., Matthews, M. S. (eds.), Asteroids II, University of Arizona Press, pp. 524-556.
+
+- [Diameter from H and albedo] Pravec, P., Harris, A. W. (2007). Binary asteroid population. 1. Angular momentum content. Icarus, 190, 250-259 (D = 1329 km / sqrt(albedo) x 10^(-H/5)).
+   https://doi.org/10.1016/j.icarus.2007.02.023
+
+### Software
+
+- [Astropy] Astropy Collaboration, Price-Whelan, A. M., et al. (2022). The Astropy Project: Sustaining and Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the Core Package. The Astrophysical Journal, 935, 167.
+   https://doi.org/10.3847/1538-4357/ac7c74
+
+- [astroquery] Ginsburg, A., et al. (2019). astroquery: An Astronomical Web-querying Package in Python. The Astronomical Journal, 157, 98.
+   https://doi.org/10.3847/1538-3881/aafc33
+
+- [NumPy] Harris, C. R., et al. (2020). Array programming with NumPy. Nature, 585, 357-362.
+   https://doi.org/10.1038/s41586-020-2649-2
+
+- [SciPy] Virtanen, P., et al. (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. Nature Methods, 17, 261-272.
+   https://doi.org/10.1038/s41592-019-0686-2
+
+- [pandas] The pandas development team, pandas-dev/pandas: Pandas (Zenodo): https://doi.org/10.5281/zenodo.3509134
+
+- [Leaflet] Leaflet, an open-source JavaScript library for interactive maps (report and GUI maps): https://leafletjs.com
+
 
