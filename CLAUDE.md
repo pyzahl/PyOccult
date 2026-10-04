@@ -54,6 +54,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for
   pyoccult_owc_check.py) with the matching pick runs (`.pick.csv/.log`) and a README of settings and findings. Keep
   adding sets there; never delete them.
+- `CONTRIBUTING.md`: fork/branch workflow, setup, tests, working with Claude Code, private files, pull requests,
+  GPL-3.0-or-later for contributions. `LICENSE` (GPL-3.0 text), `CITATION.cff` (validated with cffconvert).
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).
 
 ## Conventions that matter

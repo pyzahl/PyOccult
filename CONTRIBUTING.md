@@ -1,0 +1,108 @@
+# Contributing to PyOccult
+
+Additions, fixes and patches are welcome. This guide shows how to get a working copy, make a change on a branch,
+check it, and offer it for integration. It also explains how to work on PyOccult with Claude Code, the way most of
+it was written.
+
+## 1. Get your own copy and a branch
+
+PyOccult lives at https://github.com/pyzahl/PyOccult. Fork it on GitHub (button "Fork"), then:
+
+```bash
+git clone https://github.com/<you>/PyOccult.git
+cd PyOccult
+git remote add upstream https://github.com/pyzahl/PyOccult.git     # to stay up to date with the original
+git checkout -b my-feature                                          # one branch per change
+```
+
+Later, to pick up new work from the original before you continue:
+
+```bash
+git fetch upstream
+git rebase upstream/main            # or: git merge upstream/main
+```
+
+## 2. Install and set up
+
+As in the README (sections 1-4):
+
+```bash
+python -m venv .venv
+source .venv/bin/activate           # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python pyoccult_setup.py --gmax 16 --source zenodo    # kernels + the small G <= 16 catalog (2.1 GB), enough for development
+```
+
+Setup asks for your observing site and writes `sites.py`. That file is private and stays out of git.
+
+## 3. Know the code before you change it
+
+- `README.md`: what the tools do and how to use them.
+- `ABOUT.md`: how the predictions are computed, the data sources, the validation and the open items (Part 6 is a
+  good list of things to work on).
+- `CLAUDE.md`: the project notes: what each file does, the conventions that matter (coordinate frames, SPICE
+  rules, cache handling, test stand-ins) and the current status. Read it even if you do not use Claude Code: it is
+  the shortest complete map of the project.
+
+## 4. Working with Claude Code
+
+[Claude Code](https://claude.com/claude-code) reads `CLAUDE.md` automatically when you start it in the project
+folder, so it knows the structure and conventions from the first prompt:
+
+```bash
+cd PyOccult
+claude                              # then describe the change you want
+```
+
+Good practice:
+
+- Work on your branch, one topic per session or branch.
+- Ask it to run the tests (below) and, for anything that changes predictions, to compare with a known result
+  (`pyoccult_owc_check.py`, see ABOUT.md Part 5).
+- Keep `CLAUDE.md` current: when a change adds a file, a convention or a known limitation, update the matching
+  section (Files, Conventions that matter, Status, Ideas not built yet) in the same branch. It is the memory for the
+  next developer and the next session.
+- Review what it wrote before you commit; you are responsible for the change.
+- Mark commits made with its help with this last line in the commit message:
+  `Co-Authored-By: Claude <noreply@anthropic.com>` (Claude Code adds the exact model name for you).
+
+## 5. Check your change
+
+```bash
+for t in tests/*.py; do python "$t" > /dev/null || echo "FAILED: $t"; done
+```
+
+The tests use stand-ins for SPICE, astropy and the network, so they run in seconds without kernels or a catalog.
+Each one is a plain script: `python tests/test_solver.py` runs one. If you change a function signature that a
+stand-in imitates, update the stand-in so it stays honest. Add a test for new behaviour where you can.
+
+If your change affects results (orbits, solver, sizes, magnitudes, the pick), run a real search and the GUI once,
+and say in the pull request what you compared it with.
+
+## 6. Never commit private or generated files
+
+`.gitignore` already keeps them out; please do not force them in:
+
+- your sites: `sites.py` (coordinates of your observing places), `owc_reference.txt`, `owc_refs/`, `picks/`,
+  `favorites/` (they name your sites)
+- downloads and generated data: SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`), Gaia catalogs (`gaia_dr3_*/`),
+  run outputs (`hits_log.csv`, `hits_report.html`, `maps/`, `targets.py`, ...)
+
+Never put real coordinates into tracked files (examples use New York City Hall, see `sites_example.py`).
+
+## 7. Offer it for integration
+
+```bash
+git push origin my-feature
+```
+
+Then open a pull request on GitHub from your branch to `pyzahl/PyOccult` `main`. In the description, say what it
+changes and why, how you tested it, and anything a reviewer should look at closely. Small, focused pull requests
+are easier to review and merge. For bigger ideas, open an issue first to agree on the approach.
+
+No GitHub account? A patch file works too: `git format-patch upstream/main` and send the files to the maintainer.
+
+## 8. Licence
+
+PyOccult is licensed under GPL-3.0-or-later (see `LICENSE`). By contributing you agree that your contribution is
+licensed under the same terms. Data used by PyOccult keep their own terms (Gaia DR3: CC BY-NC 3.0 IGO).

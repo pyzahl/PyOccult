@@ -2,7 +2,8 @@
 
 How PyOccult computes its predictions, where its data comes from, how it was validated and what is still under active development.
 Data comes from Gaia DR3 (stars), JPL Horizons and SBDB (asteroid orbits and sizes) and NAIF SPICE kernels
-(planets, Earth orientation); see Part 4. Usage is in `README.md`. Updated 2026-10-03.
+(planets, Earth orientation); see Part 4. Usage is in `README.md`; to contribute, see `CONTRIBUTING.md`.
+Updated 2026-10-04.
 
 PyOccult is intended as a future and portable Python replacement for the Windows occultation predictor Occult (occult.exe, the engine behind
 Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one observer site.

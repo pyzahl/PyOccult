@@ -582,6 +582,11 @@ View results table. Detail quick path view map button and star field preview (st
 <img width="1905" height="2007" alt="image" src="https://github.com/user-attachments/assets/5fcfcb8c-24f8-4384-a858-8e244b880bf4" />
 
 
+## Contributing
+
+Additions and fixes are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for forking, branches, the tests, working
+with Claude Code (`CLAUDE.md` holds the project notes it reads) and pull requests.
+
 ## License
 
 PyOccult is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
