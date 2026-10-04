@@ -13,13 +13,6 @@ Scientific background, start here; International Occultation Timing Association 
 
 - OWC: https://cloud.occultwatcher.net
 
-## Occultation Data
-includes all reported timings of observed asteroid occultation events:
-
-- https://data.nasa.gov/dataset/asteroid-occultations
-
-- https://science.unistellar.com/asteroid-occultations/results/
-
 ### What is an Occultation?
 An occultation occurs when a solar-system body passes in front of a more distant object (e.g. a star or another solar system body), partially or totally hiding the more distant object and momentarily blocking its light. Each occultation can be seen only at the right time and from a limited part of the Earth.
 
@@ -29,6 +22,14 @@ the star to be occulted and monitor the star to watch for any drop in brightness
 
 <img width="599" height="425" alt="image" src="https://github.com/user-attachments/assets/0225ac54-fc17-460e-a2cd-28fff8c801ef" />
 
+## Occultation Data
+includes all reported timings of observed asteroid occultation events:
+
+- https://data.nasa.gov/dataset/asteroid-occultations
+
+- https://science.unistellar.com/asteroid-occultations/results/
+
+And for predicting events for observation planning with the goal of improving our knowledge/data about the so many small bodies is where this tool comes to use.
 
 # Tools in this project:
 
