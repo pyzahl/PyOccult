@@ -570,7 +570,7 @@ Run the final precision search for observable events
 
 #### Results
 View results table. Detail quick path view map button and star field preview (stars only), use for example Kstars (Linux: use Kstars auto point button!) to further investigate and check for other potentially interesting or interfering objects like planets, etc..
-<img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/64698ea9-d617-4b54-a91f-e1f42c471a68" />
+<img width="1925" height="1865" alt="image" src="https://github.com/user-attachments/assets/3f69dd73-5fa9-4526-8b88-08961a0e67b3" />
 <img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/1cd6d017-8be9-4046-b03f-add32d6741d2" />
 <img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/c9034a2c-4aa2-4ce4-a0dd-63d7b340edbd" />
 <img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/812c5402-e848-46ce-a9b8-f047c8f6b6c5" />
