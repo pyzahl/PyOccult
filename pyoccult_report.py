@@ -203,6 +203,8 @@ def find_kml(kml_dir, target_id, when, ext="kml"):
     return found[0] if found else None
 
 
+JPL_SBDB = "https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr="     # asteroid page, + number
+VIZIER_GAIA = "https://vizier.cds.unistra.fr/viz-bin/VizieR-5?-source=I/355/gaiadr3&Source="   # star, + Gaia DR3 id
 KML_NS = "{http://www.opengis.net/kml/2.2}"
 LINE_STYLES = (("Centre", "#15803d", 3, None), ("Shadow limit", "#dc2626", 2, None), ("1-sigma", "#7c3aed", 1.5, "2 4"),
                ("3-sigma", "#d97706", 2, "6 6"))
@@ -612,9 +614,13 @@ def html_row(e):
         calc = f'<td class="num" data-s="{s(e["calc"])}">{fmt(e["calc"])}</td>'
     return (
         lead +
-        f'<td data-s="{esc(e["label"])}" title="{tip_ast}">{esc(e["label"])}</td>' + mid +
+        f'<td data-s="{esc(e["label"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
+        f'target="_blank" rel="noopener">{esc(e["label"])}</a></td>' + mid +
         f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)">{esc(fmt_time(e["when"]))}</td>'
-        f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">{fmt(e["mag"])}</td>'
+        f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">'
+        + (f'<a href="{esc(VIZIER_GAIA)}{urllib.parse.quote(str(e["star"]))}" target="_blank" rel="noopener" '
+           f'title="Gaia DR3 {esc(e["star"])} in VizieR. {mag_tip}">{fmt(e["mag"])}</a>' if e.get("star") else fmt(e["mag"]))
+        + '</td>'
         f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}</td>'
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
