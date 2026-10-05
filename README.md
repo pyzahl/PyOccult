@@ -59,8 +59,11 @@ https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 # Install
 
-Linux: all the below explained steps can be simply executed via running the linux_install.sh script. Once completed it starts the GUI task.
+Linux: all the below explained steps can be simply executed via running the linux_install.sh script after cloning this repository.
+Once completed it starts the GUI task.
   ```bash
+  git clone https://github.com/pyzahl/PyOccult.git
+  cd PyOccult
   sh linux_install.sh
   ```
 
