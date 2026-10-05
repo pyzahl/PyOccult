@@ -174,19 +174,23 @@ def index():
                         ui.button("Search", on_click=lambda: find_place()).props("outline")
                         ui.button("My IP location", on_click=lambda: ip_loc()).props("outline")
                     hits = ui.column().classes("w-full gap-1")
-                    occ = geo.occult_sites()                    # Occult/OWC site list (downloaded once into data/)
-                    occ_sel = ui.select({i: f"{x['name']} \u00b7 {x['region']} \u00b7 {x['lat']:.3f}, {x['lon']:.3f}, "
-                                            f"{x['ele']:.0f} m" for i, x in enumerate(occ)},
+                    occ = geo.mpc_observatories()               # MPC observatory codes (downloaded once into data/)
+                    occ_sel = ui.select({i: f"{x['code']} {x['name']}" for i, x in enumerate(occ)},  # searchable:
+                                                                                  # code and name only
                                         with_input=True, clearable=True,
-                                        label="Occult/OWC site list (type to search)" if occ else
-                                        "Occult/OWC site list: not available (offline?)").classes("w-full").props(
+                                        label="MPC observatory (type code or name)" if occ else
+                                        "MPC observatory list: not available (offline?)").classes("w-full").props(
                         "dense options-dense" + ("" if occ else " disable")).tooltip(
-                        f"{len(occ)} reference places and observatories from Occult's site list (occultations.org): "
-                        "sets position, elevation and description; the equipment stays as it is")
+                        f"{len(occ)} observatories with their official MPC codes (Minor Planet Center): sets position, "
+                        "elevation, description and MPC code; the equipment stays as it is")
                     ui.label("Click the map to set the position; the elevation is looked up. "
                              "Use an exact position (GPS, map) for observing.").classes("text-xs text-slate-500")
                 with ui.column().classes("w-1/2"):
-                    desc = ui.input("Description").classes("w-full")
+                    with ui.row().classes("w-full no-wrap gap-4"):
+                        desc = ui.input("Description").classes("grow")
+                        mpc = ui.input("MPC code").classes("w-28").tooltip(
+                            "The site's official Minor Planet Center observatory code, if it has one (kept in sites.py "
+                            "as mpc_code; filled in when you pick an observatory below)")
                     with ui.row():
                         lat = ui.number("Latitude (°)", format="%.5f", step=0.0001)
                         lon = ui.number("Longitude (°, east +)", format="%.5f", step=0.0001)
@@ -326,6 +330,7 @@ def index():
         s = sites[name]
         state["name"] = name
         lat.value, lon.value, ele.value, desc.value = s["lat"], s["lon"], s["ele"], s.get("name", name)
+        mpc.value = str(s.get("mpc_code", "") or "")
         for key, _, default, _ in SITE_KEYS:
             if key == "sensor_w_mm":
                 fields[key].value = s.get("sensor_mm", (5.6, 3.2))[0]
@@ -349,6 +354,8 @@ def index():
     def collect():
         s = dict(lat=float(lat.value or 0), lon=float(lon.value or 0), ele=float(ele.value or 0),
                  name=desc.value or state["name"])
+        if (mpc.value or "").strip():
+            s["mpc_code"] = mpc.value.strip()
         for key, _, default, _ in SITE_KEYS:
             v = fields[key].value
             if key in ("sensor_w_mm", "sensor_h_mm") or v is None or v == "":
@@ -364,7 +371,7 @@ def index():
         derived.text = (f"Stars searched to G {mag_limit(s):.1f} · camera field {w:.1f}′ × {h:.1f}′ "
                         f"(focal {s.get('focal_mm') or 100 * s.get('aperture_cm', 25):.0f} mm)")
 
-    for el in [lat, lon, ele, *fields.values()]:
+    for el in [lat, lon, ele, mpc, *fields.values()]:
         el.on_value_change(update_derived)
 
     def set_position(la, lo, el=None):
@@ -382,16 +389,20 @@ def index():
 
     m.on("map-click", on_click)
 
-    def pick_occult(e):
+    async def pick_occult(e):
         if e.value is None:
             return
         x = occ[e.value]
-        set_position(x["lat"], x["lon"], x["ele"])
+        set_position(x["lat"], x["lon"], x["ele"] if x["ele_ok"] else None)
         m.set_center((x["lat"], x["lon"]))
-        desc.value = x["name"]
+        desc.value, mpc.value = x["name"], x["code"]
         if not (new_name.value or "").strip():
-            new_name.value = x["name"].split(",")[0].strip()
-        ui.notify(f"{x['name']} ({x['region']}, from Occult's site list): position and elevation set in the form. "
+            new_name.value = f"{x['code']} {x['name'].split(',')[0].strip()}"
+        if not x["ele_ok"]:                                       # old low-precision entry: look the height up
+            el = await run.io_bound(geo.elevation, x["lat"], x["lon"])
+            if el is not None:
+                ele.value = round(el)
+        ui.notify(f"MPC {x['code']} {x['name']}: position and elevation set in the form. "
                   f"Add site keeps it as a new site; Save sites.py would move {state['name']} there instead.",
                   multi_line=True, timeout=9000)
 

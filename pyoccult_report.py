@@ -91,7 +91,8 @@ def header_info(run, lat, lon):
     s, L = run["site"], run["limits"]
     ns, ew = ("N" if s["lat"] >= 0 else "S"), ("E" if s["lon"] >= 0 else "W")
     out = [("Site", f"{s['name']}" + (f" ({s['desc']})" if s.get("desc") else "") +
-            f": {abs(s['lat']):.4f}°{ns} {abs(s['lon']):.4f}°{ew}, {s['ele']:g} m"),
+            f": {abs(s['lat']):.4f}°{ns} {abs(s['lon']):.4f}°{ew}, {s['ele']:g} m"
+            + (f", MPC code {s['mpc_code']}" if s.get("mpc_code") else "")),
            ("Equipment", f"{s['aperture_cm']:g} cm aperture, {s['frames']} detection frames, MagAdjust "
                          f"{s['mag_adjust']:+g}, extinction " +
                          (f"{s['extinction']:g} mag/airmass" if s["extinction"] else "off")),

@@ -46,9 +46,12 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   pure `render_svg(d)`. Data `data/ne_110m_earth.json` (Natural Earth 110m coast/borders/land, public domain).
   Report "Globe" button (prevbtn with data-wide); favorites copy it as files["globe"] (+ `backfill_globes` from maps/
   at GUI start). Preview lookups exclude `*_globe.svg`.
-- Occult site list: `pyoccult_geo.occult_sites()` downloads https://www.occultations.org/sw/occult/InstallSites.zip
-  once to `data/InstallSites.zip` (gitignored: redistribution terms unknown) and parses the fixed-width .site files
-  (lon E+, lat, height m, aperture, mag corr, ?, name 32, ?, short 9, tz h, ?); 795 unique sites. GUI Site tab select.
+- MPC observatories: `pyoccult_geo.mpc_observatories()` downloads https://minorplanetcenter.net/iau/lists/ObsCodes.html
+  once to `data/ObsCodes.html` (gitignored) and parses the fixed columns (code [0:3], east lon [4:13], rho cos phi'
+  [13:21], rho sin phi' [21:30], name [30:]); `mpc_geodetic` turns the parallax constants into WGS84 lat/lon/height
+  (ele_ok False below 5 decimals: look the height up). GUI Site tab select (code + name only, so a code search does
+  not match coordinates) and the `mpc_code` site key (report header, run summary). Replaced Occult's InstallSites.zip
+  (0.12.0: mainly cities) and astropy's EarthLocation registry (no MPC codes).
 - `pyoccult_kstars.py`: KStars D-Bus control (Linux only, `gdbus` with `--` before args, else `dbus-send`; never raises).
   setGPSLocation(site) -> setLocalTime (KStars local time: re-read `tz` from location(), it follows DST of the shown
   date) -> setRaDecJ2000 (RA in hours) -> setTracking -> setApproxFOV. `set_location` (GUI Results checkbox,

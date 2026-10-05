@@ -35,5 +35,5 @@ __pycache__/
 # Zenodo catalog archives
 release/
 *.tar.xz
-# downloaded site list of Occult (occultations.org), see pyoccult_geo.occult_sites
-data/InstallSites.zip
+# downloaded MPC observatory code list (minorplanetcenter.net), see pyoccult_geo.mpc_observatories
+data/ObsCodes.html

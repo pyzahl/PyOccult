@@ -201,8 +201,8 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
 ```
 
 1. **Site**: set your observing site on the map (or by place name / IP address, or from Occult's list of about 800
-   reference places and observatories: type a few letters in **Occult/OWC site list**, then **Add site** to keep it as
-   a new site) and enter its equipment: aperture,
+   ~2700 observatories with their official MPC codes: type a code or name in **MPC observatory**, then **Add site** to
+   keep it as a new site; the **MPC code** field holds your site's code, if it has one) and enter its equipment: aperture,
    focal length, sensor size, detection frames, reach (how far you can travel), minimum star altitude, Sun limit.
    The site and the Gaia catalog used by all runs are chosen at the top right.
 2. **Pick**: choose a window (start date, today by default, and days) and run the pick: it screens all asteroids (H below 17 by default)
@@ -702,8 +702,8 @@ DOI 10.1016/j.pss.2017.02.013
 
 - [OWC] Pavlov, H., Occult Watcher Cloud (used for validation): https://cloud.occultwatcher.net
 
-- [Occult site list] Occult's reference places and observatories (InstallSites.zip, occultations.org), downloaded once
-  by the GUI into `data/` (not redistributed): https://www.occultations.org/sw/occult/InstallSites.zip
+- [MPC observatory codes] Minor Planet Center, list of observatory codes (code, longitude, parallax constants, name),
+  downloaded once by the GUI into `data/` (not redistributed): https://minorplanetcenter.net/iau/lists/ObsCodes.html
 
 - [H, G] Bowell, E., et al. (1989). Application of photometric models to asteroids. In: Binzel, R. P., Gehrels, T., Matthews, M. S. (eds.), Asteroids II, University of Arizona Press, pp. 524-556.
 

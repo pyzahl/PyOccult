@@ -6,6 +6,17 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Changed
+- GUI Site tab: the site list is now the Minor Planet Center's list of observatory codes (ObsCodes.html, ~2700
+  observatories, downloaded once into `data/`, not in git; `pyoccult_geo.mpc_observatories`), searchable by code or
+  name. It replaces Occult's site list of 0.12.0, which turned out to hold mainly reference cities. Positions and
+  heights come from the MPC parallax constants (WGS84); for old entries with fewer than 5 decimals the height is
+  looked up instead.
+
+### Added
+- Site key `mpc_code` (the official MPC observatory code), a **MPC code** field in the GUI Site tab (filled in when
+  an MPC observatory is picked), shown in the report header and kept in the run summary.
+
 ### Fixed
 - `linux_install.sh`: ran `.venv/bin/activate` as a command (no effect), so `pip install` went to the system Python
   (refused as "externally-managed-environment" on Debian/Ubuntu) and setup and GUI ran without their packages. It now
