@@ -61,7 +61,7 @@ https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 General steps: Clone this repository, change into it's folder PyOccult and setup a Python virtual environment, install requirements and run setup.
 
-For Linux: all the below explained steps can be simply executed via running the linux_install.sh script after cloning this repository:
+For Linux: all the below explained steps 1-5 can be simply executed via running the linux_install.sh script after cloning this repository:
 Once completed it starts the GUI task.
 
   ```bash
