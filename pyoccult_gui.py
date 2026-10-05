@@ -9,7 +9,7 @@ It listens on this computer only (127.0.0.1), because it can start programs. Eve
 (pyoccult_runner.py), so SPICE stays out of the GUI; settings chosen here apply to that run only, pyoccult_config.py is
 not changed. Saving a site rewrites sites.py (comments in it are not kept).
 """
-from pyoccult_version import __version__
+from pyoccult_version import __version__, __codename__, __author__, __copyright__, __license__, __url__
 import argparse, asyncio, csv, json, math, os, pprint, runpy, sys, time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -106,7 +106,8 @@ def index():
     with ui.header().classes("items-center bg-slate-800"):
         ui.element("img").props('src=/pyoccult_logo.svg alt=""').classes("w-9 h-9")
         ui.label("PyOccult").classes("text-xl font-semibold")
-        ui.label(f"v{__version__}").classes("text-xs text-slate-400 self-end mb-1").tooltip("PyOccult version")
+        ui.label(f"v{__version__}").classes("text-xs text-slate-400 self-end mb-1").tooltip(
+            f"PyOccult {__version__} \u201c{__codename__}\u201d")
         ui.label("asteroid occultation search").classes("text-slate-300")
         ui.space()
         ui.label("Site for all runs:").classes("text-slate-300")
@@ -122,6 +123,32 @@ def index():
                             (min(complete) if complete else (next(iter(cats)) if cats else None))
                             ).props("dark dense options-dense standout").classes("w-64").tooltip(
             "Local Gaia catalogs in the project folder. Install or add one with: python pyoccult_setup.py [--gmax 16]")
+        ui.button("About", on_click=lambda: about.open()).props("flat dense color=white no-caps")
+    with ui.dialog() as about, ui.card().classes("max-w-xl"):
+        with ui.row().classes("items-center gap-4 no-wrap"):
+            ui.element("img").props('src=/pyoccult_logo.svg alt=""').classes("w-20 h-20")
+            with ui.column().classes("gap-0"):
+                ui.label("PyOccult").classes("text-2xl font-semibold")
+                ui.label(f"Version {__version__} \u201c{__codename__}\u201d").classes("text-slate-600")
+                ui.label(f"by {__author__}").classes("text-sm text-slate-600")
+        ui.label("Asteroid occultation prediction for your observing sites: picks the events at your site from all "
+                 "numbered asteroids, computes them exactly (JPL Horizons orbits, NAIF SPICE, a local Gaia DR3 "
+                 "catalog), and shows shadow paths, star-field previews and whole-Earth plots. A portable Python "
+                 "successor to the Windows predictor Occult, validated against Occult Watcher Cloud. Every observed "
+                 "event, positive or negative, adds to what we know about the sizes, shapes and orbits of the small "
+                 "bodies of the Solar System.").classes("text-sm")
+        ui.label("Credits").classes("font-semibold mt-2")
+        ui.label("Stars: ESA Gaia DR3 (Gaia/DPAC) \u00b7 orbits and sizes: JPL Horizons and Small-Body Database \u00b7 "
+                 "planets and Earth orientation: NAIF SPICE (SpiceyPy), DE440 \u00b7 coastlines: Natural Earth \u00b7 "
+                 "maps: OpenStreetMap contributors, Leaflet \u00b7 interface: NiceGUI \u00b7 also Astropy, astroquery, "
+                 "NumPy, SciPy, pandas \u00b7 reference predictions: Occult (D. Herald) and Occult Watcher Cloud "
+                 "(H. Pavlov) \u00b7 the IOTA community \u00b7 developed with the help of Claude (Anthropic) via "
+                 "Claude Code. Full references: README.md.").classes("text-xs text-slate-600")
+        ui.label(f"{__copyright__}. Free software under the GNU GPL v3 or later ({__license__}); no warranty. "
+                 "Gaia data: CC BY-NC 3.0 IGO.").classes("text-xs text-slate-600 mt-2")
+        with ui.row().classes("w-full items-center justify-between mt-2"):
+            ui.link(__url__, __url__, new_tab=True).classes("text-sm")
+            ui.button("Close", on_click=lambda: about.close()).props("flat")
     with ui.tabs().classes("w-full") as tabs:
         t_site, t_pick, t_search, t_res = ui.tab("Site"), ui.tab("Pick"), ui.tab("Search"), ui.tab("Results")
         t_fav = ui.tab("Favorites")
