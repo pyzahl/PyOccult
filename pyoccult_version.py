@@ -3,6 +3,7 @@ them from here (GUI header and About box, --version of the tools, run summaries,
 
 Semantic versioning: MAJOR.MINOR.PATCH. Raise PATCH for fixes, MINOR for new features, MAJOR for changes that break
 existing files or results (and update CITATION.cff's version with it). The code name changes at major milestones.
+Every version increase gets its entry in CHANGELOG.md.
 """
 __version__ = "0.11.0"
 __codename__ = "New Horizons"      # JPL Horizons orbits; and New Horizons' target Arrokoth was first shaped by occultations

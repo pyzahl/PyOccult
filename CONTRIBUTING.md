@@ -63,6 +63,7 @@ Good practice:
   section (Files, Conventions that matter, Status, Ideas not built yet) in the same branch. It is the memory for the
   next developer and the next session.
 - Review what it wrote before you commit; you are responsible for the change.
+- Add a line for your change to `CHANGELOG.md` (section of the coming version).
 - Mark commits made with its help with this last line in the commit message:
   `Co-Authored-By: Claude <noreply@anthropic.com>` (Claude Code adds the exact model name for you).
 

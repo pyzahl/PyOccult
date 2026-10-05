@@ -5,7 +5,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 
 ## Files
 - `pyoccult_version.py`: the one place for `__version__` and `__codename__` ("New Horizons"; changes at major
-  milestones), `__author__`, `__copyright__`, `__license__`, `__url__` (GUI About box) (semver; keep CITATION.cff `version` and the README line in step);
+  milestones), `__author__`, `__copyright__`, `__license__`, `__url__` (GUI About box). Every version increase gets a
+  `CHANGELOG.md` entry (Keep a Changelog style, newest first) (semver; keep CITATION.cff `version` and the README line in step);
   every module imports it, tools have `--version`, GUI header, run summary/report, picks and favorites record it.
 - `pyoccult.py`: main search script. Kernel setup runs at import time (not import-safe). Driver is the `__main__` block.
 - `sites.py` (private, not in git; layout `sites_example.py`): named observing sites with view (min_alt, max_sun_alt,
