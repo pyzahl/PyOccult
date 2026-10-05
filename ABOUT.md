@@ -180,7 +180,9 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
   plot: the shadow path from `shadow_path` (centre line, shadow limits, 1- and 3-sigma limits) with dots and labels
   at whole minutes, the shadow axis beyond the Earth (fundamental plane, dashed, minute ticks), the site, and either
   sea, land and the night side (`globe_style = "color"`, like OWC's globe) or a line drawing with the day side
-  (`"lines"`). Land polygons crossing the limb are drawn with the hidden points pushed onto the limb.
+  (`"lines"`). Land is drawn with an extended orthographic projection (r = sin c on the visible side, 2 - sin c
+  beyond the limb) clipped to the disk; a land mass containing the far-side point is filled as the outside of its
+  outline (detected by its orientation).
 - Header with Occult's parameter set: star (Gaia id, G, RA/Dec as used and of date via astropy TETE, the applied
   parallax and deflection), maximum duration, time per km and per mas, drop, Sun and Moon distance and Moon
   illumination, 1-sigma error (Horizons RSS, in km and mas), asteroid magnitude, diameter (range, mas), horizontal

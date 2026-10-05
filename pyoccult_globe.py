@@ -37,15 +37,45 @@ STYLE = {
 }
 
 
-def _clamped(px, py, vis):
-    """Polygon points with the hidden ones pushed onto the limb (orthographic fill trick)."""
-    pts = []
-    for x, y, v in zip(px, py, vis):
-        if not v:
-            r = math.hypot(x - CX, y - CY) or 1.0
-            x, y = CX + (x - CX) / r * RPX, CY + (y - CY) / r * RPX
-        pts.append(f"{x:.1f},{y:.1f}")
-    return " ".join(pts)
+def _land_path(proj, lon, lat):
+    """SVG path data of a land polygon for drawing inside the disk clip. Every vertex is mapped with an extended
+    orthographic projection: angular distance c from the point under the star, r = sin(c) on the visible side and
+    2 - sin(c) beyond the limb (continuous, orientation-preserving, the far side lies outside the disk and is clipped).
+    A polygon containing the far-side point (the antipode) comes out inside out; it is detected by comparing its
+    orientation on the map with its orientation in lon/lat, and drawn as the outside of its outline (even-odd with an
+    enclosing square). None if nothing of it can be visible."""
+    P = geodetic_to_itrf(lon, lat) @ proj.R.T
+    P = P / np.linalg.norm(P, axis=1)[:, None]
+    phi0 = np.arctan2(P @ proj.y, P @ proj.x)
+    dphi = np.abs((np.diff(np.append(phi0, phi0[0])) + np.pi) % (2 * np.pi) - np.pi)
+    if (dphi > math.radians(10)).any():                               # long steps around the centre (near the
+        pts = []                                                      # antipode): subdivide along the great circle
+        for k in range(len(P)):
+            a_, b_ = P[k], P[(k + 1) % len(P)]
+            pts.append(a_)
+            m = int(dphi[k] / math.radians(5))
+            om = math.acos(max(-1.0, min(1.0, float(a_ @ b_))))
+            for i in range(1, m + 1 if om > 1e-9 else 1):
+                t = i / (m + 1)
+                pts.append((math.sin((1 - t) * om) * a_ + math.sin(t * om) * b_) / math.sin(om))
+        P = np.array(pts)
+    X, Y, Z = P @ proj.x, P @ proj.y, P @ proj.z
+    c = np.arccos(np.clip(Z, -1.0, 1.0))
+    phi = np.arctan2(Y, X)
+    r = np.where(Z >= 0, np.sin(c), 2.0 - np.sin(c))
+    mx, my = r * np.cos(phi), r * np.sin(phi)                         # unit-disk coordinates, y up
+    area = lambda x, y: float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))
+    lo, la = np.asarray(lon, float), np.asarray(lat, float)
+    inside_out = (area(mx, my) > 0) != (area(lo, la) > 0)             # contains the antipode
+    if not inside_out and not (Z > 0).any():
+        return None
+    d = "M" + " L".join(f"{CX + a * RPX:.1f},{CY - b * RPX:.1f}" for a, b in zip(mx, my)) + " Z"
+    if inside_out:
+        q = 2.2 * RPX
+        d = (f"M{CX - q:.0f},{CY - q:.0f} L{CX + q:.0f},{CY - q:.0f} L{CX + q:.0f},{CY + q:.0f} "
+             f"L{CX - q:.0f},{CY + q:.0f} Z " + d)
+    return d
+
 _EARTH = None
 
 
@@ -146,11 +176,13 @@ def render_svg(d):
     # globe: sea, land, night or day side, grid, coast, borders
     o.append(f'<circle cx="{CX}" cy="{CY}" r="{RPX}" fill="{st["sea"]}" stroke="#111" stroke-width="1.4"/>')
     if st["land"]:
+        o.append(f'<clipPath id="disk"><circle cx="{CX}" cy="{CY}" r="{RPX}"/></clipPath><g clip-path="url(#disk)">')
         for ring in E.get("land", []):
-            px, py, vis = proj(geodetic_to_itrf(ring[0::2], ring[1::2]))
-            if vis.any():
-                o.append(f'<polygon points="{_clamped(px, py, vis)}" fill="{st["land"]}" stroke="{st["land_edge"]}" '
+            path = _land_path(proj, ring[0::2], ring[1::2])
+            if path:
+                o.append(f'<path d="{path}" fill="{st["land"]}" fill-rule="evenodd" stroke="{st["land_edge"]}" '
                          f'stroke-width="0.5"/>')
+        o.append("</g>")
     if st["night"]:
         night = _day_side(proj.R, (proj.x, proj.y, proj.z), -np.asarray(d["sun_dir"], float))
         if night:

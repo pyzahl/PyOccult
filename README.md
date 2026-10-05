@@ -1,5 +1,5 @@
 # PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
-Python Occultation Searcher by PyZahl (C) 2026, version 0.11.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.11.1 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult_version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).

@@ -10,7 +10,7 @@ authors:
     given-names: Percy
     alias: pyzahl
 license: GPL-3.0-or-later
-version: "0.11.0"
+version: "0.11.1"
 repository-code: "https://github.com/pyzahl/PyOccult"
 abstract: >-
   Portable Python replacement for the Occult occultation predictor: finds asteroid

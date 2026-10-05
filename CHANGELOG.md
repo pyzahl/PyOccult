@@ -4,6 +4,15 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `pyoccult_version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
+## [0.11.1] "New Horizons" - 2026-10-05
+
+### Fixed
+- Globe plot, color style: land masses mostly on the far side of the Earth could flood the visible disk with land
+  colour (e.g. Africa/Eurasia when the view is centred on the Americas or the Pacific). Land is now drawn with an
+  extended orthographic projection (the far side continues beyond the disk edge) clipped to the disk; a land mass
+  containing the far-side point is detected by its orientation and filled as the outside of its outline. Checked on
+  nine views around the globe and on the reported event (84851, 2026-10-18).
+
 ## [0.11.0] "New Horizons" - 2026-10-04
 
 The code name: PyOccult's orbits come from JPL Horizons, and the New Horizons mission measured its flyby target
@@ -61,6 +70,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
-[0.11.0]: https://github.com/pyzahl/PyOccult/commits/main
+[0.11.1]: https://github.com/pyzahl/PyOccult/commits/main
+[0.11.0]: https://github.com/pyzahl/PyOccult/commit/5abc5f6
 [0.10.0]: https://github.com/pyzahl/PyOccult/commit/0047057
 [0.9.0]: https://github.com/pyzahl/PyOccult/commit/a2d5c21

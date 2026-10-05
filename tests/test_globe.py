@@ -53,10 +53,25 @@ assert len(G.earth_lines()["coast"]) > 100, "Natural Earth data present (data/ne
 for style in ("color", "lines"):
     svg = G.render_svg(dict(d, style=style))
     r = ET.fromstring(svg)
-    fills = [p.get("fill") for p in r.iter(ns + "polygon")]
+    fills = [p.get("fill") for p in list(r.iter(ns + "polygon")) + list(r.iter(ns + "path"))]
     if style == "color":
         assert G.STYLE["color"]["land"] in fills and "#000" in fills, "land and night side"
     else:
         assert G.STYLE["lines"]["day"] in fills and G.STYLE["color"]["land"] not in fills
 assert len(G.earth_lines()["land"]) > 100, "Natural Earth land polygons present"
+# land drawing: a polygon containing the far-side point is drawn inside out (outside of its outline), others normally;
+# seen from the Pacific, Africa/Eurasia contains the antipode; seen from the Atlantic it does not (regression 2026-10-05)
+def view(lon, lat):
+    l, b = math.radians(lon), math.radians(lat)
+    z = np.array([math.cos(b) * math.cos(l), math.cos(b) * math.sin(l), math.sin(b)])
+    x = np.cross([0, 0, 1.0], z); x = x / np.linalg.norm(x)
+    return G._Proj(np.eye(3), (x, np.cross(z, x), z))
+afeu = max(G.earth_lines()["land"], key=len)                       # the largest ring: Africa + Eurasia
+assert min(afeu[0::2]) < 0 < 100 < max(afeu[0::2])
+pac, atl = G._land_path(view(-160, 0), afeu[0::2], afeu[1::2]), G._land_path(view(-20, 10), afeu[0::2], afeu[1::2])
+square = lambda d: d.count(" Z") == 2                               # enclosing square + outline
+assert pac is not None and square(pac), "seen from the Pacific: Africa/Eurasia drawn as the outside of its outline"
+assert atl is not None and not square(atl), "seen from the Atlantic: drawn normally"
+aus = next(r_ for r_ in G.earth_lines()["land"] if 110 < min(r_[0::2]) and max(r_[0::2]) < 160 and min(r_[1::2]) < -30)
+assert G._land_path(view(-20, 10), aus[0::2], aus[1::2]) is None, "Australia is on the far side: nothing drawn"
 print("GLOBE TESTS PASSED")
