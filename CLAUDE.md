@@ -43,6 +43,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   pure `render_svg(d)`. Data `data/ne_110m_earth.json` (Natural Earth 110m coast/borders/land, public domain).
   Report "Globe" button (prevbtn with data-wide); favorites copy it as files["globe"] (+ `backfill_globes` from maps/
   at GUI start). Preview lookups exclude `*_globe.svg`.
+- Occult site list: `pyoccult_geo.occult_sites()` downloads https://www.occultations.org/sw/occult/InstallSites.zip
+  once to `data/InstallSites.zip` (gitignored: redistribution terms unknown) and parses the fixed-width .site files
+  (lon E+, lat, height m, aperture, mag corr, ?, name 32, ?, short 9, tz h, ?); 795 unique sites. GUI Site tab select.
 - `pyoccult_kstars.py`: KStars D-Bus control (Linux only, `gdbus` with `--` before args, else `dbus-send`; never raises).
   setGPSLocation(site) -> setLocalTime (KStars local time: re-read `tz` from location(), it follows DST of the shown
   date) -> setRaDecJ2000 (RA in hours) -> setTracking -> setApproxFOV. `set_location` (GUI Results checkbox,
@@ -85,7 +88,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `observable()` returns a tuple `(ok, star_alt, sun_alt)`; always index it. `if not observable(...)` is always False.
 - `mag_drop` is the change in combined brightness (`m_ast - m_before`), never smaller than `m_ast - m_star`.
 - Drop of at least `d` needs the star no fainter than `m_ast + 2.5*log10(1/(10^(0.4 d) - 1))` (2.54 mag for 0.1).
-- SPICE is not thread-safe: use processes, load kernels per process, never call spice from threads. Network-only code
+- SPICE is not thread-safe: use processes, load kernels per process, never call spice from threads. Start worker
+  processes with `spawn` (`mp_context=multiprocessing.get_context("spawn")`), never `fork`: forked workers inherit the
+  parent's open kernel files and share their read position, so parallel reads of de440.bsp collide
+  (SPICE(RECORDNOTFOUND) "corrupted DAF", SPICE(INVALIDRADIUS)). Linux defaulted to fork up to Python 3.13 (3.14:
+  forkserver), macOS uses spawn; found on a 14-worker server with Python 3.13 (2026-10-05). Network-only code
   (Gaia/Horizons fetches) may use a few threads.
 - Gaia bulk files: `https://cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` (note `esac`); the listing is an S3 bucket at
   `https://gaia.eu-1.cdn77-storage.com/?prefix=Gaia/gdr3/gaia_source/&delimiter=/`. Files are `csv.gz` with `#` comment

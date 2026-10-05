@@ -1,7 +1,7 @@
 # PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
 
-Python Occultation Searcher by PyZahl (C) 2026, version 0.11.1 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.12.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult_version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).
@@ -195,10 +195,12 @@ Start the GUI and work through its tabs from left to right:
 python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your browser (local only)
 ```
 
-1. **Site**: set your observing site on the map (or by place name / IP address) and enter its equipment: aperture,
+1. **Site**: set your observing site on the map (or by place name / IP address, or from Occult's list of about 800
+   reference places and observatories: type a few letters in **Occult/OWC site list**, then **Add site** to keep it as
+   a new site) and enter its equipment: aperture,
    focal length, sensor size, detection frames, reach (how far you can travel), minimum star altitude, Sun limit.
    The site and the Gaia catalog used by all runs are chosen at the top right.
-2. **Pick**: choose a window (start date, days) and run the pick: it screens all asteroids (H below 17 by default)
+2. **Pick**: choose a window (start date, today by default, and days) and run the pick: it screens all asteroids (H below 17 by default)
    for actual events at your site and saves the best targets for this site and window. This is the slow step
    (several minutes); a saved pick is reused by every later search of the same site and window.
 3. **Search**: the exact prediction for the picked targets (JPL Horizons orbits, local Gaia catalog): event times,
@@ -212,7 +214,8 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    (later searches do not change them). The table is the Results table (same columns, sorting and tools: KStars,
    Map, Preview, KML) plus a select box, the site, status, note and when it was added. Check rows to set their
    status (planned / observed / cancelled / clouded) or remove them; **Remove past events** drops every favorite
-   whose event is before today (UTC). Click a row to see its star-field preview and shadow path map side by side
+   whose event is before today (UTC); **times** switches the event times between UT, your computer's time zone (Local)
+   and the time zone of each event's site (Site). Click a row to see its star-field preview and shadow path map side by side
    below the table, with its size (the diameter and range the search used, its source, H and albedo), and to
    edit its note. **CSV** downloads all favorites as a table: `favorites/favorites.csv` is rewritten with every
    change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
@@ -693,6 +696,9 @@ DOI 10.1016/j.pss.2017.02.013
 - [Occult] Herald, D., Occult (occultation prediction software, the engine behind Occult Watcher Cloud): http://www.lunar-occultations.com/iota/occult4.htm
 
 - [OWC] Pavlov, H., Occult Watcher Cloud (used for validation): https://cloud.occultwatcher.net
+
+- [Occult site list] Occult's reference places and observatories (InstallSites.zip, occultations.org), downloaded once
+  by the GUI into `data/` (not redistributed): https://www.occultations.org/sw/occult/InstallSites.zip
 
 - [H, G] Bowell, E., et al. (1989). Application of photometric models to asteroids. In: Binzel, R. P., Gehrels, T., Matthews, M. S. (eds.), Asteroids II, University of Arizona Press, pp. 524-556.
 

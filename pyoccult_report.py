@@ -432,7 +432,25 @@ document.querySelectorAll('tr.favrow').forEach(function(tr){tr.addEventListener(
  if(ev.target.closest('input,button,a'))return;
  document.querySelectorAll('tr.favrow.cur').forEach(function(x){x.classList.remove('cur');});
  tr.classList.add('cur');tell('fav_select',tr.dataset.key);});});
-upd();})();
+upd();
+// event times: UT (default), this computer's time zone, or each site's time zone; remembered in this browser
+var cells=[].slice.call(document.querySelectorAll('td.evtime')),sel=document.getElementById('favtime'),
+    head=document.getElementById('evtimehead'),M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+cells.forEach(function(c){c.dataset.ut=c.textContent;});
+function zoned(c,tz){var o={year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',
+  second:'2-digit',hour12:false,timeZoneName:'short'};if(tz)o.timeZone=tz;var p={};
+  try{new Intl.DateTimeFormat('en-US',o).formatToParts(new Date(c.dataset.utc)).forEach(function(x){p[x.type]=x.value;});}
+  catch(e){return c.dataset.ut;}
+  return p.year+'-'+M[+p.month-1]+'-'+('0'+p.day).slice(-2)+' '+(p.hour==='24'?'00':p.hour)+':'+p.minute+':'+p.second+
+    ' '+(p.timeZoneName||'');}
+function show(mode){cells.forEach(function(c){c.textContent=mode==='local'?zoned(c,null):
+  mode==='site'?(c.dataset.tz?zoned(c,c.dataset.tz)+' ('+c.dataset.tz.split('/').pop().replace(/_/g,' ')+')':
+  c.dataset.ut+' UT (site zone unknown)'):c.dataset.ut;});
+  if(head)head.firstChild.textContent={ut:'Event time (UT)',local:'Event time (local)',site:'Event time (site)'}[mode];
+  try{localStorage.setItem('pyoccult_fav_time',mode);}catch(e){}}
+if(sel){try{var m=localStorage.getItem('pyoccult_fav_time');if(m)sel.value=m;}catch(e){}
+  sel.addEventListener('change',function(){show(sel.value);});if(sel.value!=='ut')show(sel.value);}
+})();
 </script>"""
 
 KSTARS_JS = """<script>
@@ -614,9 +632,12 @@ def html_row(e):
         calc = f'<td class="num" data-s="{s(e["calc"])}">{fmt(e["calc"])}</td>'
     return (
         lead +
-        f'<td data-s="{esc(e["label"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
+        f'<td data-s="{esc(e["tid"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
         f'target="_blank" rel="noopener">{esc(e["label"])}</a></td>' + mid +
-        f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)">{esc(fmt_time(e["when"]))}</td>'
+        f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)"'
+        + (f' class="evtime" data-utc="{(e["when"] + timedelta(milliseconds=500)).strftime("%Y-%m-%dT%H:%M:%SZ")}" '
+           f'data-tz="{esc((e.get("site") or {}).get("tz") or "")}"' if f else "")
+        + f'>{esc(fmt_time(e["when"]))}</td>'
         f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">'
         + (f'<a href="{esc(VIZIER_GAIA)}{urllib.parse.quote(str(e["star"]))}" target="_blank" rel="noopener" '
            f'title="Gaia DR3 {esc(e["star"])} in VizieR. {mag_tip}">{fmt(e["mag"])}</a>' if e.get("star") else fmt(e["mag"]))
@@ -642,7 +663,7 @@ def to_html(events, meta):
     fav = meta.get("favorites")
     head = (('<th><input type="checkbox" id="favall" aria-label="Select all"></th><th data-k>Asteroid</th>'
              '<th data-k title="Site the event was predicted for">Site</th>') if fav else '<th data-k>Asteroid</th>') + (
-            f'<th class="{on("date").strip()}" data-k>Event time (UT)</th>'
+            f'<th class="{on("date").strip()}" data-k id="evtimehead">Event time (UT)</th>'
             f'<th class="num{on("mag")}" data-k title="Gaia G magnitude of the star">Star mag</th>'
             '<th class="num" data-k title="Magnitude drop with the star fully covered">Mag drop</th>'
             '<th class="num" data-k title="Maximum duration (centre line), seconds">Max dur (s)</th>'
@@ -663,7 +684,12 @@ def to_html(events, meta):
                  f'<button class="mapbtn" id="favsetst" type="button">Set status</button>'
                  f'<button class="mapbtn" id="favdel" type="button">Remove selected</button>'
                  f'<button class="mapbtn" id="favpast" type="button" title="Remove every favorite whose event is '
-                 f'before today (UTC)">Remove past events</button></div>' + table)
+                 f'before today (UTC)">Remove past events</button>'
+                 f'<label title="Event times in UT, in this computer\'s time zone (Local), or in the time zone of each '
+                 f'event\'s site (Site; looked up once per site), with daylight saving time">times '
+                 f'<select id="favtime"><option value="ut">UT</option><option value="local">Local</option>'
+                 f'<option value="site">Site</option></select></label>'
+                 f'</div>' + table)
     n_kml = sum(1 for e in events if e["kml"])
     n_prev = sum(1 for e in events if e.get("preview"))
     paths = meta.get("paths") or {}

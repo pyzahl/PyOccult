@@ -255,6 +255,24 @@ def backfill_globes(map_dir="maps", folder=DIR):
     return n
 
 
+def backfill_timezones(lookup, folder=DIR):
+    """Give each favorite's site its IANA time zone (for showing site times): lookup(lat, lon) -> name or None,
+    called once per distinct site position. Saves only if something changed. Returns the number filled in."""
+    items, n, cache = load(folder), 0, {}
+    for e in items:
+        site = e.get("site") or {}
+        if site.get("tz") or site.get("lat") is None or site.get("lon") is None:
+            continue
+        key = (round(float(site["lat"]), 3), round(float(site["lon"]), 3))
+        if key not in cache:
+            cache[key] = lookup(site["lat"], site["lon"])
+        if cache[key]:
+            site["tz"], n = cache[key], n + 1
+    if n:
+        _save(items, folder)
+    return n
+
+
 def size_text(entry):
     """'D 3.04 km (2.81-3.27 km, SBDB diameter, NEOWISE) · H 14.03 · albedo 0.06': the size the search used (from
     its record: radius and range, source) and the cached SBDB data kept with the favorite."""

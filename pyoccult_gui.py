@@ -174,6 +174,15 @@ def index():
                         ui.button("Search", on_click=lambda: find_place()).props("outline")
                         ui.button("My IP location", on_click=lambda: ip_loc()).props("outline")
                     hits = ui.column().classes("w-full gap-1")
+                    occ = geo.occult_sites()                    # Occult/OWC site list (downloaded once into data/)
+                    occ_sel = ui.select({i: f"{x['name']} \u00b7 {x['region']} \u00b7 {x['lat']:.3f}, {x['lon']:.3f}, "
+                                            f"{x['ele']:.0f} m" for i, x in enumerate(occ)},
+                                        with_input=True, clearable=True,
+                                        label="Occult/OWC site list (type to search)" if occ else
+                                        "Occult/OWC site list: not available (offline?)").classes("w-full").props(
+                        "dense options-dense" + ("" if occ else " disable")).tooltip(
+                        f"{len(occ)} reference places and observatories from Occult's site list (occultations.org): "
+                        "sets position, elevation and description; the equipment stays as it is")
                     ui.label("Click the map to set the position; the elevation is looked up. "
                              "Use an exact position (GPS, map) for observing.").classes("text-xs text-slate-500")
                 with ui.column().classes("w-1/2"):
@@ -192,7 +201,7 @@ def index():
         with ui.tab_panel(t_search):
             site_note_s = ui.label().classes("text-sm text-slate-600")
             with ui.row().classes("items-end gap-4"):
-                s_start = ui.input("Start (UTC date)", value=str(config.ct)[:10]).props("type=date")
+                s_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date")
                 s_days = ui.number("Days", value=config.days, min=1, step=1)
                 s_drop = ui.number("Min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1), step=0.05)
             s_use_file = ui.switch("Targets from the saved pick of this site (Pick tab)", value=True).tooltip(
@@ -221,7 +230,7 @@ def index():
         with ui.tab_panel(t_pick):
             site_note_p = ui.label().classes("text-sm text-slate-600")
             with ui.row().classes("items-end gap-4"):
-                p_start = ui.input("Start (UTC date)", value=str(config.ct)[:10]).props("type=date")
+                p_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date")
                 p_days = ui.number("Days", value=config.days, min=1, step=1)
                 p_hmax = ui.number("H below", value=getattr(config, "pick_hmax", 17.0), step=0.5)
                 p_all = ui.checkbox("All numbered (slow)")
@@ -372,6 +381,21 @@ def index():
             ele.value = round(el)
 
     m.on("map-click", on_click)
+
+    def pick_occult(e):
+        if e.value is None:
+            return
+        x = occ[e.value]
+        set_position(x["lat"], x["lon"], x["ele"])
+        m.set_center((x["lat"], x["lon"]))
+        desc.value = x["name"]
+        if not (new_name.value or "").strip():
+            new_name.value = x["name"].split(",")[0].strip()
+        ui.notify(f"{x['name']} ({x['region']}, from Occult's site list): position and elevation set in the form. "
+                  f"Add site keeps it as a new site; Save sites.py would move {state['name']} there instead.",
+                  multi_line=True, timeout=9000)
+
+    occ_sel.on_value_change(pick_occult)
 
     async def find_place():
         hits.clear()
@@ -676,6 +700,13 @@ def index():
 KSTARS_OPT = dict(set_location=True)                   # Results tab option, read by /api/kstars/show
 
 
+def today_utc():
+    """Today's date (UTC), the default start of the Pick and Search windows in the GUI (pyoccult_config.ct is only the
+    command-line default)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
@@ -691,6 +722,7 @@ def main():
     import pyoccult_sbdb                                        # size data for favorites added before it was kept
     favorites.backfill_phys(lambda t: pyoccult_sbdb.get(t, config.cache_path)[0])
     favorites.backfill_globes(config.map_dir)                   # globe plots of later searches for older favorites
+    favorites.backfill_timezones(geo.timezone)                  # site time zones (online, once per site)
     favorites.write_csv()
     app.add_static_files("/fav", os.path.join(ROOT, favorites.DIR), max_cache_age=0)
 
@@ -725,6 +757,8 @@ def main():
         import pyoccult_sbdb
         ok, msg = favorites.add(rec, pyoccult_report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir,
                                 sbdb=pyoccult_sbdb.get(tid, cfg.cache_path)[0])
+        if ok:
+            favorites.backfill_timezones(geo.timezone)          # the new favorite's site time zone (once per site)
         favorites.write_page()
         return {"ok": ok, "msg": msg}
 

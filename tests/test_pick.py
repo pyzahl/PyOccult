@@ -75,4 +75,9 @@ print("site solver: t", round(float(t[0]), 4), "miss", round(float(miss[0]), 4),
 assert abs(t[0] - T_TRUE) < 1e-3 and abs(miss[0] - B) < 1e-6 and abs(v[0] - 7.0) < 1e-9
 t, miss, _, _ = SC.solve_site(None, FakeSite(), track, sdir, np.array([2300.0]), np.array([100.0]))
 assert abs(t[0] - 2200.0) < 1e-9, "the solution must stay inside the bracket"
+# worker processes must start with "spawn": with "fork" (Linux default before Python 3.14) they share the parent's open
+# SPICE kernel files and their read position, and parallel reads of de440.bsp collide (regression 2026-10-05)
+import inspect, pyoccult_pick as _pk
+assert inspect.signature(_pk.run_screen).parameters["mp_start"].default == "spawn"
+assert 'mp_context=multiprocessing.get_context(mp_start)' in inspect.getsource(_pk.run_screen)
 print("PICK TESTS PASSED")

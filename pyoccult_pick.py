@@ -109,11 +109,17 @@ def _screen_chunk(args):
     return _W["SC"].screen(_W["spice"], rows, et0, et1, _W["site"], _W["index"], opt, chunk=max(len(rows), 1)), len(rows)
 
 
-def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000):
+def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000, mp_start="spawn"):
+    """Screen rows in worker processes. Workers are started with "spawn": each loads its own SPICE kernels with its
+    own file handles. With "fork" (the Linux default before Python 3.14) they would inherit the parent's open kernel
+    files and share their read position, so parallel reads of de440.bsp collide (SPICE(RECORDNOTFOUND),
+    SPICE(INVALIDRADIUS), corrupted DAF), more often the more workers run."""
+    import multiprocessing
     folder = os.path.dirname(os.path.abspath(__file__))
     jobs = [(rows[i:i + chunk], et0, et1, opt) for i in range(0, len(rows), chunk)]
     events, done, t0 = [], 0, time.time()
-    with ProcessPoolExecutor(max_workers=workers, initializer=_init, initargs=(folder, *site_args)) as ex:
+    with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context(mp_start),
+                             initializer=_init, initargs=(folder, *site_args)) as ex:
         for ev, n in ex.map(_screen_chunk, jobs):
             events += ev
             done += n
@@ -189,6 +195,9 @@ def main(argv=None):
     ap.add_argument("--sort", choices=sorted(SORT_KEYS), default="mag", help="ranking (default: brightest star first)")
     ap.add_argument("--top", type=int, default=40, help="asteroids written to targets.py (best events first)")
     ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) // 2), help="parallel processes")
+    ap.add_argument("--mp-start", choices=("spawn", "forkserver", "fork"), default="spawn",
+                    help="how worker processes start (default spawn; fork shares the parent's open SPICE kernel files "
+                         "and breaks parallel reads, for diagnosis only)")
     ap.add_argument("--catalog", default=c("catalog", "gaia_dr3_g18"), help="local Gaia catalog folder")
     ap.add_argument("--sbdb-cache", help="SBDB download cache (default: <config cache_path>/PyOccult_sbdb_cache.json)")
     ap.add_argument("-o", "--output", default="pick_events.csv")
@@ -217,7 +226,7 @@ def main(argv=None):
     print(f"{len(rows)} asteroids, {a.start} + {a.days:g} d, site {a.site or ''} {a.lat:.4f} {a.lon:.4f}, reach {a.reach:g} km, "
           f"G <= {a.cam_limit:g}, {a.workers} workers", file=sys.stderr)
     t0 = time.time()
-    ev = run_screen(rows, et0, et1, opt, (a.catalog, a.cam_limit, a.lat, a.lon, a.ele), a.workers)
+    ev = run_screen(rows, et0, et1, opt, (a.catalog, a.cam_limit, a.lat, a.lon, a.ele), a.workers, mp_start=a.mp_start)
     print(f"screened in {time.time() - t0:.0f} s: {len(ev)} events", file=sys.stderr)
 
     E = pd.DataFrame(ev)

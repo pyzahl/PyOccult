@@ -4,6 +4,29 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `pyoccult_version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
+## [0.12.0] "New Horizons" - 2026-10-05
+
+### Fixed
+- Pick tool with several workers on Linux with Python 3.13 or older: workers were started with "fork" and inherited
+  the parent's open SPICE kernel files, so parallel reads of `de440.bsp` collided (SPICE(RECORDNOTFOUND) "corrupted
+  DAF", SPICE(INVALIDRADIUS)); seen with 14 workers on a 28-thread server. Workers now always start with "spawn" and
+  open their own kernels (Python 3.14 and macOS were not affected). Reproduced with `--mp-start fork` and 12 workers,
+  fixed with the default spawn. `--mp-start` (spawn, forkserver, fork) is kept for diagnosis.
+- Results and Favorites tables: sorting by Asteroid is numeric by its number (20 before 100), not alphabetic.
+
+### Added
+- GUI Site tab: **Occult/OWC site list**, a searchable list of Occult's ~800 reference places and observatories
+  (InstallSites.zip from occultations.org, downloaded once into `data/`, not in git; `pyoccult_geo.occult_sites`).
+  Picking one sets position, elevation and description and proposes it as a new site name (**Add site**).
+- Favorites table: a **times** selector shows the event times in UT (default), in this computer's time zone
+  (Local) or in each event site's time zone (Site, e.g. "2026-Oct-12 00:47:46 GMT+2 (Zurich)"), with daylight saving
+  time; remembered in the browser, sorting unchanged. Site time zones are looked up once per site (Open-Meteo,
+  `pyoccult_geo.timezone`) when a favorite is added, and for older favorites when the GUI starts.
+
+### Changed
+- GUI: the start date of the Pick and Search windows defaults to today (UTC) instead of `ct` from
+  `pyoccult_config.py` (which stays the default for command-line runs).
+
 ## [0.11.1] "New Horizons" - 2026-10-05
 
 First GitHub release with a Zenodo DOI: 10.5281/zenodo.23149372 (this release; all versions:
@@ -73,6 +96,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[0.12.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.11.1]: https://github.com/pyzahl/PyOccult/releases/tag/V0.11.1-NewHorizons
 [0.11.0]: https://github.com/pyzahl/PyOccult/commit/5abc5f6
 [0.10.0]: https://github.com/pyzahl/PyOccult/commit/0047057
