@@ -6,6 +6,9 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [0.11.1] "New Horizons" - 2026-10-05
 
+First GitHub release with a Zenodo DOI: 10.5281/zenodo.23149372 (this release; all versions:
+10.5281/zenodo.23149371). Tags `V0.11.1-NewHorizons` and `V0.1.11-NewHorizons` (same commit).
+
 ### Fixed
 - Globe plot, color style: land masses mostly on the far side of the Earth could flood the visible disk with land
   colour (e.g. Africa/Eurasia when the view is centred on the Americas or the Pacific). Land is now drawn with an
@@ -70,7 +73,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
-[0.11.1]: https://github.com/pyzahl/PyOccult/commits/main
+[0.11.1]: https://github.com/pyzahl/PyOccult/releases/tag/V0.11.1-NewHorizons
 [0.11.0]: https://github.com/pyzahl/PyOccult/commit/5abc5f6
 [0.10.0]: https://github.com/pyzahl/PyOccult/commit/0047057
 [0.9.0]: https://github.com/pyzahl/PyOccult/commit/a2d5c21

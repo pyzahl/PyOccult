@@ -1,4 +1,6 @@
 # PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
+
 Python Occultation Searcher by PyZahl (C) 2026, version 0.11.1 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult_version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
@@ -619,7 +621,8 @@ for the full text.
 The licence covers the code. The data PyOccult downloads or uses keep their own terms, in particular Gaia DR3
 (CC BY-NC 3.0 IGO, see References), and so does the ready-made catalog on Zenodo.
 
-To cite PyOccult, use [CITATION.cff](CITATION.cff) (GitHub: "Cite this repository").
+To cite PyOccult, use [CITATION.cff](CITATION.cff) (GitHub: "Cite this repository") or its Zenodo DOI
+[10.5281/zenodo.23149371](https://doi.org/10.5281/zenodo.23149371) (all versions; each release also has its own DOI).
 
 ## Acknowledgements
 

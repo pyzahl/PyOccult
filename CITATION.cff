@@ -10,6 +10,7 @@ authors:
     given-names: Percy
     alias: pyzahl
 license: GPL-3.0-or-later
+doi: 10.5281/zenodo.23149371
 version: "0.11.1"
 repository-code: "https://github.com/pyzahl/PyOccult"
 abstract: >-
