@@ -59,16 +59,21 @@ https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 # Install
 
-General steps: Clone this repository, change into it's folder PyOccult and setup a Python virtual environment, install requirements and run setup.
+General steps: clone this repository, change into its folder PyOccult, set up a Python virtual environment, install
+the requirements and run the setup.
 
-For Linux: all the below explained steps 1-5 can be simply executed via running the linux_install.sh script after cloning this repository:
-Once completed it starts the GUI task.
+For Linux (and macOS): the script `linux_install.sh` does steps 1-5 below in one go after cloning: it creates the
+virtual environment `.venv`, installs the packages into it, runs the one-time setup (it asks for your site and the
+catalog) and then starts the GUI:
 
   ```bash
   git clone https://github.com/pyzahl/PyOccult.git
   cd PyOccult
   sh linux_install.sh
   ```
+
+It can be rerun (it reuses `.venv`, and the setup resumes). It needs Python 3 with its venv module (Debian/Ubuntu:
+`sudo apt install python3 python3-venv`). Later, start the GUI with `.venv/bin/python pyoccult_gui.py`.
 
 # Python Virtual Environment Setup Guide
 

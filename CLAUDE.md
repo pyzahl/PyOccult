@@ -26,6 +26,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= 15, cells sorted by G). Worker processes.
 - `pyoccult_corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
+- `linux_install.sh` (user's quick install, Linux/macOS): creates `.venv` with python3, installs requirements via
+  `.venv/bin/python -m pip` (never `activate`: sh runs it in a subshell; system pip is refused by PEP 668), runs
+  `pyoccult_setup.py` then `exec`s the GUI; `set -e`, rerunnable. Keep it in step with setup/GUI changes.
 - `pyoccult_setup.py`: one-time bootstrap (kernels via `pyoccult_kernels.py`, local Gaia catalog, bright-star index);
   rerunnable, resumes. `pyoccult_kernels.py`: the kernel download, also called by pyoccult.py at start-up.
 - `pyoccult_gaia_local.py`: builds/reads a local G-limited Gaia DR3 copy from ESA's CDN bulk files (`build`, `status`);

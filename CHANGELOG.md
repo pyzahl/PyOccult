@@ -4,6 +4,14 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `pyoccult_version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
+## [Unreleased]
+
+### Fixed
+- `linux_install.sh`: ran `.venv/bin/activate` as a command (no effect), so `pip install` went to the system Python
+  (refused as "externally-managed-environment" on Debian/Ubuntu) and setup and GUI ran without their packages. It now
+  calls `.venv/bin/python` directly, finds `python3`, stops at the first error, hints at `python3-venv`, and can be
+  rerun.
+
 ## [0.12.0] "New Horizons" - 2026-10-05
 
 ### Fixed
