@@ -59,6 +59,11 @@ https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 # Install
 
+For Linux all the below steps can be simply executed via running, once completed it starts the GUI task. Quick install+start:
+  ```bash
+  sh linux_install.sh
+  ```
+
 # Python Virtual Environment Setup Guide
 
 To set up a Python virtual environment and install dependencies from an existing `requirements.txt` file, open your terminal or command prompt and follow these three steps:
