@@ -59,7 +59,7 @@ https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 # Install
 
-For Linux all the below steps can be simply executed via running, once completed it starts the GUI task. Quick install+start:
+Linux: all the below explained steps can be simply executed via running the linux_install.sh script. Once completed it starts the GUI task.
   ```bash
   sh linux_install.sh
   ```
