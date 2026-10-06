@@ -304,8 +304,9 @@ def index():
                 fav_info = ui.label().classes("text-sm text-slate-600")
                 ui.button("Reload", on_click=lambda: load_favs()).props("flat dense")
                 ui.link("Open in a new tab", "/fav/favorites.html", new_tab=True)
-                ui.link("CSV", "/fav/favorites.csv").props("download").tooltip(
-                    "favorites/favorites.csv: all favorites as a table (rewritten with every change)")
+                ui.button("CSV", on_click=lambda: fav_csv()).props("outline dense").tooltip(
+                    "Download all favorites as a table (favorites/favorites.csv, rewritten with every change), "
+                    "named favorites_<today>.csv")
             ui.label("Add events with the ☆ button in the Results report (opened from this GUI). Each favorite keeps "
                      "its own copy of map and preview, so later searches do not change it. Click a row for its preview, "
                      "map and note below; check rows for the actions above the table. Drag the table's bottom-right corner to make "
@@ -637,12 +638,24 @@ def index():
             return
         ui.download(p["csv"], os.path.basename(p["csv"]))
 
+    def fav_csv():
+        path = os.path.join(ROOT, favorites.DIR, "favorites.csv")
+        if not os.path.isfile(path):
+            ui.notify("No favorites yet", type="warning")
+            return
+        ui.download(path, f"favorites_{today_utc()}.csv")
+
     def hits_csv():
         path = os.path.join(ROOT, config.hits_output_cvs_file)
         if not os.path.isfile(path):
             ui.notify("No search results yet (run a search)", type="warning")
             return
-        ui.download(path, os.path.basename(path))
+        import pyoccult_report
+        run = pyoccult_report.read_last_run(path) or {}             # name it like the picks: site, window
+        site, start = (run.get("site") or {}).get("name"), str(run.get("window_start") or "")[:10]
+        name = (f"hits_{picks._safe(site)}__{start}_{float(run['window_days']):g}d.csv"
+                if site and start and run.get("window_days") else os.path.basename(path))
+        ui.download(path, name)
 
     def use_saved():
         p = next((p for p in saved_list if p["py"] == p_saved.value), None)

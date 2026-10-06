@@ -222,7 +222,8 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    (from the site's telescope, capped at the catalog; change it for one run), and run the pick: it screens all asteroids (H below 17 by default)
    for actual events at your site and saves the best targets for this site and window. This is the slow step
    (several minutes); a saved pick is reused by every later search of the same site and window. **CSV** downloads the
-   selected pick's events as a table (the Results tab has the same button for the search results).
+   selected pick's events as a table (the Results tab has the same button for the search results, named
+   `hits_<site>__<start>_<days>d.csv`).
 3. **Search**: the exact prediction for the picked targets (JPL Horizons orbits, local Gaia catalog): event times,
    drops, durations, shadow paths (KML maps) and star-field previews.
 4. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
@@ -238,7 +239,7 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    and the time zone of each event's site (Site). Click a row to see its star-field preview and shadow path map side by side
    below the table, with its size (the diameter and range the search used, its source, H and albedo), its shape and
    rotation where SBDB knows them (axes, rotation period, pole, taxonomic type; fetched once per favorite from the
-   SBDB API, as the pick tool's bulk data holds only the size), and to edit its note. **CSV** downloads all favorites as a table: `favorites/favorites.csv` is rewritten with every
+   SBDB API, as the pick tool's bulk data holds only the size), and to edit its note. **CSV** downloads all favorites as a table (`favorites_<date>.csv`): `favorites/favorites.csv` is rewritten with every
    change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
    in your browser).
 

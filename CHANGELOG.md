@@ -20,7 +20,7 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 - Pick: the asteroid's H in `pick_events.csv`, the saved picks and the Pick tab table (the "H below" limit is the
   most common reason an asteroid is missing from a pick).
 - GUI Pick and Results tabs: a **CSV** button downloads the selected saved pick's events, or the search results
-  (`hits_log.csv`).
+  (`hits_log.csv`, downloaded as `hits_<site>__<start>_<days>d.csv` from the last run, like the saved picks).
 - GUI Pick tab: **Star G limit** (left of "H below"), the pick's star limit, computed from the site's telescope (as "Stars searched
   to G" in the Site tab) and capped at the selected catalog; it can be changed for one run (`--cam-limit`). Before,
   the GUI pick used the config's `MAG_MIN`, which `gaia_local_gmax` can cap lower than the site allows.
@@ -37,6 +37,8 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- GUI Favorites tab: the **CSV** download was saved as "true.csv" (the link's `download` attribute); it is now a
+  button like in the Pick and Results tabs and saves `favorites_<date>.csv`.
 - Pick tool with a star limit above G 15 (now easy to reach with the GUI's **Faintest star** field): the deeper
   bright-star index it needs (`bright_G16.0.v2.npy`, ...) was built by every worker at once, each reading the whole
   catalog into memory, so the system ran into swap and the browser stalled. The pick now builds a missing index once,
