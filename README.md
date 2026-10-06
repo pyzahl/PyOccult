@@ -201,8 +201,11 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
 ```
 
 1. **Site**: set your observing site on the map (or by place name / IP address, or from Occult's list of about 800
-   ~2700 observatories with their official MPC codes: type a code or name in **MPC observatory**, then **Add site** to
-   keep it as a new site; the **MPC code** field holds your site's code, if it has one) and enter its equipment: aperture,
+   ~2700 observatories with their official MPC codes: type a code or name in **MPC observatory**; the **MPC code**
+   field holds your site's code, if it has one) and enter its equipment. **Add as new site** (next to the list) adds
+   what the map and form show as a new site to the site selector, named as in **New site name**, and saves it;
+   **Save sites.py** instead stores the form into the site selected at the top right; **Remove site** deletes the
+   selected site from `sites.py` (after asking): aperture,
    focal length, sensor size, detection frames, reach (how far you can travel), minimum star altitude, Sun limit.
    The site and the Gaia catalog used by all runs are chosen at the top right.
 2. **Pick**: choose a window (start date, today by default, and days) and run the pick: it screens all asteroids (H below 17 by default)

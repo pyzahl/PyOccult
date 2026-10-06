@@ -164,6 +164,8 @@ def index():
                 is_default = ui.checkbox("Default for command-line runs").tooltip(
                     "default_site in sites.py: used by pyoccult.py / pyoccult_pick.py run without the GUI")
                 ui.button("Save sites.py", on_click=lambda: save()).props("color=primary")
+                ui.button("Remove site", on_click=lambda: remove_site()).props("outline color=negative").tooltip(
+                    "Remove the site selected at the top right from sites.py (asks first; saved at once)")
                 unsaved = ui.label().classes("text-sm text-amber-700")
             with ui.row().classes("w-full no-wrap gap-4"):
                 with ui.column().classes("w-1/2"):
@@ -183,6 +185,9 @@ def index():
                         "dense options-dense" + ("" if occ else " disable")).tooltip(
                         f"{len(occ)} observatories with their official MPC codes (Minor Planet Center): sets position, "
                         "elevation, description and MPC code; the equipment stays as it is")
+                    ui.button("Add as new site", on_click=lambda: add_site()).props("outline").tooltip(
+                        "Add the current map site (position, description, MPC code and the equipment in the form) as a "
+                        "new site to the site selector at the top right, named as in 'New site name'; saved at once")
                     ui.label("Click the map to set the position; the elevation is looked up. "
                              "Use an exact position (GPS, map) for observing.").classes("text-xs text-slate-500")
                 with ui.column().classes("w-1/2"):
@@ -396,14 +401,16 @@ def index():
         set_position(x["lat"], x["lon"], x["ele"] if x["ele_ok"] else None)
         m.set_center((x["lat"], x["lon"]))
         desc.value, mpc.value = x["name"], x["code"]
-        if not (new_name.value or "").strip():
-            new_name.value = f"{x['code']} {x['name'].split(',')[0].strip()}"
+        auto = f"{x['code']} {x['name'].split(',')[0].strip()}"
+        if not (new_name.value or "").strip() or new_name.value == state.get("auto_name"):   # keep a name you typed
+            new_name.value = auto
+        state["auto_name"] = auto
         if not x["ele_ok"]:                                       # old low-precision entry: look the height up
             el = await run.io_bound(geo.elevation, x["lat"], x["lon"])
             if el is not None:
                 ele.value = round(el)
-        ui.notify(f"MPC {x['code']} {x['name']}: position and elevation set in the form. "
-                  f"Add site keeps it as a new site; Save sites.py would move {state['name']} there instead.",
+        ui.notify(f"MPC {x['code']} {x['name']}: shown on the map and in the form. 'Add as new site' adds it to the "
+                  f"site selector; 'Save sites.py' would instead move {state['name']} there.",
                   multi_line=True, timeout=9000)
 
     occ_sel.on_value_change(pick_occult)
@@ -429,15 +436,20 @@ def index():
         ui.notify(f"Approximate (from your IP address): {r[3]}")
 
     def add_site():
+        """The position and settings in the form as a new site (name from 'New site name'), selected and saved."""
         name = (new_name.value or "").strip()
         if not name or name in sites:
-            ui.notify("Enter a new, unused site name", type="warning")
+            ui.notify("Enter a new, unused site name (field 'New site name' at the top)", type="warning")
             return
-        sites[name] = collect()
-        sites[name]["name"] = name
+        sites[name] = collect()                                   # keeps the description from the form
         sel.options = list(sites)
-        sel.value = name
-        new_name.value = ""
+        sel.update()
+        sel.value = name                                          # shows it (show_site) and makes it the run site
+        new_name.value, state["auto_name"] = "", None
+        save_sites(sites, state.get("default", default_site))
+        unsaved.text = ""
+        ui.notify(f"Site {name} added and saved in sites.py; it is now selected for all runs (top right)",
+                  type="positive")
 
     def effective(s, name):
         """A site with every optional key filled in with its default, for comparing form and file."""
@@ -464,6 +476,31 @@ def index():
             save()
             ui.notify(f"Saved the changes to site {state['name']} for this run", type="info")
 
+    async def remove_site():
+        name = state["name"]
+        if len(sites) < 2:
+            ui.notify("This is the only site: add another one before removing it", type="warning")
+            return
+        with ui.dialog() as dlg, ui.card():
+            ui.label(f"Remove site {name} ({sites[name].get('name', name)}) from sites.py?")
+            with ui.row():
+                ui.button("Remove", on_click=lambda: dlg.submit(True)).props("color=negative")
+                ui.button("Cancel", on_click=lambda: dlg.submit(False)).props("flat")
+        if not await dlg:
+            return
+        del sites[name]
+        default = state.get("default", default_site)
+        note = ""
+        if default == name or default not in sites:
+            default = state["default"] = next(iter(sites))
+            note = f"; {default} is now the default for command-line runs"
+        save_sites(sites, default)
+        sel.options = list(sites)
+        sel.update()
+        sel.value = default                                       # shows it (show_site)
+        unsaved.text = ""
+        ui.notify(f"Site {name} removed from sites.py{note}", type="positive")
+
     def save():
         sites[state["name"]] = collect()
         if is_default.value:
@@ -472,7 +509,7 @@ def index():
         ui.notify(f"sites.py saved (default site: {state.get('default', default_site)})", type="positive")
         unsaved.text = ""
 
-    sel.on_value_change(lambda e: show_site(e.value))
+    sel.on_value_change(lambda e: show_site(e.value) if e.value in sites else None)   # None while options change
     show_site(state["name"])
 
     # ------------------------------------------------ runs

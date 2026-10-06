@@ -14,10 +14,17 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- GUI Site tab: **Add as new site** next to the MPC list: adds what the map and form show as a new site to the site
+  selector and saves it at once (it is then selected for all runs).
+- GUI Site tab: **Remove site** deletes the site selected at the top right from `sites.py` (asks first, saves at
+  once; the last site cannot be removed; if it was the default for command-line runs, another site becomes it).
 - Site key `mpc_code` (the official MPC observatory code), a **MPC code** field in the GUI Site tab (filled in when
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- GUI Site tab: after picking a second MPC observatory, the proposed site name kept the first one, so **Add site**
+  stored e.g. Trieste's position under "000 Greenwich"; the name now follows each pick (a name you typed is kept).
+  Adding a site no longer overwrote its description with the site name.
 - `linux_install.sh`: ran `.venv/bin/activate` as a command (no effect), so `pip install` went to the system Python
   (refused as "externally-managed-environment" on Debian/Ubuntu) and setup and GUI ran without their packages. It now
   calls `.venv/bin/python` directly, finds `python3`, stops at the first error, hints at `python3-venv`, and can be
