@@ -167,7 +167,7 @@ def main(argv=None):
         g = lambda k, d: getattr(C, k, d)
         cfg = dict(site=g("site_name", None), picks_dir=g("picks_dir", "picks"), lat=C.LAT, lon=C.LON, ele=C.ELE, reach=C.max_shadow_dist, min_alt=C.MIN_STAR_ALT,
                    sun=C.MAX_SUN_ALT, cache=C.cache_path, start=str(C.ct)[:10], days=C.days,
-                   catalog=g("gaia_local_dir", "gaia_dr3_g18"), min_drop=g("min_mag_drop", 0.1),
+                   catalog=g("gaia_local_dir", "gaia_dr3_g16"), min_drop=g("min_mag_drop", 0.1),
                    cam_limit=g("pick_cam_limit", 15.0), aperture=g("pick_aperture_cm", 25.0),
                    mag_adjust=g("pick_mag_adjust", 0.0), extinction=g("pick_extinction", 0.0),
                    frames=g("pick_frames", 4), min_dur=g("pick_min_dur_s", 0.4), hmax=g("pick_hmax", 17.0))
@@ -201,7 +201,7 @@ def main(argv=None):
     ap.add_argument("--mp-start", choices=("spawn", "forkserver", "fork"), default="spawn",
                     help="how worker processes start (default spawn; fork shares the parent's open SPICE kernel files "
                          "and breaks parallel reads, for diagnosis only)")
-    ap.add_argument("--catalog", default=c("catalog", "gaia_dr3_g18"), help="local Gaia catalog folder")
+    ap.add_argument("--catalog", default=c("catalog", "gaia_dr3_g16"), help="local Gaia catalog folder")
     ap.add_argument("--sbdb-cache", help="SBDB download cache (default: <config cache_path>/PyOccult_sbdb_cache.json)")
     ap.add_argument("-o", "--output", default="pick_events.csv")
     ap.add_argument("--targets-file", default="targets.py", help="importable targets list ('' to skip)")

@@ -9,6 +9,7 @@ an interrupted Gaia build continues where it stopped.
     pyoccult setup --no-geoip   # do not guess your site from your IP address
     pyoccult setup --gmax 16    # a catalog to G 16 instead (own folder gaia_dr3_g16, ~3 GB)
     pyoccult setup --gmax 17 --dir /data/gaia_g17
+    pyoccult setup --home ~/PyOccult      # keep all data in this folder from now on (default for installed copies)
 
   0. Your observing site (sites.py, private): if missing, guessed from your IP address (ipinfo.io), or from a city or
      place name (Open-Meteo geocoding), or typed in; non-interactive runs copy sites_example.py.
@@ -20,7 +21,7 @@ an interrupted Gaia build continues where it stopped.
                its SHA-256 and unpack it (~11 / ~3 GB). Only for G <= 16 and 18. Resumable.
        esa:    build it from ESA's bulk files: 753 GB streamed, ~11 GB kept for G <= 18, about 1.5-2 h at
                1.4 Gbit/s. Any limit. Resumable.
-     In a terminal, setup first asks for the limit (Enter = 18; skipped with --gmax), then --source auto (default)
+     In a terminal, setup first asks for the limit (Enter = 16; skipped with --gmax), then --source auto (default)
      asks zenodo or esa (Enter = zenodo). Without a terminal: the config's limit, zenodo. auto resumes an interrupted
      esa build, and uses esa for limits Zenodo does not have.
   3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pick.py. ~30 s.
@@ -28,7 +29,50 @@ an interrupted Gaia build continues where it stopped.
 from pyoccult.version import __version__
 import argparse, os, shutil, sys
 
-from pyoccult.home import HOME, PKG
+from pyoccult import home
+from pyoccult.home import PKG
+
+
+def own_data(folder):
+    """True if folder holds data of your own (not just the files PyOccult creates from its templates)."""
+    if not os.path.isdir(folder):
+        return False
+    example = os.path.join(PKG, "templates", "sites_example.py")
+    for n in os.listdir(folder):
+        if n in ("__pycache__", "pyoccult_config.py"):
+            continue
+        if n == "sites.py":
+            with open(os.path.join(folder, n)) as f, open(example) as g:
+                if f.read() == g.read():
+                    continue
+        return True
+    return False
+
+
+def choose_home(argv):
+    """The data folder for this and all later runs: `--home <folder>` sets it; the first setup of an installed copy
+    (no setting, not a checkout) asks for it. Saved in home.POINTER; returns the folder."""
+    if "--home" in argv:
+        i = argv.index("--home")
+        if i + 1 >= len(argv):
+            sys.exit("--home needs a folder")
+        old, new = home.HOME, home.save(argv[i + 1])
+        home.HOME, home.SOURCE = new, "setting"
+        print(f"data folder: {new}  (saved in {home.POINTER})")
+        if os.path.realpath(old) != os.path.realpath(new) and own_data(old):
+            print(f"   your files are still in {old}: move what you want to keep yourself (sites.py, "
+                  f"pyoccult_config.py, picks/, favorites/, ...; the Gaia catalog folders can be moved or linked)")
+    elif home.SOURCE == "default" and sys.stdin.isatty() and "--status" not in argv:
+        print("PyOccult keeps its data in one folder: your sites and settings, the SPICE kernels, the Gaia catalog "
+              "(3-11 GB),\nsaved picks, favorites and results.")
+        k = input(f"   data folder [Enter = {home.DEFAULT}]: ").strip()
+        home.HOME, home.SOURCE = home.save(k or home.DEFAULT), "setting"
+        print(f"   data folder: {home.HOME}  (saved in {home.POINTER}; change it later with --home)")
+    os.makedirs(home.HOME, exist_ok=True)
+    return home.HOME
+
+
+HOME = choose_home(sys.argv)
 os.chdir(HOME)                                                      # kernels, catalogs, sites.py live in the data folder
 EXAMPLE = os.path.join(PKG, "templates", "sites_example.py")
 from pyoccult import geo
@@ -36,7 +80,7 @@ from pyoccult import geo
 SITES_HINT = """   Edit sites.py and enter your observing site(s), then rerun or just start searching:
      - lat, lon: geodetic degrees, longitude east-positive (west is negative); ele: metres
      - optional view: min_alt, max_sun_alt, reach_km; equipment: aperture_cm, frames, mag_adjust, extinction
-       (all keys are explained at the top of sites_example.py)
+       (all keys are explained at the top of pyoccult/templates/sites_example.py in the PyOccult code)
      - default_site names the site used; PYOCCULT_SITE=<name> picks another one for a single run
    sites.py stays private (it is in .gitignore)."""
 
@@ -142,7 +186,7 @@ def ensure_sites(geoip=True):
         print()
         return True
     shutil.copyfile(EXAMPLE, "sites.py")
-    print("WARNING: no sites.py found: created it from sites_example.py (example site: New York City Hall).")
+    print("WARNING: no sites.py found: created it from the example (site: New York City Hall).")
     print(SITES_HINT)
     print()
     return True
@@ -155,6 +199,7 @@ from pyoccult.kernels import KERNELS, download_kernels
 
 
 def show_status(d=None):
+    print(f"  data folder                  {home.describe()}")
     with open("sites.py") as f:
         example = f.read() == open(EXAMPLE).read() if os.path.isfile(EXAMPLE) else False
     print(f"  site {config.site_name!r:26s} {config.LAT:.4f} {config.LON:.4f}, {config.ELE:g} m, "
@@ -222,8 +267,8 @@ def catalog_source(source, d, gmax, st):
 def ask_gmax(default):
     """Ask for the catalog's magnitude limit (terminal only). Returns a float G."""
     print("   Faintest star (Gaia G) kept in the local catalog; fainter stars are never searched:")
-    print(f"     18   ~11 GB on disk; ready-made on Zenodo ({ZENODO_GB[18.0]:g} GB download)")
-    print(f"     16   ~3 GB on disk;  ready-made on Zenodo ({ZENODO_GB[16.0]:g} GB download)")
+    print(f"     16   ~3 GB on disk;  ready-made on Zenodo ({ZENODO_GB[16.0]:g} GB download); enough for most telescopes")
+    print(f"     18   ~11 GB on disk; ready-made on Zenodo ({ZENODO_GB[18.0]:g} GB download); for large apertures")
     print("     other limits are built from ESA's files (753 GB streamed, 1.5-2 h)")
     while True:
         k = input(f"   limit [Enter = {default:g}]: ").strip()
@@ -240,8 +285,8 @@ def catalog_target(gmax_arg, dir_arg):
     """(folder, gmax) for the Gaia build: --gmax / --dir, else the config. One folder holds one limit: a folder named
     gaia_dr3_g<N> is used only for G <= N, any other limit goes to its own gaia_dr3_g<gmax> (unless --dir)."""
     import re
-    cfg_dir = getattr(config, "gaia_local_dir", None) or "gaia_dr3_g18"
-    cfg_gmax = float(getattr(config, "gaia_local_gmax", 18.0))
+    cfg_dir = getattr(config, "gaia_local_dir", None) or "gaia_dr3_g16"
+    cfg_gmax = float(getattr(config, "gaia_local_gmax", 16.0))
     gmax = cfg_gmax if gmax_arg is None else float(gmax_arg)
     m = re.fullmatch(r"gaia_dr3_g(\d+(?:\.\d+)?)", os.path.basename(os.path.normpath(cfg_dir)))
     fits = float(m.group(1)) == gmax if m else gmax == cfg_gmax
@@ -268,11 +313,13 @@ def main():
     ap.add_argument("--no-geoip", action="store_true", help="do not guess the site from the IP address")
     ap.add_argument("--workers", type=int, default=6, help="parallel Gaia downloads")
     ap.add_argument("--gmax", type=float, help="faintest Gaia G kept in the local catalog (default: config "
-                                               "gaia_local_gmax, 18); a new limit needs its own folder")
+                                               "gaia_local_gmax, 16); a new limit needs its own folder")
     ap.add_argument("--dir", help="catalog folder (default: config gaia_local_dir, or gaia_dr3_g<gmax> for another --gmax)")
     ap.add_argument("--source", choices=["auto", "zenodo", "esa"], default="auto",
                     help="catalog from Zenodo (ready-made, G <= 16 or 18) or built from ESA's files; auto asks")
     ap.add_argument("--keep-archive", action="store_true", help="keep the downloaded Zenodo .tar.xz")
+    ap.add_argument("--home", metavar="FOLDER", help="use FOLDER as the data folder from now on (saved as a setting; "
+                                                     "files are not moved)")
     a = ap.parse_args()
     if a.status:
         show_status(catalog_target(a.gmax, a.dir)[0] if (a.gmax is not None or a.dir) else None)
@@ -287,7 +334,7 @@ def main():
         st = gaia.status(d)
         if not st["complete"] and a.gmax is None and sys.stdin.isatty():   # new catalog: ask its limit first
             print("2. local Gaia catalog")
-            ask = st["gmax"] if st["total"] else (gmax if gmax in gaia.ZENODO_GMAX else 18.0)
+            ask = st["gmax"] if st["total"] else (gmax if gmax in gaia.ZENODO_GMAX else 16.0)
             d, gmax = catalog_target(ask_gmax(ask), a.dir)
             st = gaia.status(d)
             print(f"   G <= {gmax:g} in {d}")
@@ -323,7 +370,7 @@ def main():
             print("   ok")
         except (OSError, RuntimeError, ValueError, KeyError) as e:  # network (requests' errors are OSErrors), disk
             sys.exit(network_failure(e, d, src if gmax in gaia.ZENODO_GMAX else None))
-        if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 18.0)):
+        if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 16.0)):
             print(f"\n   To search with this catalog, set in pyoccult_config.py:\n"
                   f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")
     print()

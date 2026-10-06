@@ -7,8 +7,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - Layout (since 2026-10-06): PEP 621 package, src layout like PyMovie/PyOTE. `pyproject.toml` (setuptools, version
   from `pyoccult.version`, dependencies, entry point `pyoccult = pyoccult.__main__:main`); code in `src/pyoccult/`
   (paths below are relative to `src/`); install `pip install -e .` (later: uv). Imports are `from pyoccult import x`,
-  never file paths. `pyoccult/home.py`: `HOME` = data folder (env `PYOCCULT_HOME`, else the checkout root with
-  pyproject.toml, else cwd) and `PKG` (package dir: logo, `data/ne_110m_earth.json`, `templates/`). Every command
+  never file paths. `pyoccult/home.py`: `HOME` = data folder, first match: env `PYOCCULT_HOME`; the saved setting
+  `home.POINTER` (Linux `~/.config/pyoccult/home`, macOS `~/Library/Application Support/PyOccult/home`, Windows
+  `%APPDATA%\PyOccult\home`; written by `pyoccult setup --home <dir>` or setup's first-run question); the checkout
+  root (pyproject.toml); else `~/PyOccult` (`home.SOURCE` says which; stdlib only, no platformdirs). The dispatcher
+  creates HOME except for `setup`, which chooses it first (`choose_home`, module level, before config). `PKG` (package dir: logo, `data/ne_110m_earth.json`, `templates/`). Every command
   chdirs to HOME, so data paths in the config stay relative (kernels, catalogs, sites.py, maps/, picks/, ...).
   `pyoccult/__main__.py`: dispatcher `pyoccult [command] ...` (no command = GUI; `COMMANDS` maps names to modules).
   It imports the module and calls `main()`, so functions sent to spawn workers (pick, gaia build) pickle as

@@ -7,6 +7,10 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 ## [Unreleased]
 
 ### Changed
+- Default Gaia catalog G <= 16 (`gaia_dr3_g16`, 2.1 GB download, ~3 GB on disk; enough for most amateur
+  telescopes): template `gaia_local_dir`/`gaia_local_gmax`, setup's limit question (Enter = 16) and the pick's
+  default catalog. Before, the template capped the star limit at G 13 (`gaia_local_gmax = 13.0`). G 18 stays
+  available (`pyoccult setup --gmax 18`). Your own `pyoccult_config.py` keeps its values.
 - **Standard Python package** (PEP 517/518/621, src layout as PyMovie and PyOTE use): `pyproject.toml` replaces
   `requirements.txt`; the code moved from the project root into `src/pyoccult/` with short module names
   (`pyoccult_pick.py` -> `pyoccult/pick.py`, `pyoccult.py` -> `pyoccult/search.py`, ...); imports are
@@ -33,6 +37,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- **Data folder setting** for installed copies (pip/uv without a clone): the first `pyoccult setup` asks where to keep
+  the data (Enter = `~/PyOccult`) and saves the choice in the system's settings folder (Linux
+  `~/.config/pyoccult/home`, macOS `~/Library/Application Support/PyOccult/home`, Windows `%APPDATA%\PyOccult\home`);
+  `pyoccult setup --home <folder>` changes it (for a clone too; files are not moved, setup says if the old folder
+  holds your data). A clone keeps using its own folder; `PYOCCULT_HOME` still sets it for one run. The folder in use
+  and why: `pyoccult setup --status`, the GUI's About box and start-up line.
 - Pick: the asteroid's H in `pick_events.csv`, the saved picks and the Pick tab table (the "H below" limit is the
   most common reason an asteroid is missing from a pick).
 - GUI Pick and Results tabs: a **CSV** button downloads the selected saved pick's events, or the search results

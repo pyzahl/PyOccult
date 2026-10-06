@@ -575,9 +575,9 @@ class BrightIndex:
 def default_dir():
     try:
         from pyoccult import config as C
-        return getattr(C, "gaia_local_dir", None), getattr(C, "gaia_local_gmax", 18.0)
+        return getattr(C, "gaia_local_dir", None), getattr(C, "gaia_local_gmax", 16.0)
     except ImportError:
-        return None, 18.0
+        return None, 16.0
 
 
 def main():
@@ -586,7 +586,7 @@ def main():
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("cmd", choices=["build", "status", "zenodo"])
     ap.add_argument("--dir", default=d0 or "gaia_dr3_local", help="catalog folder (default: config gaia_local_dir)")
-    ap.add_argument("--gmax", type=float, default=g0, help="faintest G kept (default: config gaia_local_gmax or 18)")
+    ap.add_argument("--gmax", type=float, default=g0, help="faintest G kept (default: config gaia_local_gmax or 16)")
     ap.add_argument("--workers", type=int, default=6, help="parallel download/parse processes")
     ap.add_argument("--keep-archive", action="store_true", help="zenodo: keep the downloaded .tar.xz")
     a = ap.parse_args()

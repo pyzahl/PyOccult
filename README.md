@@ -127,10 +127,21 @@ again (only when `pyproject.toml` gains a new package, run it once more). It als
 `pyoccult` alone starts the web interface, `pyoccult <command>` runs a tool (`pyoccult --help` lists them; options
 as before). Without activating the environment, use `.venv/bin/pyoccult` (Windows: `.venv\Scripts\pyoccult`).
 
-Your files live in the PyOccult folder (the data folder; set `PYOCCULT_HOME` to use another one): `sites.py` (your
+**Your data folder.** All your files live in one folder: `sites.py` (your
 sites), `pyoccult_config.py` (run settings; created from `src/pyoccult/templates/pyoccult_config.py` on first use,
 settings it lacks keep the template's default), the SPICE kernels, the Gaia catalogs, `picks/`, `favorites/`,
-`maps/` and the results. None of them are in git.
+`maps/` and the results. None of them are in git. Which folder:
+
+* a clone (as above): the PyOccult folder itself;
+* an installed copy (later via `pip`/`uv` without a clone): the folder you choose at the first `pyoccult setup`
+  (Enter = `~/PyOccult`, a normal folder in your home directory). The choice is saved in your system's settings
+  folder (Linux `~/.config/pyoccult/home`, macOS `~/Library/Application Support/PyOccult/home`, Windows
+  `%APPDATA%\PyOccult\home`);
+* `pyoccult setup --home <folder>` chooses another folder from now on, for a clone too (files are not moved; setup
+  tells you if the old folder holds data of yours);
+* `PYOCCULT_HOME=<folder>` for a single run.
+
+`pyoccult setup --status`, the GUI's About box and the GUI's start-up line show the folder in use and why.
 
 ## 4. One-time data setup
 
@@ -141,18 +152,20 @@ The Gaia catalog can be installed two ways, with the same result:
 
 * **zenodo** (recommended): download the ready-made catalog from Zenodo,
   [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it contains). Setup checks its SHA-256 and
-  unpacks it. Available for G <= 18 (`gaia_dr3_g18.tar.xz`, 8.2 GB) and G <= 16 (`gaia_dr3_g16.tar.xz`, 2.1 GB).
+  unpacks it. Available for G <= 16 (`gaia_dr3_g16.tar.xz`, 2.1 GB, the default) and G <= 18 (`gaia_dr3_g18.tar.xz`,
+  8.2 GB).
 * **esa**: build it yourself from ESA's Gaia DR3 bulk files. Takes much longer, but works for any magnitude limit.
 
 **What you need**
 
-| | Kernels | Gaia catalog G <= 18, zenodo | Gaia catalog G <= 18, esa | Bright-star index |
-|---|---|---|---|---|
-| Download | ~120 MB | 8.2 GB | 753 GB (streamed, not stored) | none (built from the catalog) |
-| Disk | ~120 MB | ~11 GB (~20 GB while unpacking) | ~11 GB | ~1.3 GB |
-| Time | a minute | download time + ~5 min to check and unpack | 1.5-2 h at ~1.4 Gbit/s, longer on slower lines | ~30 s |
+| | Kernels | Gaia catalog G <= 16 (default), zenodo | Gaia catalog G <= 18, zenodo | Gaia catalog, esa | Bright-star index |
+|---|---|---|---|---|---|
+| Download | ~120 MB | 2.1 GB | 8.2 GB | 753 GB (streamed, not stored) | none (built from the catalog) |
+| Disk | ~120 MB | ~3 GB (~5 GB while unpacking) | ~11 GB (~20 GB while unpacking) | ~3 GB (G 16), ~11 GB (G 18) | ~1.3 GB |
+| Time | a minute | download time + ~2 min | download time + ~5 min to check and unpack | 1.5-2 h at ~1.4 Gbit/s, longer on slower lines | ~30 s |
 
-For G <= 16 everything is about a quarter of that (2.1 GB download, ~3 GB disk). Also needed: `curl` (for the kernels)
+G 16 suits most amateur telescopes (a 25-30 cm telescope with a video camera reaches about G 15-16); take G 18 for
+large apertures or long exposures. Also needed: `curl` (for the kernels)
 and a few GB of free RAM while the index is built.
 
 **Before you start**: your observing site goes into `sites.py` (see "Observing sites" below). If it does not exist
@@ -163,9 +176,11 @@ APPROXIMATE in `sites.py`, and `--status` keeps warning until you replace it wit
 a shadow can be only a few km wide). Without a terminal, setup copies `src/pyoccult/templates/sites_example.py` instead. Also check these in
 `pyoccult_config.py`:
 
-* `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free
-  (~22 GB while the Zenodo archive is unpacked; the archive is saved next to the folder and deleted afterwards).
-* `gaia_local_gmax`: faintest star kept (default 18). Fainter stars are never searched; 18 suits most small telescopes.
+* `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g16` in the data folder). Pick a disk with ~5 GB free
+  for G 16, ~22 GB for G 18 (while the Zenodo archive is unpacked; it is saved next to the folder and deleted
+  afterwards).
+* `gaia_local_gmax`: faintest star kept (default 16). Fainter stars are never searched; it also caps the site's star
+  limit, so set it to the catalog you have (18 with `gaia_dr3_g18`).
   A different value needs a new folder (`--gmax`, see below).
 * `cache_path`: where the smaller caches go (asteroid orbits, SBDB data). Defaults to `/dev/shm` on Linux (RAM, emptied
   on reboot) and to the system temp folder elsewhere.
@@ -178,14 +193,14 @@ pyoccult setup --source zenodo   # catalog from Zenodo without asking (G <= 16 o
 pyoccult setup --source esa      # build the catalog from ESA's files without asking
 pyoccult setup --no-gaia    # kernels only (e.g. to try the old "windows" search mode)
 pyoccult setup --status     # what is installed
-pyoccult setup --gmax 16    # a smaller catalog to G 16 (own folder gaia_dr3_g16, ~3 GB); --dir to choose the folder
+pyoccult setup --gmax 18    # the larger catalog to G 18 (own folder gaia_dr3_g18, ~11 GB); --dir to choose the folder
 ```
 
-The catalog limit defaults to `gaia_local_gmax` (18). Another limit with `--gmax` is built in its own folder
+The catalog limit defaults to `gaia_local_gmax` (16). Another limit with `--gmax` is built in its own folder
 (`gaia_dr3_g<limit>`, or `--dir`); setup then prints the two lines to set in `pyoccult_config.py` (`gaia_local_dir`,
 `gaia_local_gmax`) so the search uses it. Stars fainter than the catalog limit are never searched.
 
-In a terminal, setup first asks for the catalog's limit (Enter = 18; `--gmax` skips the question), and names the
+In a terminal, setup first asks for the catalog's limit (Enter = 16; `--gmax` skips the question), and names the
 folder after it (`gaia_dr3_g<limit>`). Where the catalog comes from (`--source`, default `auto`): in a terminal, setup
 then asks, and Enter takes Zenodo. Without
 a terminal it takes Zenodo. It builds from ESA's files when the limit is not 16 or 18, or when an interrupted ESA
@@ -381,7 +396,7 @@ for s in home field; do PYOCCULT_SITE=$s pyoccult pick -o pick_$s.csv --targets-
 | `star_parallax`, `light_deflection` | `True`, `True` | astrometric corrections of the star: seen from the Earth (Gaia parallax), and the light bending by Sun, Jupiter and Saturn (ABOUT.md Part 6). Off reproduces the results before 0.10.0 |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
 | `corridor_step_s` | `600` | path step of the corridor candidate scan, s |
-| `gaia_local_dir`, `gaia_local_gmax` | `"gaia_dr3_g18"`, `18.0` | local Gaia catalog folder and its faintest G (see "Local Gaia catalog"); the environment variable `PYOCCULT_CATALOG=<folder>` chooses another catalog for one run |
+| `gaia_local_dir`, `gaia_local_gmax` | `"gaia_dr3_g16"`, `16.0` | local Gaia catalog folder and its faintest G (see "Local Gaia catalog"); the environment variable `PYOCCULT_CATALOG=<folder>` chooses another catalog for one run |
 
 **Observer**
 

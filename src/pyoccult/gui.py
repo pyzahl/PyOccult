@@ -11,6 +11,7 @@ not changed. Saving a site rewrites sites.py (comments in it are not kept).
 from pyoccult.version import __version__, __codename__, __author__, __copyright__, __license__, __url__
 import argparse, asyncio, csv, json, math, os, pprint, runpy, sys, time
 
+from pyoccult import home
 from pyoccult.home import HOME as ROOT, PKG                      # ROOT: the data folder (sites.py, maps/, ...)
 os.chdir(ROOT)
 from nicegui import app, run, ui
@@ -156,6 +157,8 @@ def index():
                  "NumPy, SciPy, pandas \u00b7 reference predictions: Occult (D. Herald) and Occult Watcher Cloud "
                  "(H. Pavlov) \u00b7 the IOTA community \u00b7 developed with the help of Claude (Anthropic) via "
                  "Claude Code. Full references: README.md.").classes("text-xs text-slate-600")
+        ui.label(f"Data folder: {home.describe()}. Change it with: pyoccult setup --home <folder>").classes(
+            "text-xs text-slate-600 mt-2")
         ui.label(f"{__copyright__}. Free software under the GNU GPL v3 or later ({__license__}); no warranty. "
                  "Gaia data: CC BY-NC 3.0 IGO.").classes("text-xs text-slate-600 mt-2")
         with ui.row().classes("w-full items-center justify-between mt-2"):
@@ -825,6 +828,7 @@ def main():
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
+    print(f"PyOccult {__version__}, data folder: {home.describe()}")
     from pyoccult import config
     os.makedirs(config.map_dir, exist_ok=True)
     app.add_static_files("/out/maps", os.path.join(ROOT, config.map_dir), max_cache_age=0)

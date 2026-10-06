@@ -13,7 +13,9 @@
     pyoccult run <command> '<json>'  a search or pick with settings overridden for this run (used by the GUI)
 
 `pyoccult <command> --help` shows a command's options. Also: python -m pyoccult <command> ...
-Every command runs in the data folder (pyoccult.home.HOME; set PYOCCULT_HOME to use another one).
+Every command runs in the data folder: a checkout's project folder, else the folder chosen at the first
+`pyoccult setup` (default ~/PyOccult; change it with `pyoccult setup --home <folder>`), or PYOCCULT_HOME for one run.
+`pyoccult setup --status` shows which one is used.
 """
 import importlib, os, runpy, sys
 
@@ -25,8 +27,10 @@ SCRIPTS = {"search"}            # not import-safe (sets up SPICE at import): exe
 
 def run(command, args):
     """Run one command with its arguments, in the data folder."""
-    from pyoccult.home import HOME
-    os.chdir(HOME)
+    from pyoccult import home
+    if command != "setup":                                    # setup chooses the data folder itself (first run, --home)
+        os.makedirs(home.HOME, exist_ok=True)
+        os.chdir(home.HOME)
     module = f"pyoccult.{COMMANDS[command]}"
     sys.argv = [f"pyoccult {command}"] + list(args)
     if command in SCRIPTS:
