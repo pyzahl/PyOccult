@@ -244,13 +244,50 @@ reports how far below the limit the star is.
 ### 3.4 Bright-star index: `BrightIndex`
 
 All catalog stars with G <= 15 (32.4 M, 1.3 GB), sorted by a 0.25 deg sky cell and, within a cell, by magnitude, so a
-lookup with a bright cap reads only the bright end of each cell. Built once from the catalog (~30 s), opened
-memory-mapped. A lookup takes 5-50 ms.
+lookup with a bright cap reads only the bright end of each cell. Built once from the catalog (~30-70 s), opened
+memory-mapped. A lookup takes 5-50 ms. A star limit above G 15 needs a deeper index, in whole magnitudes
+(`bright_G16.0.v2.npy`: ~90 M stars, ~3.7 GB; G 18 would be the whole catalog again, ~11 GB). The pick builds a
+missing one once, in the main process before the workers start, with little memory: it counts the stars per cell,
+writes each catalog file's stars into their cell's slots of a memory-mapped file and then sorts each cell by G, a
+block at a time (peak about one catalog file or block, not the whole index).
 
 ### 3.5 Speed and output
 
 465k asteroids (H < 17) over 8 days: 875 s in one process, 318 s with 4 worker processes (each loads its own SPICE
-kernels). Output: `pick_events.csv`, a ranked table (brightest star first by default) and `targets.py` with the
+kernels).
+
+**Memory.** Each worker screens the asteroids in chunks of 2000. For a chunk it holds, for every asteroid and every
+10-minute step of the window (144 per day), its barycentric position and velocity, its direction and distance from
+the Earth, its heliocentric vector, phase angle, shadow speed and visibility: about 200 bytes per asteroid and step.
+So, per worker:
+
+| part | size | grows with |
+|---|---|---|
+| Python, SPICE kernels, pandas | ~0.5 GB | fixed |
+| chunk arrays | ~55-60 MB per day of window | days (linear) |
+| stars near one asteroid's path | small, temporary | path length (days) and star limit (~2.5-3x per magnitude) |
+
+That is about 0.7 GB per worker for 3 days, 1.6-2 GB for 20 days, ~4 GB for 60 days; the total is that times the
+number of workers (seen: 4 workers at ~1.9 GB each). Rule of thumb, to stay out of swap:
+workers x (0.5 GB + 55 MB x days) well below the free memory.
+
+* **H limit**: almost no effect on memory, only on time. More asteroids are more chunks, and a worker handles one
+  chunk at a time. Only the main process grows a little with the asteroid list (well under 1 GB, even for all
+  numbered asteroids).
+* **Star limit (G)**: mostly shared memory. The bright-star index is memory-mapped, so the workers share it in the
+  file cache (it shows as SHR in `top`, and the system can free it): 1.3 GB for G <= 15, ~3.7 GB for G <= 16. Per
+  asteroid, the list of stars near its path grows ~2.5-3x per magnitude, but it is temporary and small next to the
+  chunk arrays.
+* **Days**: the per-worker chunk arrays (above) and longer star lists. For long windows use fewer workers, or split
+  the window into several picks (each is saved and reused by searches).
+
+**CPU.** NumPy's linear algebra may run several threads of its own in each worker. With many workers that
+oversubscribes the CPU (seen: load 18 on 8 threads, single workers at 320 %), which costs time rather than gaining
+it. One math thread per worker is usually faster:
+`OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 python pyoccult_gui.py` (or before `pyoccult_pick.py`).
+Workers up to the number of physical cores; the GUI default is half the logical CPUs.
+
+Output: `pick_events.csv`, a ranked table (brightest star first by default) and `targets.py` with the
 asteroids of the best events; their size data goes to the shared size cache.
 
 ### 3.6 Saved picks: `pyoccult_picks.py`

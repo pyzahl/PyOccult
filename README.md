@@ -483,6 +483,13 @@ How it works:
 
 Speed: 465k asteroids (H < 17) over 8 days in about 5 minutes with 4 worker processes (`--workers`).
 
+Memory: per worker about 0.5 GB plus ~55-60 MB per day of the window, so workers x (0.5 GB + 55 MB x days) should
+stay well below your free memory (4 workers x 20 days: ~8 GB). The H limit costs time, not memory; the star limit
+mainly adds shared, memory-mapped index pages (1.3 GB for G <= 15, ~3.7 GB for G <= 16). For long windows use fewer
+workers or split the window. If `top` shows single workers far above 100 % CPU, NumPy runs extra threads in each:
+start with `OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1` for one per worker (usually faster). Details:
+ABOUT.md, section 3.5.
+
 Output:
 
 * a ranked table of the events, and `pick_events.csv` with all of them (time, star, magnitude, drop, duration,
