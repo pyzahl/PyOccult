@@ -137,6 +137,11 @@ def earth_pck_text(e, run):
     return txt + f"; this window ({w0.isoformat()} to {w1}) uses {part}"
 
 
+def size_estimated(e):
+    """True if the event's asteroid size comes from H with an assumed albedo (no measured diameter)."""
+    return str(e.get("size_src") or "").lower().startswith("h only")
+
+
 def asteroid_label(target_id, name):
     """'218001 (2001 XQ72)' -> '(218001) 2001 XQ72';  '4272 Entsuji (1977 EG5)' -> '(4272) Entsuji'."""
     name = (name or "").strip()
@@ -342,6 +347,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .badge{display:inline-block;padding:0 8px;border-radius:99px;font-size:.78rem}
 .in{background:var(--in-bg);color:var(--in-ink)}.near{background:var(--near-bg);color:var(--near-ink)}
 a{color:var(--accent)}
+sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
 .notes{color:var(--muted);font-size:.85rem;margin-top:16px}
 .notes li{margin:3px 0}
 .empty{padding:28px;text-align:center;color:var(--muted)}
@@ -636,7 +642,10 @@ def html_row(e):
     return (
         lead +
         f'<td data-s="{esc(e["tid"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
-        f'target="_blank" rel="noopener">{esc(e["label"])}</a></td>' + mid +
+        f'target="_blank" rel="noopener">{esc(e["label"])}</a>'
+        + (f'<sup class="est" title="Size estimated from H with an assumed albedo: diameter, duration and shadow width '
+           f'are uncertain by a factor of about 1.7 (no measured diameter in SBDB)">*</sup>' if size_estimated(e) else '')
+        + '</td>' + mid +
         f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)"'
         + (f' class="evtime" data-utc="{(e["when"] + timedelta(milliseconds=500)).strftime("%Y-%m-%dT%H:%M:%SZ")}" '
            f'data-tz="{esc((e.get("site") or {}).get("tz") or "")}"' if f else "")
@@ -706,6 +715,7 @@ def to_html(events, meta):
 {table}
 <ul class="notes">
 <li>Star magnitude is Gaia G. The drop assumes the star is fully covered and ignores the star's angular size and diffraction, so bright stars and very small bodies can show a smaller real drop.</li>
+<li><b>*</b> after an asteroid: no measured diameter; its size is estimated from H with an assumed albedo, so diameter, duration and shadow width are uncertain by a factor of about 1.7 (typical for small asteroids, H above ~15).</li>
 <li>Offset is the observer's distance from the shadow centre line in the fundamental plane. "Inside" means within the shadow radius; otherwise it is the gap to the shadow edge. Radius comes from the size lookup (hover the asteroid name).</li>
 <li>Altitude is the star's altitude at closest approach. The Moon is shown only while above the horizon. Click a column heading to sort.</li>
 <li>Map shows the path on an interactive map (needs internet for the map tiles) and links the closest centre-line point in Google Maps. Google Maps itself cannot load a local KML file: use the KML link with Google Earth, or import it in My Maps (Create a new map, then Import).</li>
@@ -731,8 +741,12 @@ def to_markdown(events, meta):
             off = f"{e['miss']:.1f} km" + (f" ({e['margin']:.1f} outside)" if e["margin"] is not None else "")
         kml = " ".join(x for x in (f"[KML]({e['kml']})" if e["kml"] else "", f"[Preview]({e['preview']})"
                                    if e.get("preview") else "") if x) or "—"
-        out.append(f"| {e['label']} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])} | {fmt(e['dur'])} "
+        star = " \\*" if size_estimated(e) else ""                      # size from H only (footnote)
+        out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])} | {fmt(e['dur'])} "
                    f"| {alt_text(e)} | {moon_text(e)} | {off} | {fmt(e['calc'])} | {kml} |")
+    if any(size_estimated(e) for e in events):
+        out.append("\n\\* size estimated from H with an assumed albedo (no measured diameter): diameter, duration and "
+                   "shadow width uncertain by a factor of about 1.7.")
     return "\n".join(out) + "\n"
 
 

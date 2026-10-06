@@ -249,6 +249,17 @@ def catalog_target(gmax_arg, dir_arg):
     return d, gmax
 
 
+def network_failure(e, d, source):
+    """Message for a failed catalog step (no traceback): what failed, the likely cause, how to go on."""
+    other = {"zenodo": "--source esa (build from ESA's files)", "esa": "--source zenodo (ready-made, G <= 16 or 18)"}
+    return (f"\n   catalog step failed: {type(e).__name__}: {str(e)[:300]}\n"
+            f"   Likely: offline, the server is down, or a proxy/firewall blocks the address (see pyoccult_urls.py).\n"
+            f"   - behind a proxy: export https_proxy=http://<proxy>:<port>  (and HTTPS_PROXY), then rerun\n"
+            f"   - rerun later: setup resumes, files already in {d} are kept\n"
+            + (f"   - or try the other source: python pyoccult_setup.py {other[source]}\n" if source in other else "")
+            + "   - or copy a finished catalog folder from another computer (gaia_dr3_g16 / gaia_dr3_g18)")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
@@ -268,7 +279,8 @@ if __name__ == "__main__":
         sys.exit(0)
     print("1. SPICE kernels")
     if not download_kernels(config.earth_pck_max_age):
-        sys.exit("kernel download failed")
+        sys.exit("kernel download failed (see above); rerun setup when the address is reachable, or copy the kernel "
+                 "files (*.tls, *.bsp, *.tpc, *.bpc) from another computer into this folder")
     d = None
     if not a.no_gaia:
         d, gmax = catalog_target(a.gmax, a.dir)
@@ -296,15 +308,21 @@ if __name__ == "__main__":
             shutil.rmtree(d)
             print(f"   deleted {d}")
             st = gaia.status(d)
-        if st["complete"]:
-            print("   complete")
-        elif catalog_source(a.source, d, gmax, st) == "zenodo":
-            gaia.fetch_zenodo(d, gmax, a.keep_archive)
-        else:
-            gaia.build(d, gmax, a.workers)
-        print("3. bright-star index")
-        gaia.BrightIndex(d, index_limit(d))
-        print("   ok")
+        src = None
+        try:
+            if st["complete"]:
+                print("   complete")
+            elif (src := catalog_source(a.source, d, gmax, st)) == "zenodo":
+                gaia.fetch_zenodo(d, gmax, a.keep_archive)
+            else:
+                gaia.build(d, gmax, a.workers)
+            if not gaia.status(d)["complete"]:
+                sys.exit(f"\n   catalog {d} is not complete yet: rerun setup to resume (nothing is lost)")
+            print("3. bright-star index")
+            gaia.BrightIndex(d, index_limit(d))
+            print("   ok")
+        except (OSError, RuntimeError, ValueError, KeyError) as e:  # network (requests' errors are OSErrors), disk
+            sys.exit(network_failure(e, d, src if gmax in gaia.ZENODO_GMAX else None))
         if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 18.0)):
             print(f"\n   To search with this catalog, set in pyoccult_config.py:\n"
                   f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")

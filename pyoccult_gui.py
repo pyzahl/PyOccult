@@ -76,17 +76,28 @@ async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
         env["PYOCCULT_SITE"] = env_site
     if env_catalog:
         env["PYOCCULT_CATALOG"] = env_catalog
-    log.push(f"$ {' '.join(args)}" + (f"   (site {env_site})" if env_site else "")
-             + (f"   (catalog {env_catalog})" if env_catalog else ""))
+    def push(text):
+        # the page can be gone (browser closed, reloaded or stalled past the reconnect timeout): keep going without it,
+        # and keep reading the output, or the process blocks on a full pipe and stays "in progress" forever
+        try:
+            log.push(text)
+        except RuntimeError:
+            pass
+
+    push(f"$ {' '.join(args)}" + (f"   (site {env_site})" if env_site else "")
+         + (f"   (catalog {env_catalog})" if env_catalog else ""))
     t0 = time.time()
     Job.proc = await asyncio.create_subprocess_exec(*args, cwd=ROOT, env=env, stdout=asyncio.subprocess.PIPE,
                                                    stderr=asyncio.subprocess.STDOUT)
     async for line in Job.proc.stdout:
-        log.push(line.decode(errors="replace").rstrip())
+        push(line.decode(errors="replace").rstrip())
     rc = await Job.proc.wait()
-    log.push(f"--- finished with exit code {rc} in {time.time() - t0:.0f} s")
+    push(f"--- finished with exit code {rc} in {time.time() - t0:.0f} s")
     if on_done:
-        await on_done(rc)
+        try:
+            await on_done(rc)
+        except RuntimeError:                                     # page gone: results stay in their files (picks/, ...)
+            pass
     return rc
 
 
@@ -115,6 +126,7 @@ def index():
         import pyoccult_gaia_local as gaia_local
         found = gaia_local.find_catalogs(ROOT)
         complete = {d for d, g, ok, _ in found if ok}
+        cat_gmax = {d: float(g) for d, g, ok, _ in found if g is not None}
         cats = {d: f"{d} (G \u2264 {g:g})" + ("" if ok else f", incomplete {gaia_local.status(os.path.join(ROOT, d))['done']}"
                                                          f"/{gaia_local.status(os.path.join(ROOT, d))['total']}")
                 for d, g, ok, _ in found}
@@ -239,13 +251,22 @@ def index():
         with ui.tab_panel(t_pick):
             site_note_p = ui.label().classes("text-sm text-slate-600")
             with ui.row().classes("items-end gap-4"):
-                p_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date")
-                p_days = ui.number("Days", value=config.days, min=1, step=1)
-                p_hmax = ui.number("H below", value=getattr(config, "pick_hmax", 17.0), step=0.5)
+                p_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date").classes("w-36")
+                p_days = ui.number("Days", value=config.days, min=1, step=1).classes("w-28")
+                p_mag = ui.number("Star G limit", step=0.1, min=6, max=21).classes("w-28").tooltip(
+                    "Faintest star (Gaia G) searched. Default: from the site's telescope (aperture, detection "
+                    "frames, longest exposure, MagAdjust; Site tab), capped at the catalog's limit; change it for one "
+                    "pick run. Above G 15 the first pick builds a deeper star index once (a few minutes)")
+                p_hmax = ui.number("H below", value=getattr(config, "pick_hmax", 17.0), step=0.5).classes(
+                    "w-28").tooltip(
+                    "Only asteroids with H below this are screened (fainter H = smaller asteroids; more asteroids "
+                    "take longer). An asteroid with a larger H is never found by the pick, but the search finds it if "
+                    "you enter its number")
                 p_all = ui.checkbox("All numbered (slow)")
-                p_top = ui.number("Targets (top)", value=40, min=1, step=5)
-                p_workers = ui.number("Workers", value=max(1, (os.cpu_count() or 2) // 2), min=1, step=1)
-                p_sort = ui.select(["mag", "date", "margin", "drop"], value="mag", label="Rank by")
+                p_top = ui.number("Targets (top)", value=40, min=1, step=5).classes("w-28")
+                p_workers = ui.number("Workers", value=max(1, (os.cpu_count() or 2) // 2), min=1, step=1).classes(
+                    "w-28")
+                p_sort = ui.select(["mag", "date", "margin", "drop"], value="mag", label="Rank by").classes("w-28")
             with ui.row():
                 ui.button("Run pick", on_click=lambda: run_pick()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
@@ -254,10 +275,12 @@ def index():
                 ui.button("Use for search", on_click=lambda: use_saved()).props("outline").tooltip(
                     "Set the search window to this pick's window and go to the Search tab")
                 ui.button("Reload", on_click=lambda: load_pick()).props("flat dense")
+                ui.button("CSV", on_click=lambda: pick_csv()).props("outline dense").tooltip(
+                    "Download the selected pick's events as a CSV table (all columns of pick_events.csv)")
             pick_info = ui.label().classes("text-sm text-slate-600 w-full")
             targets_info = ui.label().classes("text-sm text-slate-600 w-full")
             cols = [dict(name=k, label=lbl, field=k, sortable=True, align="left") for k, lbl in
-                    (("target", "Target"), ("number", "#"), ("name", "Asteroid"), ("utc", "UT"),
+                    (("target", "Target"), ("number", "#"), ("name", "Asteroid"), ("H", "H"), ("utc", "UT"),
                      ("star_mag", "G"), ("drop", "Drop"), ("dur_s", "Dur (s)"), ("mag_margin", "Margin"),
                      ("miss_km", "Miss (km)"), ("star_alt", "Alt"))]
             p_table = ui.table(columns=cols, rows=[], row_key="key", pagination=15).classes("w-full")
@@ -267,6 +290,8 @@ def index():
             with ui.row().classes("items-center"):
                 ui.button("Rebuild report", on_click=lambda: build_report()).props("outline")
                 ui.link("Open in a new tab", "/out/hits_report.html", new_tab=True)
+                ui.button("CSV", on_click=lambda: hits_csv()).props("outline dense").tooltip(
+                    "Download the search results (hits_log.csv: every event with all its columns)")
                 ui.checkbox("KStars: set its location to the event site", value=KSTARS_OPT["set_location"],
                             on_change=lambda e: KSTARS_OPT.update(set_location=bool(e.value))).tooltip(
                     "The report's KStars buttons (Linux, KStars running). Off: KStars keeps its location; "
@@ -313,6 +338,7 @@ def index():
                     f_title = ui.label().classes("text-lg font-semibold")
                     f_facts = ui.label().classes("text-sm text-slate-600")
                     f_size = ui.label().classes("text-sm text-slate-600")
+                    f_shape = ui.label().classes("text-sm text-slate-600")
                     with ui.row().classes("items-end gap-4"):
                         f_status = ui.select(list(favorites.STATUSES), label="Status").classes("w-40")
                         f_kml = ui.link("KML (ground track)", "#")
@@ -369,10 +395,15 @@ def index():
         s["sensor_mm"] = (float(fields["sensor_w_mm"].value or 5.6), float(fields["sensor_h_mm"].value or 3.2))
         return s
 
+    def pick_mag_default(s):
+        """Faintest star for the pick: the site's telescope limit, capped at the selected catalog's G limit."""
+        return round(min(mag_limit(s), cat_gmax.get(cat_sel.value, 18.0)), 1)
+
     def update_derived(*_):
         s = collect()
         unsaved.text = "" if saved_site(state["name"]) == effective(s, state["name"]) else "unsaved changes"
         w, h = fov(s)
+        p_mag.value = pick_mag_default(s)
         derived.text = (f"Stars searched to G {mag_limit(s):.1f} · camera field {w:.1f}′ × {h:.1f}′ "
                         f"(focal {s.get('focal_mm') or 100 * s.get('aperture_cm', 25):.0f} mm)")
 
@@ -510,6 +541,7 @@ def index():
         unsaved.text = ""
 
     sel.on_value_change(lambda e: show_site(e.value) if e.value in sites else None)   # None while options change
+    cat_sel.on_value_change(lambda e: setattr(p_mag, "value", pick_mag_default(collect())))   # catalog limit
     show_site(state["name"])
 
     # ------------------------------------------------ runs
@@ -575,9 +607,11 @@ def index():
                 with open(p["csv"]) as f:
                     rows = list(csv.DictReader(f))
             for r in rows:
-                for k in ("star_mag", "drop", "dur_s", "mag_margin", "miss_km", "star_alt"):
+                for k in ("H", "star_mag", "drop", "dur_s", "mag_margin", "miss_km", "star_alt"):
                     r[k] = f"{float(r[k]):.2f}" if r.get(k) else ""
                 r["key"] = f"{r.get('number')}_{r.get('utc')}"
+                if str(r.get("D_est")).lower() == "true":                # size from H only (see the report note)
+                    r["name"] = f"{r.get('name', '')} *"
                 r["target"] = "\u2713" if str(r.get("number")) in p["targets"] else ""
             pick_info.text = f"{picks.describe(p)}: {len(rows)} events ({p['csv']})"
             targets_info.text = ("Targets: " + ", ".join(p["targets"][:60]) + (" ..." if len(p["targets"]) > 60 else ""))
@@ -595,6 +629,20 @@ def index():
         n = show_saved()
         saved_info()
         return n
+
+    def pick_csv():
+        p = next((p for p in saved_list if p["py"] == p_saved.value), None)
+        if p is None or not os.path.isfile(p["csv"]):
+            ui.notify("No saved pick with a CSV selected", type="warning")
+            return
+        ui.download(p["csv"], os.path.basename(p["csv"]))
+
+    def hits_csv():
+        path = os.path.join(ROOT, config.hits_output_cvs_file)
+        if not os.path.isfile(path):
+            ui.notify("No search results yet (run a search)", type="warning")
+            return
+        ui.download(path, os.path.basename(path))
 
     def use_saved():
         p = next((p for p in saved_list if p["py"] == p_saved.value), None)
@@ -641,6 +689,7 @@ def index():
                         f"mag · max {float(r.get('max_duration_s') or 0):.2f} s · miss {float(r.get('min_distance') or 0):.1f} km · "
                         f"added {e.get('added', '')[:16].replace('T', ' ')} UT")
         f_size.text = "size: " + (favorites.size_text(e) or "not recorded")
+        f_shape.text = "shape and rotation: " + (favorites.shape_text(e) or "not known (no SBDB data for this asteroid)")
         f_status.value, f_note.value = e.get("status", "planned"), e.get("note", "")
         f_img.set_visibility("svg" in files)
         if "svg" in files:
@@ -736,6 +785,8 @@ def index():
         args = [PY, "-u", "pyoccult_pick.py", "--start", p_start.value, "--days", str(int(p_days.value)),
                 "--top", str(int(p_top.value)), "--workers", str(int(p_workers.value)), "--sort", p_sort.value]
         args += ["--all"] if p_all.value else ["--hmax", str(p_hmax.value)]
+        if p_mag.value:
+            args += ["--cam-limit", f"{float(p_mag.value):g}"]
 
         async def done(rc):
             if rc == 0:
@@ -767,8 +818,8 @@ def main():
     app.add_static_file(local_file=os.path.join(ROOT, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
     import pyoccult_kstars                                      # report's KStars buttons (Linux; hidden elsewhere)
     os.makedirs(os.path.join(ROOT, favorites.DIR), exist_ok=True)
-    import pyoccult_sbdb                                        # size data for favorites added before it was kept
-    favorites.backfill_phys(lambda t: pyoccult_sbdb.get(t, config.cache_path)[0])
+    import pyoccult_sbdb                                        # full SBDB data (shape, rotation) for older favorites
+    favorites.backfill_phys(lambda t: pyoccult_sbdb.get_full(t, config.cache_path))
     favorites.backfill_globes(config.map_dir)                   # globe plots of later searches for older favorites
     favorites.backfill_timezones(geo.timezone)                  # site time zones (online, once per site)
     favorites.write_csv()
@@ -804,7 +855,7 @@ def main():
             return {"ok": False, "msg": f"event {tid} {utc[:19]} not found in {cfg.hits_output_cvs_file}"}
         import pyoccult_sbdb
         ok, msg = favorites.add(rec, pyoccult_report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir,
-                                sbdb=pyoccult_sbdb.get(tid, cfg.cache_path)[0])
+                                sbdb=pyoccult_sbdb.get_full(tid, cfg.cache_path))
         if ok:
             favorites.backfill_timezones(geo.timezone)          # the new favorite's site time zone (once per site)
         favorites.write_page()
@@ -823,7 +874,7 @@ def main():
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
                         strict=False, max_cache_age=0)
     ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(ROOT, "pyoccult_logo.svg"),
-           show=not a.no_browser, reload=False)
+           show=not a.no_browser, reload=False, reconnect_timeout=60)   # a busy browser keeps its page
 
 
 if __name__ in {"__main__", "__mp_main__"}:

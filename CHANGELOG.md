@@ -17,14 +17,45 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- Pick: the asteroid's H in `pick_events.csv`, the saved picks and the Pick tab table (the "H below" limit is the
+  most common reason an asteroid is missing from a pick).
+- GUI Pick and Results tabs: a **CSV** button downloads the selected saved pick's events, or the search results
+  (`hits_log.csv`).
+- GUI Pick tab: **Star G limit** (left of "H below"), the pick's star limit, computed from the site's telescope (as "Stars searched
+  to G" in the Site tab) and capped at the selected catalog; it can be changed for one run (`--cam-limit`). Before,
+  the GUI pick used the config's `MAG_MIN`, which `gaia_local_gmax` can cap lower than the site allows.
 - GUI Site tab: **Add as new site** next to the MPC list: adds what the map and form show as a new site to the site
   selector and saves it at once (it is then selected for all runs).
 - GUI Site tab: **Remove site** deletes the site selected at the top right from `sites.py` (asks first, saves at
   once; the last site cannot be removed; if it was the default for command-line runs, another site becomes it).
+- Results, Favorites and Pick tables: an **\*** after the asteroid name marks a size estimated from H with an
+  assumed albedo (no measured diameter; uncertain by a factor of about 1.7); hover text and a note below the table.
+- Favorites detail panel: a **shape and rotation** line (axes from SBDB `extent`, rotation period, pole, taxonomic
+  type) where SBDB has them. Favorites get SBDB's full per-object record once (`pyoccult_sbdb.get_full`; the pick
+  tool's bulk rows hold only size fields); older favorites when the GUI starts.
 - Site key `mpc_code` (the official MPC observatory code), a **MPC code** field in the GUI Site tab (filled in when
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- Pick tool with a star limit above G 15 (now easy to reach with the GUI's **Faintest star** field): the deeper
+  bright-star index it needs (`bright_G16.0.v2.npy`, ...) was built by every worker at once, each reading the whole
+  catalog into memory, so the system ran into swap and the browser stalled. The pick now builds a missing index once,
+  before starting workers, and the build is low-memory (three passes through a memory-mapped file; peak about one
+  catalog file or block instead of the whole index). Same index as before (checked on G <= 15: identical).
+- GUI: when the browser page was lost during a run (stalled, closed, reloaded), the GUI stopped reading the run's
+  output, so the process blocked and every later run was refused as "already in progress". Output is now read to the
+  end without the page (results still go to their files, e.g. `picks/`); the page reconnect timeout is 60 s.
+- Setup with an unreachable or blocked address (offline, server down, proxy or firewall): instead of a traceback it
+  stops with a message (the address, the proxy setting `https_proxy`, rerun to resume, the other catalog source,
+  copying files from another computer). Kernel downloads use `curl -f` into a `.part` file (before, a proxy's error
+  page or a broken download was saved as the kernel); a failed refresh of the Earth orientation file keeps the older
+  copy. The ESA build detects a proxy page instead of the file listing, skips a file that fails after its retries
+  (the rerun fetches it) and stops early when the first files all fail.
+- Pick tool: events near sunrise or sunset (or near the altitude limit) could be lost. A candidate was kept only if
+  the asteroid was visible at the sample of its Earth-centre time estimate, but the event at the site can be 10-40 min
+  from it (e.g. 539175 on 2026-10-09: estimate 06:00 UT with the Sun at +4 deg at Seewis, real event 05:26 UT with
+  the Sun at -1.6 deg). A candidate is now kept if the asteroid is visible anywhere in its solver window, as in the
+  search; the exact star and Sun altitude at the solved time are checked as before.
 - GUI Site tab: after picking a second MPC observatory, the proposed site name kept the first one, so **Add site**
   stored e.g. Trieste's position under "000 Greenwich"; the name now follows each pick (a name you typed is kept).
   Adding a site no longer overwrote its description with the site name.

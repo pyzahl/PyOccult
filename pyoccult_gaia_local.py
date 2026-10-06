@@ -132,13 +132,19 @@ def list_files(timeout=90):
         p = dict(prefix=PREFIX, delimiter="/")
         if marker:
             p["marker"] = marker
-        t = requests.get(BUCKET, params=p, timeout=timeout).text
+        r = requests.get(BUCKET, params=p, timeout=timeout)
+        r.raise_for_status()
+        t = r.text
         ks = re.findall(r"<Key>([^<]+)</Key>.*?<Size>(\d+)</Size>", t, re.S)
         out += [(k.rsplit("/", 1)[1], int(s)) for k, s in ks]
         if "<IsTruncated>true" in t and ks:
             marker = ks[-1][0]
         else:
-            return [(n, s) for n, s in out if n.startswith("GaiaSource_") and n.endswith(".csv.gz")]
+            files = [(n, s) for n, s in out if n.startswith("GaiaSource_") and n.endswith(".csv.gz")]
+            if not files:                     # e.g. a proxy's or portal's page instead of the listing
+                raise RuntimeError(f"no Gaia source files in the listing at {BUCKET} (got {len(t)} bytes that are "
+                                   f"not the file list: blocked by a proxy or firewall?)")
+            return files
 
 
 def _download(name, dst, tries=4):
@@ -214,25 +220,38 @@ def build(out_dir, gmax=18.0, workers=6):
     total_gb = sum(s for n, s in files if n in set(todo)) / 1e9
     print(f"{len(files)} source files, {len(todo)} to do ({total_gb:.0f} GB to download), G <= {gmax}, {workers} workers",
           flush=True)
-    t0, done, kept, seen = time.time(), 0, 0, 0
-    if workers <= 0:                                                    # serial (tests, debugging)
-        results = (process_file(n, out_dir, gmax) for n in todo)
-    else:
-        ex = ProcessPoolExecutor(max_workers=workers)
-        results = (f.result() for f in as_completed([ex.submit(process_file, n, out_dir, gmax) for n in todo]))
+    t0, done, kept, seen, failed = time.time(), 0, 0, 0, []
+    ex = ProcessPoolExecutor(max_workers=workers) if workers > 0 else None       # workers <= 0: serial (tests)
+    futs = {ex.submit(process_file, n, out_dir, gmax): n for n in todo} if ex else {}
     prog = Progress("ESA build", len(todo), fmt=lambda x: f"{x:.0f} files", rate=lambda r: f"{r * 60:.1f} files/min")
     prog(0, " (first files take a minute or two)", force=True)
-    for name, n_in, n_keep, dt in results:
-        done += 1
-        if n_in is not None:
-            seen, kept = seen + n_in, kept + n_keep
-        prog(done, f", {kept/1e6:.1f} M of {seen/1e6:.1f} M stars kept", force=done == len(todo))
+    stream = ((n, None) for n in todo) if ex is None else ((futs[f], f) for f in as_completed(futs))
+    try:
+        for name, fut in stream:
+            try:
+                _, n_in, n_keep, dt = process_file(name, out_dir, gmax) if fut is None else fut.result()
+            except Exception as e:                  # this file failed after its retries: go on, a rerun resumes it
+                failed.append(name)
+                print(f"\n   failed: {name}: {str(e)[:160]}", flush=True)
+                if len(failed) >= max(3, workers) and done == len(failed) - 1:
+                    raise RuntimeError(f"the first {len(failed)} Gaia files all failed to download from "
+                                       f"{U.URL_GAIA_DR3_FILES}: offline, server down, or blocked by a proxy or "
+                                       f"firewall. Last error: {str(e)[:200]}") from None
+                continue
+            finally:
+                done += 1
+            if n_in is not None:
+                seen, kept = seen + n_in, kept + n_keep
+            prog(done, f", {kept/1e6:.1f} M of {seen/1e6:.1f} M stars kept", force=done == len(todo))
+    finally:
+        if ex is not None:
+            ex.shutdown(cancel_futures=True)
     if todo:
-        prog.finish(f"{done} files, {kept/1e6:.1f} M stars kept")
-    if workers > 0:
-        ex.shutdown()
+        prog.finish(f"{done - len(failed)} files, {kept/1e6:.1f} M stars kept")
     st = status(out_dir)
     print(f"done: {st['done']}/{st['total']} files, {st['gb']:.1f} GB")
+    if failed:
+        print(f"{len(failed)} files failed (network); rerun setup to fetch just those (it resumes)")
     if st["complete"]:
         BrightIndex(out_dir, 15.0)                                           # for pyoccult_pick.py
 
@@ -481,24 +500,54 @@ class BrightIndex:
             raise ValueError(f"local catalog goes to G {man['gmax']}, cannot index G <= {self.gmax}")
         if not status(self.dir)["complete"]:
             raise RuntimeError(f"local Gaia catalog in {self.dir} is incomplete; run: python pyoccult_setup.py")
+        # Low-memory build (any limit, any RAM): 1) count stars per cell, 2) write each file's stars into their cell's
+        # slots of a memory-mapped output, 3) sort each cell by G, a block of cells at a time. Peak memory: one source
+        # file's selection or one block, not the whole index (a G <= 16 index is ~3.7 GB, G <= 18 ~11 GB).
         t0 = time.time()
-        parts = []
-        prog = Progress(f"bright-star index G <= {self.gmax:g}", len(man["files"]), fmt=lambda x: f"{x:.0f} files",
-                        rate=lambda r: f"{r:.0f} files/s")
-        for i, n in enumerate(man["files"], 1):
-            a = np.load(os.path.join(self.dir, n[:-len(".csv.gz")] + ".npy"), mmap_mode="r")
-            parts.append(np.asarray(a[a["phot_g_mean_mag"] <= self.gmax]))
-            prog(i)
-        prog.finish("read; sorting")
-        arr = np.concatenate(parts)
-        cell = cell_of(arr["ra"], arr["dec"], self.CELL)
-        order = np.lexsort((arr["phot_g_mean_mag"], cell))                          # by cell, then by G
-        arr, cell = arr[order], cell[order]
+        files = [os.path.join(self.dir, n[:-len(".csv.gz")] + ".npy") for n in man["files"]]
         n_cells = int(round(180 / self.CELL)) * int(round(360 / self.CELL))
-        offsets = np.searchsorted(cell, np.arange(n_cells + 1)).astype(np.int64)
+        counts, dtype = np.zeros(n_cells, np.int64), None
+        prog = Progress(f"bright-star index G <= {self.gmax:g}", 2 * len(files), fmt=lambda x: f"{x:.0f} file reads",
+                        rate=lambda r: f"{r:.0f} files/s")
+
+        def selected(path):
+            a = np.load(path, mmap_mode="r")
+            sel = np.asarray(a[np.asarray(a["phot_g_mean_mag"]) <= self.gmax])
+            return sel, cell_of(sel["ra"], sel["dec"], self.CELL)
+
+        for i, f in enumerate(files, 1):
+            sel, cell = selected(f)
+            counts += np.bincount(cell, minlength=n_cells)
+            dtype = sel.dtype
+            prog(i)
+        offsets = np.concatenate([[0], np.cumsum(counts)]).astype(np.int64)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(stem), suffix=".tmp")
+        os.close(fd)
+        out = np.lib.format.open_memmap(tmp, mode="w+", dtype=dtype, shape=(int(offsets[-1]),))
+        cursor = offsets[:-1].copy()
+        for i, f in enumerate(files, 1):
+            sel, cell = selected(f)
+            order = np.argsort(cell, kind="stable")
+            sel, cell = sel[order], cell[order]
+            rank = np.arange(len(cell)) - np.searchsorted(cell, cell, side="left")      # place within its cell
+            out[cursor[cell] + rank] = sel
+            cursor += np.bincount(cell, minlength=n_cells)
+            prog(len(files) + i)
+        prog.finish("read; sorting by G within cells")
+        block, i = 4_000_000, 0
+        while i < len(out):
+            j = int(offsets[np.searchsorted(offsets, i + block, side="right") - 1])     # end on a cell boundary
+            if j <= i:
+                j = int(offsets[np.searchsorted(offsets, i, side="right")])           # one cell larger than a block
+            blk = np.asarray(out[i:j])
+            out[i:j] = blk[np.lexsort((blk["phot_g_mean_mag"], cell_of(blk["ra"], blk["dec"], self.CELL)))]
+            i = j
+        out.flush()
+        n_stars = len(out)
+        del out
         _save_atomic(stem + ".offsets.npy", offsets)                  # offsets first: the .npy of the stars marks done
-        _save_atomic(stem + ".npy", arr)
-        print(f"bright-star index G <= {self.gmax}: {len(arr) / 1e6:.1f} M stars in {time.time() - t0:.0f} s -> {stem}.npy")
+        os.replace(tmp, stem + ".npy")
+        print(f"bright-star index G <= {self.gmax}: {n_stars / 1e6:.1f} M stars in {time.time() - t0:.0f} s -> {stem}.npy")
 
     def near_path(self, U, w_deg, mag_cap=None, sample_deg=None):
         """Stars (structured array) within w_deg (per sample) of the path U (m,3 unit vectors), G <= mag_cap.

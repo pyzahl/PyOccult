@@ -114,7 +114,8 @@ Order of precedence:
 1. `SIZE_OVERRIDES` (curated values, e.g. from occultation chords or shape models).
 2. SBDB `diameter` with its sigma (15 % if missing); bounds +/-3 sigma, widened by the tri-axial `extent`.
 3. H plus SBDB albedo `p`.
-4. H only, albedo 0.14 (bounds from albedo 0.30 and 0.05).
+4. H only, albedo 0.14 (bounds from albedo 0.30 and 0.05). The tables mark these asteroids with "*": the diameter
+   is uncertain by a factor of about 1.7 (sqrt(0.30/0.14), sqrt(0.14/0.05)).
 
 `D = 1329 / sqrt(p) * 10^(-H/5)` km. `r_min_km` is clamped at 0. The bounds describe size uncertainty only, not orbit
 uncertainty. No diameter and no H gives no size (the target is skipped).
@@ -147,6 +148,9 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
 - About 1.3 Earth radii of track on each side of the event, ~100 km per step. Seven lines: centre, the shadow limits
   (+/-r), the 1-sigma limits (+/-(r + sigma)) and the 3-sigma limits (+/-(r + 3 sigma)); each plane point is projected onto the Earth ellipsoid
   (`surfpt`; a miss raises `NotFoundError` and the point is skipped), with the centre-line duration at each point.
+- The 1- and 3-sigma lines describe the uncertainty of the asteroid's **position** (orbit), not of its size: the
+  size enters only through r (the red shadow limits use the best radius); its uncertainty (r_min .. r_max) sets the
+  search range and is not drawn.
 - Sigma: `path_sigma3_km` asks JPL Horizons for the plane-of-sky 3-sigma position uncertainty at the event
   (`RSS_3sigma`, arcsec) and converts it to km at the asteroid's distance; sigma = that / 3. Without a Horizons
   covariance it uses `default_sigma3_km` (10 km, so sigma 3.3 km). Only the orbit counts: the star's position error is

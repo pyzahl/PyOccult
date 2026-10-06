@@ -87,14 +87,22 @@ def download_kernels(earth_pck_max_age=7):
         # Download using the system curl pipeline if it doesn't exist
         if not check_file_age (name, maxage):
             print(f"Downloading {name} via system curl...")
+            part = name + ".part"
             try:
-                # -L follows redirects, -s hides progress bar, -f fails silently on server errors
-                subprocess.run(
-                    ["curl", "-L", "-A", "Mozilla/5.0", url, "-o", name],
-                    check=True
-                )
-            except subprocess.CalledProcessError as e:
-                print(f"🚨 Curl download failed for {name}: {e}")
+                # -L follows redirects, -f fails on server errors (no error page saved as a kernel); into .part,
+                # renamed when complete, so a broken download never looks like a kernel
+                subprocess.run(["curl", "-f", "-L", "-A", "Mozilla/5.0", url, "-o", part], check=True)
+                os.replace(part, name)
+            except (subprocess.CalledProcessError, OSError) as e:
+                if os.path.exists(part):
+                    os.remove(part)
+                why = "curl not found: install curl" if isinstance(e, FileNotFoundError) else e
+                print(f"🚨 Curl download failed for {name}: {why}\n"
+                      f"   URL: {url}\n   (offline, server down, or blocked; behind a proxy set https_proxy, e.g. "
+                      f"export https_proxy=http://proxy.example:8080)")
+                if os.path.exists(name):                     # a refresh failed: the older copy still works
+                    print(f"   keeping the existing {name} (older than {maxage} days); refreshed on a later run")
+                    continue
                 return False
                 
     print("✅ All kernels verified and downloaded cleanly via curl.")

@@ -91,4 +91,39 @@ plan["mag_cap"] = 19.0; assert (lg.corridor_stars(plan).phot_g_mean_mag <= 18.0)
 # ---------- 5. cells near the pole take the whole band
 c = L.cells_near([10.0], [89.7], [0.5]); assert len(c) >= 360, len(c)
 c = L.cells_near([359.99], [0.0], [0.05]); assert L.cell_of(0.01, 0.0).item() in c
+# network failures in the ESA build: blocked downloads stop early with a message, a single failure is skipped
+import types
+real_list, real_proc = L.list_files, L.process_file
+fail_dir = tempfile.mkdtemp()
+L.list_files = lambda timeout=90: [(f"GaiaSource_{i}.csv.gz", 1) for i in range(6)]
+def blocked(name, out_dir, gmax, ruwe_max=None):
+    raise OSError("403 Forbidden (proxy)")
+L.process_file = blocked
+try:
+    L.build(fail_dir, 17.0, workers=0)
+    raise AssertionError("a fully blocked build must stop")
+except RuntimeError as e:
+    assert "the first 3 Gaia files all failed" in str(e) and "proxy" in str(e), e
+def one_bad(name, out_dir, gmax, ruwe_max=None):
+    if name.endswith("_2.csv.gz"):
+        raise OSError("timeout")
+    open(os.path.join(out_dir, name[:-len(".csv.gz")] + ".npy"), "wb").close()
+    return name, 10, 5, 0.1
+L.process_file = one_bad
+L.build(fail_dir, 17.0, workers=0)                                   # goes on; the failed file is left for a rerun
+assert L.status(fail_dir)["done"] == 5 and not L.status(fail_dir)["complete"]
+L.list_files, L.process_file = real_list, real_proc
+# a proxy's page instead of the S3 listing
+import requests
+real_get = requests.get
+requests.get = lambda *a, **k: types.SimpleNamespace(text="<html>Access denied by policy</html>", raise_for_status=lambda: None)
+import importlib.util
+spec = importlib.util.spec_from_file_location("gaia_fresh", L.__file__)          # the real list_files (stubbed above)
+fresh = importlib.util.module_from_spec(spec); spec.loader.exec_module(fresh)
+try:
+    fresh.list_files()
+    raise AssertionError("an empty listing must raise")
+except RuntimeError as e:
+    assert "no Gaia source files" in str(e), e
+requests.get = real_get
 print("GAIA LOCAL TESTS PASSED")

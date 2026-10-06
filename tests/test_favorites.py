@@ -55,7 +55,7 @@ open(log, "a").write("")
 rec = dict(target_id="21641", target_name="21641 Tiffanyko", best_utc="2026-10-06T04:26:25.5", mag="8.1",
            r_km="1.52", r_min_km="0.49", r_max_km="2.555",
            size_source="SBDB diameter (ref urn:nasa:pds:neowise_diameters_albedos::2.0 (http://x))")
-cache = {"fetched": 1.0, "phys": {"H": {"value": "14.92", "ref": "MPC"}, "albedo": {"value": "0.209", "ref": "N"},
+cache = {"fetched": 1.0, "source": "sbdb_query", "phys": {"H": {"value": "14.92", "ref": "MPC"}, "albedo": {"value": "0.209", "ref": "N"},
                                   "diameter": {"value": "3.04", "ref": "N"}}}
 assert F.add(rec, run, maps, fav, sbdb=cache)[0]
 e = F.load(fav)[0]
@@ -68,10 +68,18 @@ F.update("21641_20261006T0426", fav, status="observed")                    # eve
 assert list(csv.DictReader(open(os.path.join(fav, "favorites.csv"))))[0]["status"] == "observed"
 rec2 = dict(rec, target_id="17834", best_utc="2026-10-03T02:53:07")
 F.add(rec2, run, maps, fav)                                                 # added without size data
-assert F.backfill_phys(lambda t: cache if t == "17834" else None, fav) == 1
-assert F.backfill_phys(lambda t: cache, fav) == 0, "only entries without size data"
+assert F.shape_text(e) == "", "bulk rows hold no shape data"
+full = dict(cache, source="sbdb.api", phys=dict(cache["phys"], rot_per={"value": "5.3", "ref": "LCDB"},
+                                                 extent={"value": "18.2x10.5x8.9", "ref": "x"}, spec_B={"value": "S"}))
+assert F.backfill_phys(lambda t: full if t == "17834" else None, fav) == 1
+assert F.backfill_phys(lambda t: full, fav) == 1, "21641 came from a bulk row: fetched once more"
+assert F.backfill_phys(lambda t: full, fav) == 0, "once per favorite"
+assert F.shape_text(F.load(fav)[0]) == "axes 18.2 x 10.5 x 8.9 km · rotation 5.3 h · type S", F.load(fav)[0]
+est = dict(F.load(fav)[0], record=dict(rec, size_source="H only, albedo assumed"))
+assert F.size_text(est).endswith("* estimate, uncertain by a factor ~1.7"), F.size_text(est)
 # preview and globe plot kept apart (report lookup, favorite copies, filling in later globes)
 import pyoccult_report as R
+assert R.size_estimated({"size_src": "H only, albedo assumed"}) and not R.size_estimated({"size_src": "SBDB diameter"})
 from datetime import datetime, timezone
 when = datetime(2026, 10, 3, 2, 53, 7, tzinfo=timezone.utc)
 open(os.path.join(maps, "17834_20261003T0253_globe.svg"), "w").write("<svg id='globe'/>")

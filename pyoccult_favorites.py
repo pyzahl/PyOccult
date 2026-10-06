@@ -46,7 +46,7 @@ def _save(items, folder):
     write_csv(items, folder)
 
 
-PHYS_KEYS = ("H", "G", "diameter", "diameter_sigma", "extent", "albedo")
+PHYS_KEYS = ("H", "G", "diameter", "diameter_sigma", "extent", "albedo", "rot_per", "pole", "spec_T", "spec_B")
 
 
 def phys_of(entry):
@@ -113,7 +113,8 @@ def add(record, run=None, map_dir="maps", folder=DIR, sbdb=None):
     run = run or {}
     entry = dict(key=key, added=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), version=__version__,
                  status="planned", note="",
-                 record=record, site=run.get("site"), files=files, phys=phys_of(sbdb),
+                 record=record, site=run.get("site"), files=files,
+                 phys=phys_of(sbdb), phys_src=(sbdb or {}).get("source", ""),
                  run={k: run.get(k) for k in ("run_utc", "window_start", "window_days", "limits", "earth_pck",
                                                "targets_from") if k in run})
     items.insert(0, entry)
@@ -224,14 +225,19 @@ def write_page(folder=DIR, tiles=None):
 
 
 def backfill_phys(lookup, folder=DIR):
-    """Give favorites added before size data was kept their size-cache data: lookup(target_id) -> cache entry or
-    None. Saves (and rewrites the CSV) only if something changed. Returns the number filled in."""
+    """Give favorites SBDB's full physical data (size, and shape and rotation where known): lookup(target_id) ->
+    size-cache entry or None (pyoccult_sbdb.get_full). Done once per favorite: 'phys_src' notes that the entry came
+    from the per-object SBDB API (bulk rows of the pick tool hold only the size; offline, it is tried again next
+    time). Saves (and rewrites the CSV) only if something changed. Returns the number updated."""
     items, n = load(folder), 0
     for e in items:
-        if not e.get("phys"):
-            ph = phys_of(lookup(str(e["record"].get("target_id", "")).strip()))
-            if ph:
-                e["phys"], n = ph, n + 1
+        if e.get("phys_src") == "sbdb.api":
+            continue
+        entry = lookup(str(e["record"].get("target_id", "")).strip())
+        if not entry:
+            continue
+        e["phys"] = {**(e.get("phys") or {}), **phys_of(entry)}
+        e["phys_src"], n = entry.get("source", ""), n + 1
     if n:
         _save(items, folder)
     return n
@@ -288,9 +294,27 @@ def size_text(entry):
         parts.append(f"D {d:.2f} km ({lo:.2f}-{hi:.2f} km" + (f", {src})" if src else ")"))
     except (KeyError, TypeError, ValueError):
         pass
-    for k, label in (("H", "H"), ("albedo", "albedo"), ("extent", "extent")):
+    for k, label in (("H", "H"), ("albedo", "albedo")):
         if k in ph:
-            parts.append(f"{label} {ph[k][0]}" + (" km" if k == "extent" else ""))
+            parts.append(f"{label} {ph[k][0]}")
+    if str(r.get("size_source") or "").lower().startswith("h only"):
+        parts.append("* estimate, uncertain by a factor ~1.7")
+    return " · ".join(parts)
+
+
+def shape_text(entry):
+    """'axes 18.2 x 10.5 x 8.9 km · rotation 5.27 h · pole (300, 25) · type S': shape and rotation data from SBDB kept
+    with the favorite, where known (most small asteroids have none). Empty string if there is nothing."""
+    ph, parts = entry.get("phys") or {}, []
+    if "extent" in ph:
+        parts.append(f"axes {str(ph['extent'][0]).replace('x', ' x ')} km")
+    if "rot_per" in ph:
+        parts.append(f"rotation {ph['rot_per'][0]} h")
+    if "pole" in ph:
+        parts.append(f"pole {ph['pole'][0]}")
+    tax = ph.get("spec_T") or ph.get("spec_B")
+    if tax:
+        parts.append(f"type {tax[0]}")
     return " · ".join(parts)
 
 

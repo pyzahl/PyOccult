@@ -23,7 +23,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `targets.py`, and saves both per site + window in `picks/` (`pyoccult_picks.py`; pyoccult.py with
   `targets_source = "auto"` uses the newest saved pick of its site covering the search window; an explicit
   `targets` override sets `"list"`). Engine `pyoccult_screen.py` (site solve, OWC observability formula), orbits `pyoccult_orbits.py` (SBDB full-precision
-  elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= 15, cells sorted by G). Worker processes.
+  elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= index_gmax(cam_limit) = max(15, ceil(limit)), cells sorted by G; a missing one is
+  built by `run_screen` in the parent before the workers start, low-memory via a memmap). Worker processes.
 - `pyoccult_corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
 - `linux_install.sh` (user's quick install, Linux/macOS): creates `.venv` with python3, installs requirements via
@@ -37,7 +38,8 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   ...338, packed by `release/pack.sh`, untracked): `fetch_zenodo` (resumable, SHA-256, unpacks into any folder name);
   setup `--source auto|zenodo|esa` (auto: ask, Enter = zenodo; resumes a partial ESA build; esa for other limits).
 - `pyoccult_sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
-  `pyoccult.sbdb_phys()` (per-object API) and by `pyoccult_pick.py` for its top targets (bulk rows); standard library only.
+  `pyoccult.sbdb_phys()` (per-object API) and by `pyoccult_pick.py` for its top targets (bulk rows: size fields only); `get_full()` fetches the per-object
+  record (rotation, pole, extent, type) for favorites; standard library only.
 - `pyoccult_gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult_runner.py`
   (JSON config overrides per run). `pyoccult_geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult_preview.py`:
   event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.

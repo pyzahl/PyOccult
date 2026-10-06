@@ -182,13 +182,21 @@ def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, pr
             cands = find_candidates(sdf, path, margin)
             if len(cands) == 0:
                 continue
-            cands = cands[vis[np.clip(np.round((cands.et_guess.to_numpy() - ets[0]) / step_s).astype(int), 0, len(ets) - 1)]]
+            # the site's event can be up to margin/speed (often 10-40 min) from the Earth-centre estimate: keep a candidate
+            # if the asteroid is visible (up, Sun low enough) at any sample of its solver window, not only at et_guess;
+            # the exact star and Sun altitude at the solved time are checked below (as corridor.solver_bracket_s)
+            half = np.clip(1.3 * margin / np.maximum(speed[k][cands.j.to_numpy()], 1e-3), step_s, 4 * 3600.0)
+            jg = (cands.et_guess.to_numpy() - ets[0]) / step_s
+            j0 = np.clip(np.floor(jg - half / step_s).astype(int), 0, len(ets) - 1)
+            j1 = np.clip(np.ceil(jg + half / step_s).astype(int), 0, len(ets) - 1)
+            cvis = np.concatenate([[0], np.cumsum(vis)])
+            keep = (cvis[j1 + 1] - cvis[j0]) > 0
+            cands, half = cands[keep], half[keep]
             if len(cands) == 0:
                 continue
             ra, de = propagate_linear(sdf.iloc[cands.star.to_numpy()], years)
             sdir = _unit(ra, de)
             gk = g[k]
-            half = np.clip(1.3 * margin / np.maximum(speed[k][cands.j.to_numpy()], 1e-3), step_s, 4 * 3600.0)
             t, miss, offs, vrel = solve_site(spice, site, lambda tt: _interp(gk, ets, tt), sdir,
                                              cands.et_guess.to_numpy(), half)
             r_max = row["D_max_km"] / 2
@@ -208,7 +216,7 @@ def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, pr
                 margin = float(owc_limit(dur_hi, opt)) - m_s - float(extinction_loss(star_alt, opt))
                 if drop < opt["min_drop"] or dur_hi < opt["min_dur"] or margin <= 0:
                     continue
-                events.append(dict(number=row["number"], spkid=row.get("spkid"), name=row["name"], et=float(t[q]),
+                events.append(dict(number=row["number"], spkid=row.get("spkid"), name=row["name"], H=row["H"], et=float(t[q]),
                                    star=int(sdf.source_id.iloc[cands.star.iloc[q]]), star_mag=m_s, star_ra=float(ra[q]),
                                    star_dec=float(de[q]), m_ast=m_a, drop=drop, dur_s=dur, dur_max_s=dur_hi,
                                    D_km=row["D_km"],

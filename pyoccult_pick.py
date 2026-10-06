@@ -116,7 +116,11 @@ def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000, mp_start="sp
     files and share their read position, so parallel reads of de440.bsp collide (SPICE(RECORDNOTFOUND),
     SPICE(INVALIDRADIUS), corrupted DAF), more often the more workers run."""
     import multiprocessing
+    import pyoccult_gaia_local as L
     folder = os.path.dirname(os.path.abspath(__file__))
+    # build a missing bright-star index here, once: workers only open it (before, each worker built it at the same
+    # time, reading the whole catalog into memory: swap and a stalled system with a star limit above G 15)
+    L.BrightIndex(site_args[0], L.index_gmax(site_args[1]))
     jobs = [(rows[i:i + chunk], et0, et1, opt) for i in range(0, len(rows), chunk)]
     events, done, t0 = [], 0, time.time()
     with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context(mp_start),
@@ -236,7 +240,7 @@ def main(argv=None):
         return 0
     E["utc"] = [spice.et2utc(x, "ISOC", 0) for x in E.et]
     E = E.sort_values(SORT_KEYS[a.sort], ascending=SORT_ASC[a.sort]).reset_index(drop=True)
-    cols = ["number", "name", "utc", "star", "star_mag", "drop", "dur_s", "dur_max_s", "mag_margin",
+    cols = ["number", "name", "H", "utc", "star", "star_mag", "drop", "dur_s", "dur_max_s", "mag_margin",
             "miss_km", "inside", "star_alt", "sun_alt", "m_ast", "D_km", "D_est", "speed_kms", "cc", "star_ra",
             "star_dec", "et"]
     E[cols].to_csv(a.output, index=False, float_format="%.6g")

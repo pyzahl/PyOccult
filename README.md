@@ -193,6 +193,14 @@ the same command resumes. `--status` should end with
 `3386/3386 files ... (complete)` and `bright-star index ... ok`. The search (`pyoccult.py`) refuses to run on an
 incomplete catalog and tells you to rerun the setup. See "Local Gaia catalog" below for what is kept and why.
 
+**Downloads fail (offline, server down, proxy or firewall).** Setup stops with a message naming the address instead
+of a traceback; what is already downloaded is kept, so rerun it later. Behind a proxy, tell curl and Python about it
+first: `export https_proxy=http://<proxy>:<port> HTTPS_PROXY=http://<proxy>:<port>`. If a proxy blocks one source,
+try the other (`--source zenodo` or `--source esa`), or copy the kernel files (`*.tls *.bsp *.tpc *.bpc`) and a
+finished catalog folder (`gaia_dr3_g16`, `gaia_dr3_g18`) from another computer. All addresses are listed in
+`pyoccult_urls.py`. An ESA build skips a file that still fails after its retries (a rerun fetches it) and stops early
+if the first files all fail.
+
 ## 5. Run it: the web interface
 
 Start the GUI and work through its tabs from left to right:
@@ -209,9 +217,12 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    selected site from `sites.py` (after asking): aperture,
    focal length, sensor size, detection frames, reach (how far you can travel), minimum star altitude, Sun limit.
    The site and the Gaia catalog used by all runs are chosen at the top right.
-2. **Pick**: choose a window (start date, today by default, and days) and run the pick: it screens all asteroids (H below 17 by default)
+2. **Pick**: choose a window (start date, today by default, and days), the asteroids (**H below**: an asteroid with a
+   larger H is never found by the pick, but the search finds it if you enter its number) and the **Star G limit**
+   (from the site's telescope, capped at the catalog; change it for one run), and run the pick: it screens all asteroids (H below 17 by default)
    for actual events at your site and saves the best targets for this site and window. This is the slow step
-   (several minutes); a saved pick is reused by every later search of the same site and window.
+   (several minutes); a saved pick is reused by every later search of the same site and window. **CSV** downloads the
+   selected pick's events as a table (the Results tab has the same button for the search results).
 3. **Search**: the exact prediction for the picked targets (JPL Horizons orbits, local Gaia catalog): event times,
    drops, durations, shadow paths (KML maps) and star-field previews.
 4. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
@@ -225,8 +236,9 @@ python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your bro
    status (planned / observed / cancelled / clouded) or remove them; **Remove past events** drops every favorite
    whose event is before today (UTC); **times** switches the event times between UT, your computer's time zone (Local)
    and the time zone of each event's site (Site). Click a row to see its star-field preview and shadow path map side by side
-   below the table, with its size (the diameter and range the search used, its source, H and albedo), and to
-   edit its note. **CSV** downloads all favorites as a table: `favorites/favorites.csv` is rewritten with every
+   below the table, with its size (the diameter and range the search used, its source, H and albedo), its shape and
+   rotation where SBDB knows them (axes, rotation period, pole, taxonomic type; fetched once per favorite from the
+   SBDB API, as the pick tool's bulk data holds only the size), and to edit its note. **CSV** downloads all favorites as a table: `favorites/favorites.csv` is rewritten with every
    change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
    in your browser).
 
@@ -582,6 +594,27 @@ python pyoccult_report.py hits_log.csv --sort date               # by event time
   `pyoccult_config.py` (`sites.py`); `--lat`, `--lon` override it. `map_dir` (default `maps`) or `--kml-dir` locate the KML files.
 * `--max-miss KM` and `--min-drop MAG` filter the list; `--no-embed` leaves out the embedded map viewer.
 * Each event row links to its KML file (`maps/<asteroid>_<YYYYMMDDTHHMM>*.kml`, written by the shadow-path module). The map button opens an embedded Leaflet map with the centre line (green), the shadow limits (red), the 1-sigma limits (purple, dotted: the real shadow edge stays inside them about 2 times in 3), the 3-sigma limits (orange, dashed) and your site, zoomed to the nearest point of the path. A link there opens that point in Google Maps.
+
+**What the lines mean** (map, KML, globe plot):
+
+| Line | Distance from the centre line | Based on |
+|---|---|---|
+| shadow limits (red) | radius r | the asteroid's **size** (best estimate) |
+| 1-sigma limits (purple, dotted) | r + 1 sigma | the **orbit** uncertainty: where the shadow edge may lie |
+| 3-sigma limits (orange, dashed) | r + 3 sigma | the **orbit** uncertainty |
+
+* The sigma lines are **not** a size uncertainty. Sigma is the uncertainty of the asteroid's **position** (its
+  orbit) at the event time: JPL Horizons' 3-sigma value (RSS), converted to km at the asteroid's distance and divided
+  by 3; without a Horizons value it is `default_sigma3_km` (10 km, so sigma 3.3 km). The 1-sigma lines enclose the
+  real shadow edge about 2 times in 3, the 3-sigma lines almost always.
+* The **size** uncertainty (diameter range, e.g. SBDB diameter +/- 3 sigma, or from H with an assumed albedo) is not
+  drawn. It sets the search range (largest likely radius + your reach), and the favorites show it in their size line.
+  An **\*** after the asteroid name (Results, Favorites, Pick tab) marks a size estimated from H with an assumed
+  albedo (no measured diameter, typical for H above ~15): diameter, duration and shadow width are uncertain by a
+  factor of about 1.7, so watch from a wider band or expect a shorter or longer event.
+* Not included in sigma: the star's position error (small for bright stars, a few km for faint ones), and the
+  direction of the error ellipse (the RSS value is its whole size, so the band is right when its long axis lies
+  across the track and too wide when it lies along it). See ABOUT.md, section 2.10.
 * View it through a web server for reliable maps: copy the report, the `maps` folder (for the KML links) and, e.g.,
   ```bash
   cp hits_report.html /var/www/html/pyoccult/ && cp -r maps /var/www/html/pyoccult/

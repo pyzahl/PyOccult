@@ -73,6 +73,29 @@ def entry_from_api(js, fetched=None):
     return dict(fetched=fetched or time.time(), source="sbdb.api", phys=phys)
 
 
+def get_full(number, cache_path=None, timeout=15):
+    """Entry with all of SBDB's physical data for one asteroid (rotation period, pole, extent, taxonomic type, ...
+    with references): the cached one if it came from the per-object API, else fetched now and cached. The pick tool's
+    bulk rows hold only the size fields. Falls back to the cached entry (or None) if SBDB cannot be reached."""
+    import urllib.parse, urllib.request
+    import pyoccult_urls as U
+    n = str(number).strip()
+    e, fresh = get(n, cache_path)
+    if e and fresh and e.get("source") == "sbdb.api":
+        return e
+    try:
+        url = U.URL_JPL_SBDB_API + "?" + urllib.parse.urlencode({"sstr": n, "phys-par": 1})
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            js = json.load(r)
+    except (OSError, ValueError):
+        return e
+    if "object" not in js:
+        return e
+    new = entry_from_api(js)
+    put({n: new}, cache_path, keep_newer=False)
+    return new
+
+
 def entry_from_bulk(row, fetched):
     """Cache entry from one sbdb_query row (dict field -> value), in the same layout as entry_from_api."""
     phys = {}
