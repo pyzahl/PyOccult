@@ -1,4 +1,4 @@
-"""pyoccult_astrometry.py - astrometric corrections of a star's direction at an event (see ABOUT.md Part 6).
+"""astrometry.py - astrometric corrections of a star's direction at an event (see ABOUT.md Part 6).
 
 Gaia DR3 gives barycentric directions free of light deflection. The asteroid comes from SPICE ('CN': light-time
 corrected, no aberration, no deflection). Two corrections make the star match what the observer really sees relative
@@ -17,7 +17,7 @@ the observer), q = unit vector from the body to the source (q = p for a star), P
 (4.07 mas at elongation 90 deg from the Sun, 1.75" at the solar limb). Pure math; SPICE is passed in, so this module
 has no state and the tests can use a stand-in. Used by pyoccult.handle_star.
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import numpy as np
 
 C_KM_S = 299792.458

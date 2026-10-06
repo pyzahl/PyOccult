@@ -1,4 +1,4 @@
-"""pyoccult_version.py - the PyOccult version and project facts, kept in this one place. Every module and tool takes
+"""version.py - the PyOccult version and project facts, kept in this one place. Every module and tool takes
 them from here (GUI header and About box, --version of the tools, run summaries, CITATION.cff by hand).
 
 Semantic versioning: MAJOR.MINOR.PATCH. Raise PATCH for fixes, MINOR for new features, MAJOR for changes that break

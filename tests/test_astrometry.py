@@ -1,8 +1,8 @@
 """pyoccult_astrometry: light deflection and stellar parallax against known values, with a stand-in for SPICE."""
 import math, os, sys
 import numpy as np
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_astrometry as A
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import astrometry as A
 
 AU = 1.495978707e8
 

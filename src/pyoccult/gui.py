@@ -1,25 +1,24 @@
-#!.venv/bin/python3
-"""pyoccult_gui.py - local web interface for PyOccult (NiceGUI): set up observing sites on a map, run the search or the
+"""gui.py - local web interface for PyOccult (NiceGUI): set up observing sites on a map, run the search or the
 pick tool, follow the log, look at the results.
 
-    python pyoccult_gui.py              # opens http://127.0.0.1:8080 in the browser
-    python pyoccult_gui.py --port 8090 --no-browser
+    pyoccult                            # opens http://127.0.0.1:8080 in the browser (same as: pyoccult gui)
+    pyoccult --port 8090 --no-browser
 
 It listens on this computer only (127.0.0.1), because it can start programs. Every run is its own process
-(pyoccult_runner.py), so SPICE stays out of the GUI; settings chosen here apply to that run only, pyoccult_config.py is
+(`python -m pyoccult run ...`, pyoccult/runner.py), so SPICE stays out of the GUI; settings chosen here apply to that run only, pyoccult_config.py is
 not changed. Saving a site rewrites sites.py (comments in it are not kept).
 """
-from pyoccult_version import __version__, __codename__, __author__, __copyright__, __license__, __url__
+from pyoccult.version import __version__, __codename__, __author__, __copyright__, __license__, __url__
 import argparse, asyncio, csv, json, math, os, pprint, runpy, sys, time
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, ROOT)
+from pyoccult.home import HOME as ROOT, PKG                      # ROOT: the data folder (sites.py, maps/, ...)
 os.chdir(ROOT)
 from nicegui import app, run, ui
-import pyoccult_geo as geo
-import pyoccult_favorites as favorites
+from pyoccult import geo
+from pyoccult import favorites
 
 PY = sys.executable
+PYOCCULT = [PY, "-u", "-m", "pyoccult"]                             # how runs are started: PYOCCULT + [command, ...]
 SITE_KEYS = [  # key, label, default, step  (optional site keys, see sites_example.py)
     ("aperture_cm", "Aperture (cm)", 25.0, 1), ("focal_mm", "Focal length (mm)", None, 10),
     ("sensor_w_mm", "Sensor width (mm)", 5.6, 0.1), ("sensor_h_mm", "Sensor height (mm)", 3.2, 0.1),
@@ -32,15 +31,15 @@ SITE_KEYS = [  # key, label, default, step  (optional site keys, see sites_examp
 
 # ---------------------------------------------------------------- sites.py
 def load_sites():
-    path = "sites.py" if os.path.isfile("sites.py") else "sites_example.py"
+    path = "sites.py" if os.path.isfile("sites.py") else os.path.join(PKG, "templates", "sites_example.py")
     g = runpy.run_path(path)
     return {k: dict(v) for k, v in g["sites"].items()}, g["default_site"]
 
 
 def save_sites(sites, default_site):
-    text = ("# Your observing sites (not in git). Layout and optional keys: see sites_example.py.\n"
+    text = ("# Your observing sites (not in git). Layout and optional keys: see src/pyoccult/templates/sites_example.py.\n"
             "# pyoccult_config.py uses `default_site`, or the site named in the environment variable PYOCCULT_SITE.\n"
-            f"# Written by pyoccult_gui.py on {time.strftime('%Y-%m-%d %H:%M')}.\n\n"
+            f"# Written by the PyOccult GUI on {time.strftime('%Y-%m-%d %H:%M')}.\n\n"
             f"sites = {pprint.pformat(sites, sort_dicts=False, width=110)}\n\ndefault_site = {default_site!r}\n")
     tmp = "sites.py.tmp"
     with open(tmp, "w") as f:
@@ -71,7 +70,8 @@ async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
     if Job.proc and Job.proc.returncode is None:
         ui.notify("A run is already in progress", type="warning")
         return None
-    env = dict(os.environ, PYTHONUNBUFFERED="1")
+    env = dict(os.environ, PYTHONUNBUFFERED="1", PYOCCULT_HOME=ROOT)
+    env["PYTHONPATH"] = os.pathsep.join(x for x in (os.path.dirname(PKG), env.get("PYTHONPATH")) if x)   # not installed
     if env_site:
         env["PYOCCULT_SITE"] = env_site
     if env_catalog:
@@ -110,7 +110,7 @@ def stop_process(log):
 # ---------------------------------------------------------------- page
 @ui.page("/")
 def index():
-    import pyoccult_config as config
+    from pyoccult import config
     sites, default_site = load_sites()
     state = dict(name=default_site)
     ui.page_title("PyOccult")
@@ -123,7 +123,7 @@ def index():
         ui.space()
         ui.label("Site for all runs:").classes("text-slate-300")
         sel = ui.select(list(sites), value=state["name"]).props("dark dense options-dense standout").classes("w-48")
-        import pyoccult_gaia_local as gaia_local
+        from pyoccult import gaia_local
         found = gaia_local.find_catalogs(ROOT)
         complete = {d for d, g, ok, _ in found if ok}
         cat_gmax = {d: float(g) for d, g, ok, _ in found if g is not None}
@@ -134,7 +134,7 @@ def index():
         cat_sel = ui.select(cats, value=config.gaia_local_dir if config.gaia_local_dir in complete else
                             (min(complete) if complete else (next(iter(cats)) if cats else None))
                             ).props("dark dense options-dense standout").classes("w-64").tooltip(
-            "Local Gaia catalogs in the project folder. Install or add one with: python pyoccult_setup.py [--gmax 16]")
+            "Local Gaia catalogs in the project folder. Install or add one with: pyoccult setup [--gmax 16]")
         ui.button("About", on_click=lambda: about.open()).props("flat dense color=white no-caps")
     with ui.dialog() as about, ui.card().classes("max-w-xl"):
         with ui.row().classes("items-center gap-4 no-wrap"):
@@ -174,7 +174,7 @@ def index():
                 new_name = ui.input("New site name").classes("w-48")
                 ui.button("Add site", on_click=lambda: add_site()).props("outline")
                 is_default = ui.checkbox("Default for command-line runs").tooltip(
-                    "default_site in sites.py: used by pyoccult.py / pyoccult_pick.py run without the GUI")
+                    "default_site in sites.py: used by `pyoccult search` / `pyoccult pick` run without the GUI")
                 ui.button("Save sites.py", on_click=lambda: save()).props("color=primary")
                 ui.button("Remove site", on_click=lambda: remove_site()).props("outline color=negative").tooltip(
                     "Remove the site selected at the top right from sites.py (asks first; saved at once)")
@@ -547,7 +547,7 @@ def index():
 
     # ------------------------------------------------ runs
     async def build_report(rc=0):
-        await run_process([PY, "-u", "pyoccult_report.py", config.hits_output_cvs_file], log)
+        await run_process(PYOCCULT + ["report", config.hits_output_cvs_file], log)
         frame.props(f"src=/out/hits_report.html?t={int(time.time())}")
 
     def catalog_ok():
@@ -555,7 +555,7 @@ def index():
         if cat_sel.value in complete:
             return True
         ui.notify(("No complete Gaia catalog yet" if not cat_sel.value else f"Catalog {cat_sel.value} is incomplete")
-                  + ": run  python pyoccult_setup.py  (it resumes), then restart the GUI", type="warning", timeout=10000)
+                  + ": run  pyoccult setup  (it resumes), then restart the GUI", type="warning", timeout=10000)
         return False
 
     async def run_search():
@@ -574,7 +574,7 @@ def index():
             if rc == 0:
                 await build_report()
                 tabs.value = t_res
-        await run_process([PY, "-u", "pyoccult_runner.py", "pyoccult.py", json.dumps(over)], log,
+        await run_process(PYOCCULT + ["run", "search", json.dumps(over)], log,
                           env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
 
     def saved_info(*_):
@@ -650,8 +650,8 @@ def index():
         if not os.path.isfile(path):
             ui.notify("No search results yet (run a search)", type="warning")
             return
-        import pyoccult_report
-        run = pyoccult_report.read_last_run(path) or {}             # name it like the picks: site, window
+        from pyoccult import report
+        run = report.read_last_run(path) or {}             # name it like the picks: site, window
         site, start = (run.get("site") or {}).get("name"), str(run.get("window_start") or "")[:10]
         name = (f"hits_{picks._safe(site)}__{start}_{float(run['window_days']):g}d.csv"
                 if site and start and run.get("window_days") else os.path.basename(path))
@@ -665,7 +665,7 @@ def index():
         s_start.value, s_days.value, s_use_file.value = p["start"], p["days"], True
         tabs.value = t_search
 
-    import pyoccult_picks as picks
+    from pyoccult import picks
     picks_dir = getattr(config, "picks_dir", "picks")
     saved_list = []
     p_saved.on_value_change(show_saved)
@@ -719,13 +719,13 @@ def index():
 
     def draw_fav_map(e):
         """The favorite's own KML copy on the map: shadow path lines and the site, zoomed to the nearest path part."""
-        import pyoccult_report
+        from pyoccult import report
         for layer in fav_layers:
             f_map.remove_layer(layer)
         fav_layers.clear()
         kml = (e.get("files") or {}).get("kml")
         try:
-            data = pyoccult_report.kml_to_data(os.path.join(favorites.DIR, kml)) if kml else None
+            data = report.kml_to_data(os.path.join(favorites.DIR, kml)) if kml else None
         except Exception:
             data = None
         for el in (f_map, f_legend):
@@ -795,7 +795,7 @@ def index():
         if not catalog_ok():
             return
         ensure_saved()
-        args = [PY, "-u", "pyoccult_pick.py", "--start", p_start.value, "--days", str(int(p_days.value)),
+        args = PYOCCULT + ["pick", "--start", p_start.value, "--days", str(int(p_days.value)),
                 "--top", str(int(p_top.value)), "--workers", str(int(p_workers.value)), "--sort", p_sort.value]
         args += ["--all"] if p_all.value else ["--hmax", str(p_hmax.value)]
         if p_mag.value:
@@ -825,14 +825,14 @@ def main():
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
-    import pyoccult_config as config
+    from pyoccult import config
     os.makedirs(config.map_dir, exist_ok=True)
     app.add_static_files("/out/maps", os.path.join(ROOT, config.map_dir), max_cache_age=0)
-    app.add_static_file(local_file=os.path.join(ROOT, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
-    import pyoccult_kstars                                      # report's KStars buttons (Linux; hidden elsewhere)
+    app.add_static_file(local_file=os.path.join(PKG, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
+    from pyoccult import kstars                                      # report's KStars buttons (Linux; hidden elsewhere)
     os.makedirs(os.path.join(ROOT, favorites.DIR), exist_ok=True)
-    import pyoccult_sbdb                                        # full SBDB data (shape, rotation) for older favorites
-    favorites.backfill_phys(lambda t: pyoccult_sbdb.get_full(t, config.cache_path))
+    from pyoccult import sbdb                                        # full SBDB data (shape, rotation) for older favorites
+    favorites.backfill_phys(lambda t: sbdb.get_full(t, config.cache_path))
     favorites.backfill_globes(config.map_dir)                   # globe plots of later searches for older favorites
     favorites.backfill_timezones(geo.timezone)                  # site time zones (online, once per site)
     favorites.write_csv()
@@ -862,13 +862,13 @@ def main():
 
     @app.get("/api/favorites/add")
     def favorites_add(tid: str, utc: str):
-        import pyoccult_config as cfg, pyoccult_report
+        from pyoccult import config as cfg, report
         rec = favorites.find_record(cfg.hits_output_cvs_file, tid, utc)
         if rec is None:
             return {"ok": False, "msg": f"event {tid} {utc[:19]} not found in {cfg.hits_output_cvs_file}"}
-        import pyoccult_sbdb
-        ok, msg = favorites.add(rec, pyoccult_report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir,
-                                sbdb=pyoccult_sbdb.get_full(tid, cfg.cache_path))
+        from pyoccult import sbdb
+        ok, msg = favorites.add(rec, report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir,
+                                sbdb=sbdb.get_full(tid, cfg.cache_path))
         if ok:
             favorites.backfill_timezones(geo.timezone)          # the new favorite's site time zone (once per site)
         favorites.write_page()
@@ -876,17 +876,17 @@ def main():
 
     @app.get("/api/kstars/status")
     def kstars_status():
-        ok, msg = pyoccult_kstars.available()
+        ok, msg = kstars.available()
         return {"ok": ok, "msg": msg}
 
     @app.get("/api/kstars/show")
     def kstars_show(ra: float, dec: float, utc: str, fov: float = 2.0, lat: float = None, lon: float = None,
                     ele: float = 0.0):
-        ok, msg = pyoccult_kstars.show(ra, dec, utc, fov, lat, lon, ele, set_location=KSTARS_OPT["set_location"])
+        ok, msg = kstars.show(ra, dec, utc, fov, lat, lon, ele, set_location=KSTARS_OPT["set_location"])
         return {"ok": ok, "msg": msg}
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
                         strict=False, max_cache_age=0)
-    ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(ROOT, "pyoccult_logo.svg"),
+    ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(PKG, "pyoccult_logo.svg"),
            show=not a.no_browser, reload=False, reconnect_timeout=60)   # a busy browser keeps its page
 
 

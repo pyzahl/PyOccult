@@ -21,12 +21,12 @@ if [ ! -x .venv/bin/python ]; then
 fi
 
 # use the venv's own python and pip directly: no 'activate' needed (it only works with 'source' in the same shell)
-echo "== installing the Python packages into .venv"
+echo "== installing PyOccult and its Python packages into .venv"
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -e .          # editable: a later 'git pull' takes effect without reinstalling
 
 echo "== one-time setup: your site, SPICE kernels, local Gaia catalog (answer the questions)"
-.venv/bin/python pyoccult_setup.py
+.venv/bin/pyoccult setup
 
-echo "== starting the web interface (stop with Ctrl-C; later just run: .venv/bin/python pyoccult_gui.py)"
-exec .venv/bin/python pyoccult_gui.py
+echo "== starting the web interface (stop with Ctrl-C; later just run: .venv/bin/pyoccult)"
+exec .venv/bin/pyoccult

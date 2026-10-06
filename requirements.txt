@@ -1,8 +1,0 @@
-numpy
-requests
-scipy
-spiceypy
-astropy
-astroquery
-pandas
-nicegui

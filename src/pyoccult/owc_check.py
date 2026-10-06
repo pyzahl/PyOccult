@@ -1,23 +1,22 @@
-#!.venv/bin/python3
-"""pyoccult_owc_check.py - regression check against an OWC (Occult Watcher Cloud) search result.
+"""owc_check.py - regression check against an OWC (Occult Watcher Cloud) search result.
 
 Paste an OWC search result (the page text: the "Search Results for filter ..." line and the event table) into
 owc_reference.txt (private, not in git: it names your site). This script reads the events and the search settings
-from it (distance from shadow, StarMag, MinDur, Aperture, DetectionFrames, MinStarAltitude), runs pyoccult.py
+from it (distance from shadow, StarMag, MinDur, Aperture, DetectionFrames, MinStarAltitude), runs search.py
 (corridor mode) for those asteroids over the events' dates at your site (sites.py), then matches every OWC event to
 our hits and checks: time within 10 s, magnitude drop within 0.25 mag, maximum duration within 10 %.
 pyoccult_config.py is not changed: the settings override it for this run only. Hits go to owc_check_hits.csv, no maps.
 
-    python pyoccult_owc_check.py                 # search + compare
-    python pyoccult_owc_check.py --compare-only  # compare an existing owc_check_hits.csv
-    python pyoccult_owc_check.py --ref other_owc_result.txt
-    python pyoccult_owc_check.py --sea-level     # our side at elevation 0, as OWC online (it ignores the site height)
+    pyoccult owc-check                 # search + compare
+    pyoccult owc-check --compare-only  # compare an existing owc_check_hits.csv
+    pyoccult owc-check --ref other_owc_result.txt
+    pyoccult owc-check --sea-level     # our side at elevation 0, as OWC online (it ignores the site height)
 
 Duration = diameter / shadow speed. The report shows our diameter and the one OWC's duration implies (OWC duration x our
 speed); when only the diameters differ, the result is "ok, size differs", not a failure. Drops above DROP_TOTAL mag
 are not compared (they differ only by the asteroid's own magnitude estimate).
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import argparse, os, re, runpy, sys
 import pandas as pd
 
@@ -63,8 +62,7 @@ def read_owc(path):
 
 
 def run(ref, settings):
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import pyoccult_config as config
+    from pyoccult import config
     for k, v in settings.items():
         setattr(config, k, v)
     config.targets = [str(t) for t in ref.target_id]
@@ -72,7 +70,7 @@ def run(ref, settings):
     config.hits_output_cvs_file = OUT
     if os.path.isfile(OUT):
         os.remove(OUT)
-    runpy.run_path("pyoccult.py", run_name="__main__")
+    runpy.run_module("pyoccult.search", run_name="__main__", alter_sys=True)
 
 
 def compare(ref):
@@ -116,7 +114,7 @@ def compare(ref):
     return n_ok == len(tab)
 
 
-if __name__ == "__main__":
+def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--compare-only", action="store_true")
@@ -134,3 +132,7 @@ if __name__ == "__main__":
     if not a.compare_only:
         run(ref, settings)
     sys.exit(0 if compare(ref) else 1)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

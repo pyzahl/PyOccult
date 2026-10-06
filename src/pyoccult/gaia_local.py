@@ -1,15 +1,14 @@
-#!.venv/bin/python3
-"""pyoccult_gaia_local.py - local, magnitude-limited copy of Gaia DR3 for the corridor search.
+"""gaia_local.py - local, magnitude-limited copy of Gaia DR3 for the corridor search.
 
 Why: the Gaia archive (TAP) can take many minutes per strip query or hang. The full gaia_source table is on ESA's CDN as
 3386 gzipped CSV files (753 GB). This tool streams them once, keeps only what the search needs (G <= gmax, 5-parameter
 astrometry, ruwe < 1.4; 7 columns as binary, ~40 bytes/star, about 19 GB for G <= 18), and deletes each download.
 Afterwards a corridor lookup reads only the few files its strip touches, in about a second, without network.
 
-    python pyoccult_gaia_local.py build                 # dir and gmax from pyoccult_config (gaia_local_dir, gaia_local_gmax)
-    python pyoccult_gaia_local.py build --workers 6     # resumable: rerun after an interruption, finished files are skipped
-    python pyoccult_gaia_local.py status
-    python pyoccult_gaia_local.py zenodo --gmax 16    # ready-made copy (G <= 16 or 18) from Zenodo instead of building
+    pyoccult gaia build                 # dir and gmax from pyoccult_config (gaia_local_dir, gaia_local_gmax)
+    pyoccult gaia build --workers 6     # resumable: rerun after an interruption, finished files are skipped
+    pyoccult gaia status
+    pyoccult gaia zenodo --gmax 16    # ready-made copy (G <= 16 or 18) from Zenodo instead of building
 
 Layout of the catalog folder:
     catalog.json                      gmax, cuts and the list of source files (written first)
@@ -20,14 +19,14 @@ The .npy of a file is written last, atomically; its presence means that file is 
 
 Network only (no SPICE), so the build uses processes freely. Standard library + numpy, pandas, requests.
 """
-from pyoccult_version import __version__
-import pyoccult_urls as U
+from pyoccult.version import __version__
+from pyoccult import urls as U
 import argparse, json, math, os, re, shutil, sys, tempfile, time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 
-BUCKET = U.URL_GAIA_DR3_LISTING                                       # S3-style listing behind the CDN (pyoccult_urls)
+BUCKET = U.URL_GAIA_DR3_LISTING                                       # S3-style listing behind the CDN (urls)
 PREFIX = U.GAIA_DR3_LISTING_PREFIX
 COLS = ["source_id", "ra", "dec", "parallax", "pmra", "pmdec", "phot_g_mean_mag"]
 DTYPE = np.dtype([("source_id", "<i8"), ("ra", "<f8"), ("dec", "<f8"), ("parallax", "<f4"),
@@ -253,7 +252,7 @@ def build(out_dir, gmax=18.0, workers=6):
     if failed:
         print(f"{len(failed)} files failed (network); rerun setup to fetch just those (it resumes)")
     if st["complete"]:
-        BrightIndex(out_dir, 15.0)                                           # for pyoccult_pick.py
+        BrightIndex(out_dir, 15.0)                                           # for pick.py
 
 
 # ----------------------------------------------------------------------------------------------- ready-made copy
@@ -418,7 +417,7 @@ class LocalGaia:
         st = status(out_dir)
         if not st["complete"] and not allow_partial:
             raise RuntimeError(f"local Gaia catalog in {out_dir} is incomplete ({st['done']}/{st['total']} files); "
-                               f"run: python pyoccult_setup.py  (resumes)")
+                               f"run: pyoccult setup  (resumes)")
         self.stems = [n[:-len(".csv.gz")] for n in man["files"]
                       if os.path.isfile(os.path.join(out_dir, n[:-len(".csv.gz")] + ".npy"))]
         self.by_cell = {}
@@ -435,7 +434,7 @@ class LocalGaia:
 
     def cone(self, ra_deg, dec_deg, radius_deg, mag_cap=None):
         """Stars (DataFrame, epoch 2016.0) within radius_deg of (ra, dec), G <= mag_cap. For small fields (previews)."""
-        from pyoccult_corridor import _unit
+        from pyoccult.corridor import _unit
         cap = self.gmax if mag_cap is None else min(mag_cap, self.gmax)
         c = _unit(ra_deg, dec_deg)
         files = sorted({i for k in cells_near([ra_deg], [dec_deg], [radius_deg]).tolist() for i in self.by_cell.get(k, ())})
@@ -450,7 +449,7 @@ class LocalGaia:
 
     def corridor_stars(self, plan, include_high_pm=True, chunk_deg=0.05):
         """Stars (G <= plan mag_cap) within margin_km/distance + pad of the plan's path, plus the high-pm stars."""
-        from pyoccult_corridor import _radec, _unit
+        from pyoccult.corridor import _radec, _unit
         path = plan["path"]
         U, D = path["u"], path["delta_km"]
         w = np.degrees(plan["margin_km"] / D) + plan["pad_arcsec"] / 3600.0              # half-width per sample, deg
@@ -482,7 +481,7 @@ def index_gmax(mag_limit):
 class BrightIndex:
     """Stars with G <= gmax (default 15, ~32 M stars, 1.3 GB) from the local catalog, sorted by a fine sky cell and,
     within a cell, by magnitude (so a lookup with a bright cap reads only the bright end of each cell). For screening many
-    asteroids at once (pyoccult_screen.py). Built once from the catalog (~15 s) and saved next to it as
+    asteroids at once (screen.py). Built once from the catalog (~15 s) and saved next to it as
     bright_G<gmax>.v2.npy + .v2.offsets.npy; opened memory-mapped."""
     CELL = 0.25                                                                       # deg
 
@@ -499,7 +498,7 @@ class BrightIndex:
         if man["gmax"] < self.gmax:
             raise ValueError(f"local catalog goes to G {man['gmax']}, cannot index G <= {self.gmax}")
         if not status(self.dir)["complete"]:
-            raise RuntimeError(f"local Gaia catalog in {self.dir} is incomplete; run: python pyoccult_setup.py")
+            raise RuntimeError(f"local Gaia catalog in {self.dir} is incomplete; run: pyoccult setup")
         # Low-memory build (any limit, any RAM): 1) count stars per cell, 2) write each file's stars into their cell's
         # slots of a memory-mapped output, 3) sort each cell by G, a block of cells at a time. Peak memory: one source
         # file's selection or one block, not the whole index (a G <= 16 index is ~3.7 GB, G <= 18 ~11 GB).
@@ -552,7 +551,7 @@ class BrightIndex:
     def near_path(self, U, w_deg, mag_cap=None, sample_deg=None):
         """Stars (structured array) within w_deg (per sample) of the path U (m,3 unit vectors), G <= mag_cap.
         A superset of the exact strip (coarse discs); the candidate scan does the exact test."""
-        from pyoccult_corridor import _radec, _unit
+        from pyoccult.corridor import _radec, _unit
         if len(U) == 0:
             return self.stars[:0]
         # cells: path points every ~CELL/5 are enough (the strip is far narrower than a cell)
@@ -575,13 +574,13 @@ class BrightIndex:
 
 def default_dir():
     try:
-        import pyoccult_config as C
+        from pyoccult import config as C
         return getattr(C, "gaia_local_dir", None), getattr(C, "gaia_local_gmax", 18.0)
     except ImportError:
         return None, 18.0
 
 
-if __name__ == "__main__":
+def main():
     d0, g0 = default_dir()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
@@ -595,6 +594,10 @@ if __name__ == "__main__":
         build(a.dir, a.gmax, a.workers)
     elif a.cmd == "zenodo":
         if fetch_zenodo(a.dir, a.gmax, a.keep_archive)["complete"]:
-            BrightIndex(a.dir, 15.0)                                         # for pyoccult_pick.py
+            BrightIndex(a.dir, 15.0)                                         # for pick.py
     else:
         print(status(a.dir))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

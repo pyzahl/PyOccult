@@ -1,18 +1,17 @@
-#!.venv/bin/python3
-"""pyoccult_picks.py - saved pick results per site and window, so a search can reuse them instead of picking again.
+"""picks.py - saved pick results per site and window, so a search can reuse them instead of picking again.
 
-pyoccult_pick.py saves every run for a named site as a pair in picks/ (config picks_dir):
+pick.py saves every run for a named site as a pair in picks/ (config picks_dir):
     picks/<site>__<start>_<days>d.py     importable target list (targets, target_names, pick_meta)
     picks/<site>__<start>_<days>d.csv    all events of that pick (as pick_events.csv)
-A new pick of the same site and window replaces the pair. pyoccult.py (targets_source = "auto") uses the newest saved
+A new pick of the same site and window replaces the pair. search.py (targets_source = "auto") uses the newest saved
 pick of its site whose window covers the search window; without one it falls back to targets.py / the config list.
 
-    python pyoccult_picks.py list [site]       # saved picks
-    python pyoccult_picks.py import            # save the current targets.py + pick_events.csv under their site/window
+    pyoccult picks list [site]       # saved picks
+    pyoccult picks import            # save the current targets.py + pick_events.csv under their site/window
 
 Standard library only.
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import argparse, os, re, runpy, shutil, sys
 from datetime import date, timedelta
 
@@ -99,16 +98,21 @@ def import_current(targets_py="targets.py", events_csv="pick_events.csv", folder
     print(f"saved {py}" + (f" and {csv}" if os.path.isfile(events_csv) else ""))
 
 
-if __name__ == "__main__":
+def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("cmd", choices=["list", "import"])
     ap.add_argument("site", nargs="?")
     a = ap.parse_args()
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    from pyoccult.home import HOME
+    os.chdir(HOME)
     if a.cmd == "import":
         import_current()
     else:
         for p in list_for(a.site):
             print(f"{p['site']:20s} {p['start']} + {p['days']:g} d  picked {p['picked'][:16] or '?':16s}  "
                   f"{len(p['targets']):3d} targets  {p['py']}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

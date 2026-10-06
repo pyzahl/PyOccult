@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""pyoccult_report.py - turn PyOccult's hits_log.csv into a readable event list (HTML or Markdown).
+"""report.py - turn PyOccult's hits_log.csv into a readable event list (HTML or Markdown).
 
 Columns follow the Occult Watcher (OWC) list - asteroid, event time (UT), star magnitude, magnitude
 drop, maximum duration, star altitude with compass direction, Moon distance with phase icon - plus the
@@ -7,24 +6,24 @@ observer's offset from the shadow centre line and a link to the KML ground-track
 
 Standard library only. Usage:
 
-    python pyoccult_report.py hits_log.csv                       # -> hits_report.html next to the CSV
-    python pyoccult_report.py hits_log.csv -o events.html --kml-dir maps --max-miss 50 --min-drop 0.5
-    python pyoccult_report.py hits_log.csv --format md           # Markdown table instead
-    python pyoccult_report.py hits_log.csv --sort date           # by event time (default: by star magnitude)
+    pyoccult report hits_log.csv                       # -> hits_report.html next to the CSV
+    pyoccult report hits_log.csv -o events.html --kml-dir maps --max-miss 50 --min-drop 0.5
+    pyoccult report hits_log.csv --format md           # Markdown table instead
+    pyoccult report hits_log.csv --sort date           # by event time (default: by star magnitude)
 
 The observer position (needed only for the compass direction) comes from pyoccult_config.py (LAT, LON)
 if that file is importable, or from --lat / --lon (east-positive degrees).
 
 KML files are looked up as  <kml-dir>/<target_id>_<YYYYMMDD>T<HHMM>*.kml , i.e. the name that
-pyoccult_paths.write_shadow_kml() is given in the pipeline hook (best_utc truncated to the minute).
+paths.write_shadow_kml() is given in the pipeline hook (best_utc truncated to the minute).
 
 For every event with a KML file the HTML page gets a "Map" button: an interactive map (Leaflet + OpenStreetMap
 tiles, loaded from the internet when the button is first used) showing the shadow centre line, the shadow
 limits, the 3-sigma limits and the observer. The path data is embedded in the page, so it works when the file
 is opened straight from disk. A link opens the closest centre-line point in Google Maps. --no-embed turns it off.
 """
-from pyoccult_version import __version__
-import pyoccult_urls as U
+from pyoccult.version import __version__
+from pyoccult import urls as U
 import argparse
 import csv
 import glob
@@ -72,7 +71,7 @@ def read_log(path):
 
 
 def read_last_run(csv_path):
-    """The last run summary pyoccult.py appended to <hits log>.runs.jsonl, or None."""
+    """The last run summary search.py appended to <hits log>.runs.jsonl, or None."""
     path = os.path.splitext(csv_path)[0] + ".runs.jsonl"
     try:
         with open(path) as f:
@@ -135,6 +134,14 @@ def earth_pck_text(e, run):
     else:
         part = f"measured values up to {last}, predicted after" if last else "?"
     return txt + f"; this window ({w0.isoformat()} to {w1}) uses {part}"
+
+
+def parse_utc(text):
+    """'2026-10-08T22:10:05.939' (any number of decimals, optional Z) -> aware UTC datetime. Python before 3.11
+    only reads 3 or 6 decimals with datetime.fromisoformat."""
+    base, _, frac = str(text).strip().rstrip("Z").partition(".")
+    t = datetime.fromisoformat(base).replace(tzinfo=timezone.utc)
+    return t + timedelta(seconds=float("0." + frac)) if frac else t
 
 
 def size_estimated(e):
@@ -218,7 +225,7 @@ LINE_STYLES = (("Centre", "#15803d", 3, None), ("Shadow limit", "#dc2626", 2, No
 
 
 def kml_to_data(path):
-    """Lines and pins of a pyoccult_paths KML as a compact dict ([lat, lon] order, ~1 m precision).
+    """Lines and pins of a paths KML as a compact dict ([lat, lon] order, ~1 m precision).
     Line colours are re-mapped to map-friendly ones (the KML uses neon colours meant for Google Earth)."""
     root = ET.parse(path).getroot()
     lines, pins = [], []
@@ -245,7 +252,7 @@ def kml_to_data(path):
 
 
 def build_event(r, lat, lon, kml_dir, out_dir):
-    when = datetime.fromisoformat(r["best_utc"].strip().rstrip("Z")).replace(tzinfo=timezone.utc)
+    when = parse_utc(r["best_utc"])
     tid = r["target_id"].strip()
     mag, drop = num(r.get("mag")), num(r.get("mag_drop"))
     speed, rad = num(r.get("speed_kms")), num(r.get("r_km"))
@@ -455,8 +462,8 @@ function show(mode){cells.forEach(function(c){c.textContent=mode==='local'?zoned
   mode==='site'?(c.dataset.tz?zoned(c,c.dataset.tz)+' ('+c.dataset.tz.split('/').pop().replace(/_/g,' ')+')':
   c.dataset.ut+' UT (site zone unknown)'):c.dataset.ut;});
   if(head)head.firstChild.textContent={ut:'Event time (UT)',local:'Event time (local)',site:'Event time (site)'}[mode];
-  try{localStorage.setItem('pyoccult_fav_time',mode);}catch(e){}}
-if(sel){try{var m=localStorage.getItem('pyoccult_fav_time');if(m)sel.value=m;}catch(e){}
+  try{localStorage.setItem('fav_time',mode);}catch(e){}}
+if(sel){try{var m=localStorage.getItem('fav_time');if(m)sel.value=m;}catch(e){}
   sel.addEventListener('change',function(){show(sel.value);});if(sel.value!=='ut')show(sel.value);}
 })();
 </script>"""
@@ -753,12 +760,10 @@ def to_markdown(events, meta):
 # ---------------------------------------------------------------- main
 
 def load_config_observer(csv_path):
-    for d in (os.path.dirname(os.path.abspath(csv_path)), os.getcwd(), os.path.dirname(os.path.abspath(__file__))):
-        sys.path.insert(0, d)
     try:
-        import pyoccult_config as cfg
+        from pyoccult import config as cfg
         return getattr(cfg, "LAT", None), getattr(cfg, "LON", None), getattr(cfg, "map_dir", None)
-    except ImportError:
+    except (ImportError, SystemExit, OSError):           # no usable configuration: no observer position
         return None, None, None
 
 

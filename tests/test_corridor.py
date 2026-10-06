@@ -1,5 +1,5 @@
 import sys, math, re, os, tempfile, numpy as np, pandas as pd
-sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..')); import pyoccult_corridor as C
+sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src')); from pyoccult import corridor as C
 rng = np.random.default_rng(7)
 AU = C.AU_KM
 

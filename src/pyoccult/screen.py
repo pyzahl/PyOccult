@@ -1,38 +1,38 @@
-"""pyoccult_screen.py - find the actual occultation events at one site for many asteroids at once (pick tool engine).
+"""screen.py - find the actual occultation events at one site for many asteroids at once (pick tool engine).
 
 For every asteroid (SBDB full-precision elements):
-  1. positions every step_s over the window, integrated with the planets (pyoccult_orbits, ~0.01" vs Horizons),
+  1. positions every step_s over the window, integrated with the planets (orbits, ~0.01" vs Horizons),
   2. only times when the asteroid is above min_alt at the site and the Sun is below max_sun_alt are searched,
   3. the faintest useful star is set per asteroid by the drop rule (min_drop) and OWC's observability criterion
      (owc_limit: aperture, detection frames, MagAdjust), so small/fast asteroids only search bright stars.
      Durations for these rules use the upper size bound (an H-only size is uncertain by ~1.7x), i.e. an event is
      kept if it CAN be observable,
-  4. stars along the visible path come from the bright-star index (pyoccult_gaia_local.BrightIndex),
+  4. stars along the visible path come from the bright-star index (gaia_local.BrightIndex),
   5. the corridor candidate scan finds closest approaches to the Earth's centre; each is then solved for the site
      (fundamental plane, observer on the rotating Earth), and kept if the shadow passes within r_max + reach.
 
-Screening accuracy: asteroid positions ~2 km; star proper motion linear (no stellar parallax, like pyoccult.py today).
-Stars faster than 1500 mas/yr are not searched. Final predictions: pyoccult.py with the exact Horizons SPK.
+Screening accuracy: asteroid positions ~2 km; star proper motion linear (no stellar parallax, like search.py today).
+Stars faster than 1500 mas/yr are not searched. Final predictions: search.py with the exact Horizons SPK.
 
 SPICE (not thread-safe): one process at a time per SPICE pool; screen() may run in worker processes, each loading the
 kernels itself (load_kernels).
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import math, os
 import pandas as pd
 import numpy as np
-import pyoccult_orbits as O
-from pyoccult_corridor import find_candidates, propagate_linear, pad_for_pm, _unit, EARTH_R_KM, GAIA_EPOCH_YEAR
+from pyoccult import orbits as O
+from pyoccult.corridor import find_candidates, propagate_linear, pad_for_pm, _unit, EARTH_R_KM, GAIA_EPOCH_YEAR
 
 AU_KM = O.AU_KM
-from pyoccult_kernels import KERNELS
+from pyoccult.kernels import KERNELS
 
 
 def load_kernels(spice, folder="."):
     for k in KERNELS:
         p = os.path.join(folder, k)
         if not os.path.isfile(p):
-            raise FileNotFoundError(f"{p} missing: run  python pyoccult_setup.py --no-gaia  (downloads the kernels)")
+            raise FileNotFoundError(f"{p} missing: run  pyoccult setup --no-gaia  (downloads the kernels)")
         spice.furnsh(p)
 
 

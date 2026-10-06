@@ -1,7 +1,7 @@
 import sys, os, math, types, tempfile, numpy as np, pandas as pd
-sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..')); import pyoccult_corridor as C
+sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src')); from pyoccult import corridor as C
 exec(open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), 'test_corridor.py')).read().split("# ---------- 3. magnitude cap")[0])      # reuse synthetic path, catalogue, FakeLocal (no tests after this point)
-src = open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'pyoccult.py')).read()
+src = open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src', 'pyoccult', 'search.py')).read()
 funcs = src[src.index("RUN = dict("):src.index('if __name__ == "__main__":')]   # run stats, handle_star, target_test_corridor
 
 out_csv = os.path.join(tempfile.mkdtemp(), "hits.csv")
@@ -15,7 +15,8 @@ class Cfg:
     write_maps = False; default_sigma3_km = 10.0
     star_parallax = False; light_deflection = False      # covered by test_astrometry (needs SPICE positions)
     pick_aperture_cm = 25.0; pick_frames = 4; pick_mag_adjust = 0.0; pick_extinction = 0.2       # site equipment
-import time, json, datetime, pyoccult_screen, pyoccult_astrometry
+import time, json, datetime
+from pyoccult import screen as pyoccult_screen, astrometry as pyoccult_astrometry
 ns = dict(np=np, pd=pd, os=os, time=time, json=json, datetime=datetime.datetime, screen=pyoccult_screen, astrometry=pyoccult_astrometry, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
 ns['spice'] = types.SimpleNamespace(et2utc=lambda et, f, p: "ET:%r" % float(et))
 def star_test(loc, utc, span, ra, dec, tid, r, reach):

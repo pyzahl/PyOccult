@@ -1,4 +1,4 @@
-"""pyoccult_globe.py - Occult-style event plot as SVG: the whole Earth as seen from the star at the event time, with the
+"""globe.py - Occult-style event plot as SVG: the whole Earth as seen from the star at the event time, with the
 shadow path (centre line, shadow limits, 1- and 3-sigma limits, minute marks), the shadow axis off the Earth, day
 side and terminator, the observer's site, a header with the event parameters (as Occult's plot: star, durations,
 time per km and per mas, drop, Sun and Moon, 1-sigma error, asteroid size, parallax and motion) and a 2 deg star
@@ -9,7 +9,7 @@ chart with the asteroid's motion in 24 h steps.
 
 Coastlines and borders: data/ne_110m_earth.json (Natural Earth 1:110m, public domain).
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import json, math, os
 import numpy as np
 
@@ -315,10 +315,10 @@ def _hms(deg, sign=False):
 def globe_data(spice, record, target, star_dir, paths, sigma3_km, site=None, stars=None, size=None,
                run_utc="", corrections=None, of_date=None, style="color"):
     """The dict render_svg() draws. record: the hits_log record of the event; target: SPICE name of the asteroid;
-    star_dir: the (corrected) J2000 unit vector used by the search; paths: pyoccult_paths.shadow_path() result;
+    star_dir: the (corrected) J2000 unit vector used by the search; paths: paths.shadow_path() result;
     site: (lon_deg, lat_deg, name); stars: (ra, dec, g) arrays at the event date for the 2 deg chart;
     size: the size dict of the search (r_km, r_min_km, r_max_km, source); of_date: (ra_deg, dec_deg) true of date."""
-    from pyoccult_paths import plane_basis
+    from pyoccult.paths import plane_basis
     et = float(record["best_et"])
     basis = plane_basis(np.asarray(star_dir, float))
     x_ax, y_ax, z_ax = basis

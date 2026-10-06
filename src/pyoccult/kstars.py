@@ -1,11 +1,11 @@
-"""pyoccult_kstars.py - point a running KStars at an event: the observer site, the event time, the target star, a field
+"""kstars.py - point a running KStars at an event: the observer site, the event time, the target star, a field
 like the preview. Linux only (KStars' D-Bus interface, called with the gdbus or dbus-send command line tools). On any
 other system, or without KStars running, available() says why not and show() does nothing: never raises.
 
-Used by pyoccult_gui.py (/api/kstars/...), which the report's KStars buttons call when the GUI serves the report.
+Used by gui.py (/api/kstars/...), which the report's KStars buttons call when the GUI serves the report.
 Standard library only.
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import json, shutil, subprocess, sys
 from datetime import datetime, timedelta, timezone
 
@@ -124,7 +124,11 @@ def show(ra_deg, dec_deg, utc, fov_deg=2.0, lat=None, lon=None, ele=0.0, set_loc
     return True, f"KStars: {t:%Y-%m-%d %H:%M:%S} UT, RA {ra_deg:.4f} Dec {dec_deg:+.4f}, field {fov_deg:.2f} deg{note}"
 
 
-if __name__ == "__main__":
+def main():
     print(available())
-    if len(sys.argv) >= 4:                       # python pyoccult_kstars.py <ra_deg> <dec_deg> <utc> [fov_deg]
+    if len(sys.argv) >= 4:                       # pyoccult kstars <ra_deg> <dec_deg> <utc> [fov_deg]
         print(show(*sys.argv[1:4], *(sys.argv[4:5] or [2.0])))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,4 +1,4 @@
-"""pyoccult_favorites.py - a hand-picked list of events from any search and any site, kept with everything known.
+"""favorites.py - a hand-picked list of events from any search and any site, kept with everything known.
 
     favorites/favorites.json                    the list (one entry per event, newest first)
     favorites/favorites.csv                     the same as a flat table (rewritten with every change; for sharing)
@@ -7,12 +7,12 @@
 An entry holds the full hits_log record, the site and the run context of the search it came from, when it was added,
 a status (planned / observed / cancelled / clouded) and a note. Map and preview are copies, so later searches (which
 overwrite or delete files in maps/) never change a favorite. Private (site names): favorites/ is in .gitignore.
-Used by pyoccult_gui.py (report star buttons, Favorites tab). Standard library only.
+Used by gui.py (report star buttons, Favorites tab). Standard library only.
 
-    python pyoccult_favorites.py list
+    pyoccult favorites list
 """
-from pyoccult_version import __version__
-import pyoccult_urls as U
+from pyoccult.version import __version__
+from pyoccult import urls as U
 import glob, json, os, shutil, sys, tempfile
 from datetime import datetime, timezone
 
@@ -50,7 +50,7 @@ PHYS_KEYS = ("H", "G", "diameter", "diameter_sigma", "extent", "albedo", "rot_pe
 
 
 def phys_of(entry):
-    """{name: (value, ref)} of the size-cache entry (pyoccult_sbdb) kept with a favorite, for H, G, diameter, ..."""
+    """{name: (value, ref)} of the size-cache entry (sbdb) kept with a favorite, for H, G, diameter, ..."""
     out = {}
     for k in PHYS_KEYS:
         v = ((entry or {}).get("phys") or {}).get(k)
@@ -90,7 +90,7 @@ def keys(folder=DIR):
 
 def add(record, run=None, map_dir="maps", folder=DIR, sbdb=None):
     """Add an event (record: a hits_log row as a dict; run: the run summary of its search, or None; sbdb: the
-    asteroid's size-cache entry from pyoccult_sbdb, kept with the favorite). Copies its KML and preview from map_dir.
+    asteroid's size-cache entry from sbdb, kept with the favorite). Copies its KML and preview from map_dir.
     Returns (ok, message)."""
     try:
         key = key_of(record["target_id"], record["best_utc"])
@@ -187,7 +187,7 @@ def cleanup(before=None, folder=DIR):
 def write_page(folder=DIR, tiles=None):
     """favorites/favorites.html: the favorites as a report table (as the Results page, plus select box, site, status,
     note, added) with the same tools, using each favorite's own map and preview copies. Returns the path."""
-    import pyoccult_report as R
+    from pyoccult import report as R
     events, paths, sites = [], {}, set()
     for f in load(folder):
         r, site = f["record"], f.get("site") or {}
@@ -226,7 +226,7 @@ def write_page(folder=DIR, tiles=None):
 
 def backfill_phys(lookup, folder=DIR):
     """Give favorites SBDB's full physical data (size, and shape and rotation where known): lookup(target_id) ->
-    size-cache entry or None (pyoccult_sbdb.get_full). Done once per favorite: 'phys_src' notes that the entry came
+    size-cache entry or None (sbdb.get_full). Done once per favorite: 'phys_src' notes that the entry came
     from the per-object SBDB API (bulk rows of the pick tool hold only the size; offline, it is tried again next
     time). Saves (and rewrites the CSV) only if something changed. Returns the number updated."""
     items, n = load(folder), 0
@@ -332,11 +332,16 @@ def find_record(csv_path, target_id, best_utc):
     return None
 
 
-if __name__ == "__main__":
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+def main():
+    from pyoccult.home import HOME
+    os.chdir(HOME)
     if sys.argv[1:2] != ["list"]:
         sys.exit(__doc__)
     for e in load():
         r, s = e["record"], e.get("site") or {}
         print(f"{e['key']:24s} {e['status']:9s} {(r.get('target_name') or '')[:28]:28s} site {s.get('name', '?'):12s} "
               f"G {float(r.get('mag') or 0):5.2f}  {e['note'][:40]}")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

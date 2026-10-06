@@ -1,7 +1,7 @@
 """pyoccult_favorites: add (with copies of map and preview), duplicates, status/note, remove, lookup in a hits log."""
 import os, sys, tempfile
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_favorites as F
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import favorites as F
 
 tmp = tempfile.mkdtemp()
 maps, fav = os.path.join(tmp, "maps"), os.path.join(tmp, "favorites")
@@ -78,7 +78,7 @@ assert F.shape_text(F.load(fav)[0]) == "axes 18.2 x 10.5 x 8.9 km · rotation 5.
 est = dict(F.load(fav)[0], record=dict(rec, size_source="H only, albedo assumed"))
 assert F.size_text(est).endswith("* estimate, uncertain by a factor ~1.7"), F.size_text(est)
 # preview and globe plot kept apart (report lookup, favorite copies, filling in later globes)
-import pyoccult_report as R
+from pyoccult import report as R
 assert R.size_estimated({"size_src": "H only, albedo assumed"}) and not R.size_estimated({"size_src": "SBDB diameter"})
 from datetime import datetime, timezone
 when = datetime(2026, 10, 3, 2, 53, 7, tzinfo=timezone.utc)

@@ -29,13 +29,18 @@ As in the README (sections 1-4):
 ```bash
 python -m venv .venv
 source .venv/bin/activate           # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python pyoccult_setup.py --gmax 16 --source zenodo    # kernels + the small G <= 16 catalog (2.1 GB), enough for development
+pip install -e .
+pyoccult setup --gmax 16 --source zenodo    # kernels + the small G <= 16 catalog (2.1 GB), enough for development
 ```
 
 Setup asks for your observing site and writes `sites.py`. That file is private and stays out of git.
 
 ## 3. Know the code before you change it
+
+The code is a standard Python package (PEP 621 `pyproject.toml`, src layout): modules in `src/pyoccult/`, imported as
+`from pyoccult import screen` (never by file path). `pip install -e .` makes your edits live at once. Commands are
+listed in `src/pyoccult/__main__.py` (`COMMANDS`): a new tool gets a module with a `main()` and an entry there. Tools
+run in the data folder (`pyoccult.home.HOME`: the project folder in a checkout), so data paths stay relative.
 
 - `README.md`: what the tools do and how to use them.
 - `ABOUT.md`: how the predictions are computed, the data sources, the validation and the open items (Part 6 is a
@@ -58,7 +63,7 @@ Good practice:
 
 - Work on your branch, one topic per session or branch.
 - Ask it to run the tests (below) and, for anything that changes predictions, to compare with a known result
-  (`pyoccult_owc_check.py`, see ABOUT.md Part 5).
+  (`pyoccult/owc_check.py`, see ABOUT.md Part 5).
 - Keep `CLAUDE.md` current: when a change adds a file, a convention or a known limitation, update the matching
   section (Files, Conventions that matter, Status, Ideas not built yet) in the same branch. It is the memory for the
   next developer and the next session.
@@ -84,12 +89,12 @@ and say in the pull request what you compared it with.
 
 `.gitignore` already keeps them out; please do not force them in:
 
-- your sites: `sites.py` (coordinates of your observing places), `owc_reference.txt`, `owc_refs/`, `picks/`,
+- your sites and settings: `sites.py` (coordinates of your observing places), `pyoccult_config.py`, `owc_reference.txt`, `owc_refs/`, `picks/`,
   `favorites/` (they name your sites)
 - downloads and generated data: SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`), Gaia catalogs (`gaia_dr3_*/`),
   run outputs (`hits_log.csv`, `hits_report.html`, `maps/`, `targets.py`, ...)
 
-Never put real coordinates into tracked files (examples use New York City Hall, see `sites_example.py`).
+Never put real coordinates into tracked files (examples use New York City Hall, see `src/pyoccult/templates/sites_example.py`).
 
 ## 7. Offer it for integration
 

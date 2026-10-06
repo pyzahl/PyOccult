@@ -2,7 +2,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
 
 Python Occultation Searcher by PyZahl (C) 2026, version 0.12.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
-The version and its code name (it changes at major milestones) are kept in `pyoccult_version.py`; the GUI header and
+The version and its code name (it changes at major milestones) are kept in `pyoccult/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).
 
@@ -37,23 +37,28 @@ This is where PyOccult comes in: it predicts such events for observation plannin
 
 # Tools in this project:
 
+The code is the Python package `pyoccult` in `src/pyoccult/` (paths below are relative to `src/`). One command starts
+everything: `pyoccult` (the web interface) or `pyoccult <command>`, e.g. `pyoccult search`, `pyoccult pick`,
+`pyoccult setup`, `pyoccult report hits_log.csv`, `pyoccult owc-check`, `pyoccult gaia status`, `pyoccult picks list`
+(`pyoccult --help` lists them all).
+
 | File | What it does |
 |---|---|
-| `pyoccult.py` | the search: finds star occultations by your targets for your site, appends to `hits_log.csv` |
-| `pyoccult_config.py` | run configuration (window, targets, limits, output) |
-| `sites.py` | your observing site(s) with their view and equipment; private, created by `pyoccult_setup.py` from `sites_example.py` |
-| `pyoccult_paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
-| `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
-| `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py`, and saves both per site and window in `picks/` |
-| `pyoccult_picks.py` | the saved picks: which one a search uses, `list`, `import` |
-| `pyoccult_urls.py` | every download and web address PyOccult uses (NAIF, ESA Gaia, Zenodo, JPL, MPC, Open-Meteo, maps), each with its own name: change them there only |
-| `pyoccult_kstars.py` | points a running KStars at an event (Linux, D-Bus); used by the report's KStars button in the GUI |
-| `pyoccult_favorites.py` | the favorites list (`favorites/`, private): events starred in the report, with copies of map and preview; `list` |
-| `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
-| `pyoccult_gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult_setup.py` and the search) |
-| `pyoccult_gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
-| `pyoccult_owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
-| supporting modules | `pyoccult_corridor.py` (star corridor), `pyoccult_screen.py` + `pyoccult_orbits.py` (pick tool engine), `pyoccult_preview.py` (event preview image), `pyoccult_sbdb.py` (asteroid size cache), `pyoccult_kernels.py` (kernel download), `pyoccult_geo.py` (place and IP lookup), `pyoccult_runner.py` (runs with per-run settings) |
+| `pyoccult/search.py` | the search: finds star occultations by your targets for your site, appends to `hits_log.csv` |
+| `pyoccult_config.py` | your run configuration (window, targets, limits, output), in the PyOccult folder; created from `pyoccult/templates/pyoccult_config.py` |
+| `sites.py` | your observing site(s) with their view and equipment; private, created by `pyoccult setup` from `pyoccult/templates/sites_example.py` |
+| `pyoccult/paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
+| `pyoccult/report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
+| `pyoccult/pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py`, and saves both per site and window in `picks/` |
+| `pyoccult/picks.py` | the saved picks: which one a search uses, `list`, `import` |
+| `pyoccult/urls.py` | every download and web address PyOccult uses (NAIF, ESA Gaia, Zenodo, JPL, MPC, Open-Meteo, maps), each with its own name: change them there only |
+| `pyoccult/kstars.py` | points a running KStars at an event (Linux, D-Bus); used by the report's KStars button in the GUI |
+| `pyoccult/favorites.py` | the favorites list (`favorites/`, private): events starred in the report, with copies of map and preview; `list` |
+| `pyoccult/setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
+| `pyoccult/gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult/setup.py` and the search) |
+| `pyoccult/gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
+| `pyoccult/owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
+| supporting modules | `pyoccult/corridor.py` (star corridor), `pyoccult/screen.py` + `pyoccult/orbits.py` (pick tool engine), `pyoccult/preview.py` (event preview image), `pyoccult/sbdb.py` (asteroid size cache), `pyoccult/kernels.py` (kernel download), `pyoccult/geo.py` (place and IP lookup), `pyoccult/runner.py` (runs with per-run settings) |
 
 See `ABOUT.md` for the computations, data sources and open points:
 https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
@@ -61,7 +66,9 @@ https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 # Install
 
 General steps: clone this repository, change into its folder PyOccult, set up a Python virtual environment, install
-the requirements and run the setup.
+PyOccult into it (`pip install -e .`, which also installs the packages it needs and the `pyoccult` command) and run
+the setup. PyOccult is a standard Python package (`pyproject.toml`, code in `src/pyoccult/`); your data (sites,
+settings, kernels, catalogs, results) stays in the PyOccult folder.
 
 For Linux (and macOS): the script `linux_install.sh` does steps 1-5 below in one go after cloning: it creates the
 virtual environment `.venv`, installs the packages into it, runs the one-time setup (it asks for your site and the
@@ -74,11 +81,12 @@ catalog) and then starts the GUI:
   ```
 
 It can be rerun (it reuses `.venv`, and the setup resumes). It needs Python 3 with its venv module (Debian/Ubuntu:
-`sudo apt install python3 python3-venv`). Later, start the GUI with `.venv/bin/python pyoccult_gui.py`.
+`sudo apt install python3 python3-venv`). Later, start the GUI with `.venv/bin/pyoccult`.
 
 # Python Virtual Environment Setup Guide
 
-To set up a Python virtual environment and install dependencies from an existing `requirements.txt` file, open your terminal or command prompt and follow these three steps:
+To set up a Python virtual environment and install PyOccult with its dependencies (listed in `pyproject.toml`), open
+your terminal or command prompt in the PyOccult folder and follow these three steps:
 
 ## 1. Create the Virtual Environment
 Navigate to your project folder and run the `venv` command. Replacing `.venv` with your preferred environment name is optional, though `.venv` is the standard convention.
@@ -107,17 +115,27 @@ Before installing packages, you must activate the environment. The command depen
 
 NOTE: all caches go to `cache_path` in pyoccult_config.py. It defaults to /dev/shm (RAM, Linux) and to the system temp folder on other platforms; set it to any folder you like.
 
-## 3. Install from requirements.txt
-With the environment active, run `pip` to download and install all the listed packages into your isolated environment:
+## 3. Install PyOccult
+With the environment active, install PyOccult and all the packages it needs into your isolated environment:
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
+
+`-e` (editable) runs the code from `src/pyoccult/` directly, so a later `git pull` takes effect without installing
+again (only when `pyproject.toml` gains a new package, run it once more). It also installs the command `pyoccult`:
+`pyoccult` alone starts the web interface, `pyoccult <command>` runs a tool (`pyoccult --help` lists them; options
+as before). Without activating the environment, use `.venv/bin/pyoccult` (Windows: `.venv\Scripts\pyoccult`).
+
+Your files live in the PyOccult folder (the data folder; set `PYOCCULT_HOME` to use another one): `sites.py` (your
+sites), `pyoccult_config.py` (run settings; created from `src/pyoccult/templates/pyoccult_config.py` on first use,
+settings it lacks keep the template's default), the SPICE kernels, the Gaia catalogs, `picks/`, `favorites/`,
+`maps/` and the results. None of them are in git.
 
 ## 4. One-time data setup
 
 PyOccult works offline from local data: SPICE kernels for the planets and Earth orientation, and a local copy of the
-Gaia star catalog. `pyoccult_setup.py` installs all of it.
+Gaia star catalog. `pyoccult/setup.py` installs all of it.
 
 The Gaia catalog can be installed two ways, with the same result:
 
@@ -138,11 +156,11 @@ For G <= 16 everything is about a quarter of that (2.1 GB download, ~3 GB disk).
 and a few GB of free RAM while the index is built.
 
 **Before you start**: your observing site goes into `sites.py` (see "Observing sites" below). If it does not exist
-yet, `pyoccult_setup.py` helps you create it: it guesses your position from your IP address (ipinfo.io; city level,
+yet, `pyoccult/setup.py` helps you create it: it guesses your position from your IP address (ipinfo.io; city level,
 off by 10-100 km, wrong behind a VPN; `--no-geoip` skips it), and you can accept that, look up a city or place name
 (Open-Meteo, with elevation), or type latitude, longitude and elevation. A guessed or looked-up position is marked
 APPROXIMATE in `sites.py`, and `--status` keeps warning until you replace it with your exact position (GPS or a map;
-a shadow can be only a few km wide). Without a terminal, setup copies `sites_example.py` instead. Also check these in
+a shadow can be only a few km wide). Without a terminal, setup copies `src/pyoccult/templates/sites_example.py` instead. Also check these in
 `pyoccult_config.py`:
 
 * `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g18` in the project folder). Pick a disk with ~13 GB free
@@ -155,12 +173,12 @@ a shadow can be only a few km wide). Without a terminal, setup copies `sites_exa
 **Run it**
 
 ```bash
-python pyoccult_setup.py              # kernels + local Gaia catalog + bright-star index (asks: zenodo or esa)
-python pyoccult_setup.py --source zenodo   # catalog from Zenodo without asking (G <= 16 or 18 only)
-python pyoccult_setup.py --source esa      # build the catalog from ESA's files without asking
-python pyoccult_setup.py --no-gaia    # kernels only (e.g. to try the old "windows" search mode)
-python pyoccult_setup.py --status     # what is installed
-python pyoccult_setup.py --gmax 16    # a smaller catalog to G 16 (own folder gaia_dr3_g16, ~3 GB); --dir to choose the folder
+pyoccult setup              # kernels + local Gaia catalog + bright-star index (asks: zenodo or esa)
+pyoccult setup --source zenodo   # catalog from Zenodo without asking (G <= 16 or 18 only)
+pyoccult setup --source esa      # build the catalog from ESA's files without asking
+pyoccult setup --no-gaia    # kernels only (e.g. to try the old "windows" search mode)
+pyoccult setup --status     # what is installed
+pyoccult setup --gmax 16    # a smaller catalog to G 16 (own folder gaia_dr3_g16, ~3 GB); --dir to choose the folder
 ```
 
 The catalog limit defaults to `gaia_local_gmax` (18). Another limit with `--gmax` is built in its own folder
@@ -181,8 +199,8 @@ options. In the background setup cannot ask: it would take the example site (New
 `pyoccult_config.py`.
 
 ```bash
-python pyoccult_setup.py --no-gaia                                           # in the terminal: your site and the kernels
-nohup python pyoccult_setup.py --gmax 18 --source zenodo > setup.log 2>&1 &  # then the catalog in the background
+pyoccult setup --no-gaia                                           # in the terminal: your site and the kernels
+nohup pyoccult setup --gmax 18 --source zenodo > setup.log 2>&1 &  # then the catalog in the background
 tail -f setup.log                     # progress with speed and ETA: a new line every 30 s
 ```
 
@@ -190,7 +208,7 @@ tail -f setup.log                     # progress with speed and ETA: a new line 
 
 It is safe to stop and rerun: a Zenodo download continues where it stopped, and an ESA build skips finished files, so
 the same command resumes. `--status` should end with
-`3386/3386 files ... (complete)` and `bright-star index ... ok`. The search (`pyoccult.py`) refuses to run on an
+`3386/3386 files ... (complete)` and `bright-star index ... ok`. The search (`pyoccult/search.py`) refuses to run on an
 incomplete catalog and tells you to rerun the setup. See "Local Gaia catalog" below for what is kept and why.
 
 **Downloads fail (offline, server down, proxy or firewall).** Setup stops with a message naming the address instead
@@ -198,7 +216,7 @@ of a traceback; what is already downloaded is kept, so rerun it later. Behind a 
 first: `export https_proxy=http://<proxy>:<port> HTTPS_PROXY=http://<proxy>:<port>`. If a proxy blocks one source,
 try the other (`--source zenodo` or `--source esa`), or copy the kernel files (`*.tls *.bsp *.tpc *.bpc`) and a
 finished catalog folder (`gaia_dr3_g16`, `gaia_dr3_g18`) from another computer. All addresses are listed in
-`pyoccult_urls.py`. An ESA build skips a file that still fails after its retries (a rerun fetches it) and stops early
+`pyoccult/urls.py`. An ESA build skips a file that still fails after its retries (a rerun fetches it) and stops early
 if the first files all fail.
 
 ## 5. Run it: the web interface
@@ -206,7 +224,7 @@ if the first files all fail.
 Start the GUI and work through its tabs from left to right:
 
 ```bash
-python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your browser (local only)
+pyoccult                 # opens http://127.0.0.1:8080 in your browser (local only)
 ```
 
 1. **Site**: set your observing site on the map (or by place name / IP address, or from Occult's list of about 800
@@ -253,15 +271,15 @@ Everything the GUI does is also available on the command line (scripts, automati
 
 | Step | Command | What it does |
 |---|---|---|
-| once | `python pyoccult_setup.py` | SPICE kernels, local Gaia catalog (Zenodo download or ESA build), bright-star index, `sites.py` |
-| choose | `python pyoccult_pick.py --start 2026-10-01 --days 20` | screen all asteroids for events at the site; writes `pick_events.csv`, `targets.py` and the saved pick in `picks/` |
-| predict | `./pyoccult.py` | exact search for the targets (the saved pick of the site covering the window, else `targets.py`); appends to `hits_log.csv`, writes `maps/` |
-| present | `python pyoccult_report.py hits_log.csv` | HTML event list with maps and previews (`hits_report.html`) |
-| check | `python pyoccult_owc_check.py --ref owc_reference.txt` | rerun an OWC search result you saved as text and compare event by event (`--sea-level`: compute at elevation 0, as OWC online does) |
+| once | `pyoccult setup` | SPICE kernels, local Gaia catalog (Zenodo download or ESA build), bright-star index, `sites.py` |
+| choose | `pyoccult pick --start 2026-10-01 --days 20` | screen all asteroids for events at the site; writes `pick_events.csv`, `targets.py` and the saved pick in `picks/` |
+| predict | `pyoccult search` | exact search for the targets (the saved pick of the site covering the window, else `targets.py`); appends to `hits_log.csv`, writes `maps/` |
+| present | `pyoccult report hits_log.csv` | HTML event list with maps and previews (`hits_report.html`) |
+| check | `pyoccult owc-check --ref owc_reference.txt` | rerun an OWC search result you saved as text and compare event by event (`--sea-level`: compute at elevation 0, as OWC online does) |
 
-Useful options: `pyoccult_pick.py --hmax 18 --reach 30 --frames 4 --top 40 --workers 4` (see "Quick start: choose
-targets" below), `python pyoccult_picks.py list` (saved picks), `PYOCCULT_CATALOG=gaia_dr3_g16 ./pyoccult.py`
-(another catalog for one run), `python pyoccult_setup.py --status` (what is installed).
+Useful options: `pyoccult/pick.py --hmax 18 --reach 30 --frames 4 --top 40 --workers 4` (see "Quick start: choose
+targets" below), `pyoccult picks list` (saved picks), `PYOCCULT_CATALOG=gaia_dr3_g16 pyoccult search`
+(another catalog for one run), `pyoccult setup --status` (what is installed).
 
 A small script does a fresh run and publishes the report on a local web server (here nginx; the map tiles need a
 web server, see the report section). Save it as `run.sh` (it is in `.gitignore`, adjust the paths) and make it
@@ -271,8 +289,8 @@ executable with `chmod +x run.sh`:
 #!/bin/sh
 rm -f hits_log.csv                    # start a fresh log (the search appends)
 clear
-./pyoccult.py
-./pyoccult_report.py hits_log.csv
+pyoccult search
+pyoccult report hits_log.csv
 sudo cp hits_report.html /var/www/html/hits_report.html
 ```
 
@@ -282,17 +300,17 @@ To include the maps' KML links in the published page, also copy the `maps` folde
 
 ## Quick Tips
 * **Deactivate:** When you are done working, simply type `deactivate` to exit the virtual environment.
-* **Version Control:** Do not upload your `.venv` folder to GitHub. Add `.venv/` to your `.gitignore` file, but **do** commit your `requirements.txt` file.
-* **Updating the list:** if the code needs a new package, add its name to `requirements.txt` (unpinned, no version
-  numbers, like the others).
+* **Version Control:** Do not upload your `.venv` folder to GitHub (`.gitignore` keeps it out).
+* **Updating the list:** if the code needs a new package, add its name to `dependencies` in `pyproject.toml`
+  (unpinned, no version numbers, like the others) and run `pip install -e .` again.
 
 * **Install + run:** Quick Start, all of above for Linux:
   ```
   python -m venv .venv
   source .venv/bin/activate
-  pip install -r requirements.txt
-  python pyoccult_setup.py            # one-time: kernels + local Gaia catalog (Zenodo download, resumable)
-  python pyoccult_gui.py              # then: Site -> Pick -> Search -> Results in the browser
+  pip install -e .
+  pyoccult setup        # one-time: kernels + local Gaia catalog (Zenodo download, resumable)
+  pyoccult              # then: Site -> Pick -> Search -> Results in the browser
   ```
 
 
@@ -302,8 +320,8 @@ To include the maps' KML links in the published page, also copy the `maps` folde
 All settings live in `pyoccult_config.py` (a Python file: edit it, keep the names). The search, the pick tool and the
 report read it from the project folder.
 
-**Observing sites** are kept apart from the settings, in `sites.py` (yours, not in git). `pyoccult_setup.py` creates it
-on the first run (see step 4), or copy `sites_example.py` to `sites.py` yourself; without `sites.py` the example site
+**Observing sites** are kept apart from the settings, in `sites.py` (yours, not in git). `pyoccult/setup.py` creates it
+on the first run (see step 4), or copy `src/pyoccult/templates/sites_example.py` to `sites.py` yourself; without `sites.py` the example site
 (New York City Hall) is used:
 
 ```python
@@ -346,8 +364,8 @@ longest usable exposure, `MaxDuration / frames = max_exp_s`: G 15.0 at 25 cm, G 
 without editing anything, or several in a batch:
 
 ```bash
-PYOCCULT_SITE=field ./pyoccult.py
-for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv --targets-file ""; done
+PYOCCULT_SITE=field pyoccult search
+for s in home field; do PYOCCULT_SITE=$s pyoccult pick -o pick_$s.csv --targets-file ""; done
 ```
 
 **Search window and targets**
@@ -355,7 +373,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | Setting | Example | Meaning |
 |---|---|---|
 | `ct, days, spn` | `"2026-10-01T00:00:00", 20, 3600` | search start (UTC) and number of days; `spn` (window length, s) is used only by the old `"windows"` mode |
-| `targets` | `["218001", "305580"]` | asteroid numbers as strings. Taken from `targets.py` when it exists (written by `pyoccult_pick.py`), else the list in the `except ImportError:` branch |
+| `targets` | `["218001", "305580"]` | asteroid numbers as strings. Taken from `targets.py` when it exists (written by `pyoccult/pick.py`), else the list in the `except ImportError:` branch |
 | `targets_source`, `picks_dir` | `"auto"`, `"picks"` | `"auto"`: use the saved pick of the site covering the search window if there is one, else `targets`; `"list"`: always `targets` |
 | `max_shadow_dist` | `20` | km you can travel: an event is logged if the shadow edge passes within this of your site (0 = only from home); a site's `reach_km` overrides it |
 | `search_mode` | `"corridor"` | `"corridor"` (default, fast, needs the local Gaia catalog) or `"windows"` (old per-hour archive queries) |
@@ -376,7 +394,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `ALT_MARGIN` | `3.0` | the early visibility gate is this much looser than the final test, so it never rejects a real event |
 | `atm_extinction` | `0.0` | atmospheric extinction for low altitudes, mag per airmass (0 = off, ~0.2 typical, ~0.3 hazy); a star at altitude h counts as fainter by `atm_extinction * (airmass - 1)`; a site's `extinction` overrides it |
 
-**Pick tool** (`pyoccult_pick.py`, see below)
+**Pick tool** (`pyoccult/pick.py`, see below)
 
 | Setting | Example | Meaning |
 |---|---|---|
@@ -398,7 +416,7 @@ for s in home field; do PYOCCULT_SITE=$s python pyoccult_pick.py -o pick_$s.csv 
 | `force_cleanup` | `False` | `True` deletes and re-downloads the SPICE kernels at start-up |
 
 **Earth orientation coverage.** `earth_latest_high_prec.bpc` holds measured Earth orientation up to its "last datum"
-(about the day NAIF made the file) and a prediction for about three months after that. At start-up `pyoccult.py`
+(about the day NAIF made the file) and a prediction for about three months after that. At start-up `pyoccult/search.py`
 checks the file's age (refreshed after `earth_pck_max_age` days) and prints both dates, e.g.
 `Earth PCK of 2026-09-29T17:07:04: measured to 2026-09-29, predicted to 2026-12-26`. The report header repeats them
 and says whether the search window uses measured or predicted values. The prediction is accurate to a few
@@ -407,7 +425,7 @@ stops at start-up: shorten it, or delete the file and rerun to fetch a newer one
 
 Results are appended to `hits_log.csv` (a rerun appends again; the report drops duplicates). Each hit also records
 `calc_s` (its calculation time), `airmass`, `extinction_mag` and `mag_margin` (magnitudes below OWC's observability
-limit, after extinction). At the end of a run `pyoccult.py` prints a summary (total time, start-up, asteroid data
+limit, after extinction). At the end of a run `pyoccult/search.py` prints a summary (total time, start-up, asteroid data
 loading, search, maps, time per asteroid and per exact solve, counts) and appends it, with the site, equipment and
 limits, as one line to `hits_log.runs.jsonl`; the report shows the latest one in its header.
 
@@ -420,35 +438,35 @@ magnitude-limited copy that you build once, or download ready-made from Zenodo
 ([doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337), G <= 16 and G <= 18, same files as a build):
 
 ```
-python pyoccult_setup.py                       # does all of it (kernels, catalog, bright-star index)
-python pyoccult_gaia_local.py build            # the catalog alone; folder and G limit from gaia_local_dir / gaia_local_gmax
-python pyoccult_gaia_local.py build --dir gaia_dr3_g18 --gmax 18 --workers 6
-python pyoccult_gaia_local.py status
-python pyoccult_gaia_local.py zenodo --dir gaia_dr3_g18 --gmax 18   # or the ready-made copy from Zenodo
+pyoccult setup                       # does all of it (kernels, catalog, bright-star index)
+pyoccult gaia build            # the catalog alone; folder and G limit from gaia_local_dir / gaia_local_gmax
+pyoccult gaia build --dir gaia_dr3_g18 --gmax 18 --workers 6
+pyoccult gaia status
+pyoccult gaia zenodo --dir gaia_dr3_g18 --gmax 18   # or the ready-made copy from Zenodo
 ```
 
-`pyoccult_setup.py --gmax N` passes another limit through to this build (see step 4).
+`pyoccult/setup.py --gmax N` passes another limit through to this build (see step 4).
 
 * It streams all of Gaia DR3 `gaia_source` from ESA's CDN (3386 files, **753 GB download**), keeps G <= gmax with full
   astrometry and ruwe < 1.4 (7 columns, binary), and deletes each download. G <= 18 keeps about 11 GB
   (280 M of 1.81 G stars), G <= 16 about 3 GB.
   At about 1.4 Gbit/s it takes 1.5 to 2 hours.
 * It is resumable: rerun the same command after an interruption, finished files are skipped.
-* `gaia_local_dir` in pyoccult_config.py must name that folder. pyoccult.py refuses a missing or incomplete catalog.
+* `gaia_local_dir` in pyoccult_config.py must name that folder. pyoccult/search.py refuses a missing or incomplete catalog.
 * Several catalogs can sit side by side (e.g. `gaia_dr3_g16` and `gaia_dr3_g18`). Choose one per run with
-  `PYOCCULT_CATALOG=gaia_dr3_g16 ./pyoccult.py` (the pick tool follows it too), or in the GUI header;
-  `python pyoccult_setup.py --status` lists the catalogs it finds.
+  `PYOCCULT_CATALOG=gaia_dr3_g16 pyoccult search` (the pick tool follows it too), or in the GUI header;
+  `pyoccult setup --status` lists the catalogs it finds.
 * A strip lookup takes about 1 s (2 s in the Galactic bulge), no network. Gaia is not cached elsewhere any more.
 * Stars fainter than `gaia_local_gmax` are not searched, whatever `MAG_MIN` says.
 
-**Adding a catalog later.** Run setup again with the limit you want, e.g. `python pyoccult_setup.py --gmax 16`.
+**Adding a catalog later.** Run setup again with the limit you want, e.g. `pyoccult setup --gmax 16`.
 It asks Zenodo or ESA as on the first run and installs into its own folder `gaia_dr3_g<limit>`, next to the ones you
 have. The GUI's **Catalog** selector (top right) lists every catalog folder it finds after a restart; a half-built one
 is shown as "incomplete n/3386" and runs refuse it until setup has finished it (rerun the same command, it resumes).
 If a folder already holds a catalog with another limit (e.g. an interrupted build), setup asks before deleting it.
 
 **Other catalog sources.** The search does not care where a catalog comes from: any folder with a `catalog.json`
-(`gmax`, `files`) and, per listed file, the three `.npy` files described at the top of `pyoccult_gaia_local.py`
+(`gmax`, `files`) and, per listed file, the three `.npy` files described at the top of `pyoccult/gaia_local.py`
 (stars with the 7 Gaia columns, sky cells, fast movers) is found and can be selected. A converter for another source
 only has to write that layout.
 
@@ -456,14 +474,14 @@ only has to write that layout.
 
 ## Quick start: choose targets (pick tool)
 
-`pyoccult_pick.py` finds the actual occultation events at your site for all asteroids in a window, like an OWC/Occult
-search, and writes the asteroids of the best events to `targets.py` for `pyoccult.py`.
+`pyoccult/pick.py` finds the actual occultation events at your site for all asteroids in a window, like an OWC/Occult
+search, and writes the asteroids of the best events to `targets.py` for `pyoccult/search.py`.
 
 ```bash
-python pyoccult_pick.py                          # window from pyoccult_config.py, site and equipment from sites.py, H < 17
-python pyoccult_pick.py --start 2026-10-01 --days 14 --top 30
-python pyoccult_pick.py --all                    # exhaustive: every numbered asteroid (~900k)
-python pyoccult_pick.py --sort date              # ranking: mag (default, brightest star first), date, margin, drop
+pyoccult pick                          # window from pyoccult_config.py, site and equipment from sites.py, H < 17
+pyoccult pick --start 2026-10-01 --days 14 --top 30
+pyoccult pick --all                    # exhaustive: every numbered asteroid (~900k)
+pyoccult pick --sort date              # ranking: mag (default, brightest star first), date, margin, drop
 ```
 
 How it works:
@@ -472,7 +490,7 @@ How it works:
   elements), cached as `PyOccult_sbdb_cache.json` in `cache_path` and refreshed after `sbdb_max_age_days`.
 * Orbits are integrated with the planets' gravity for the whole window (agrees with JPL Horizons to about 0.01").
 * The stars are the actual Gaia stars along each path, from the bright-star index of the local catalog
-  (`python pyoccult_setup.py` builds it). Only times when the asteroid is up and the Sun is down are searched.
+  (`pyoccult setup` builds it). Only times when the asteroid is up and the Sun is down are searched.
 * Each event is solved for your site and kept if the shadow passes within the asteroid radius + your reach
   (the site's `reach_km`, else `max_shadow_dist`).
 * Detection follows OWC's General Observability Criterion with the site's equipment (see "Observing sites"):
@@ -495,19 +513,19 @@ Output:
 * a ranked table of the events, and `pick_events.csv` with all of them (time, star, magnitude, drop, duration,
   `mag_margin` = magnitudes below the observability limit, distance from the centre line, altitudes, size)
 * `targets.py`: the asteroids of the best `--top` events, best first, importable; each line shows its event
-* their size data goes to the shared size cache, so the following `pyoccult.py` run needs no SBDB lookups for them
+* their size data goes to the shared size cache, so the following `pyoccult/search.py` run needs no SBDB lookups for them
 * a saved copy per site and window in `picks/` (`<site>__<start>_<days>d.py` + `.csv`; `--picks-dir`, config
   `picks_dir`; private, in `.gitignore`). A new pick of the same site and window replaces it.
 
-**Saved picks are reused.** Picking is the slow part, so you only need it once per site and window: `pyoccult.py`
+**Saved picks are reused.** Picking is the slow part, so you only need it once per site and window: `pyoccult/search.py`
 (with `targets_source = "auto"`, the default) takes the newest saved pick of its site whose window covers the search
 window, e.g. a pick for Oct 1 + 30 d serves any search from Oct 1 to Oct 31 at that site. It prints which one it
 uses, and the report header names it. Without one it falls back to `targets.py` or the list in `pyoccult_config.py`
-(`targets_source = "list"` always uses that list). `python pyoccult_picks.py list` shows the saved picks;
-`python pyoccult_picks.py import` saves an existing `targets.py` + `pick_events.csv` (from before saved picks) under
+(`targets_source = "list"` always uses that list). `pyoccult picks list` shows the saved picks;
+`pyoccult picks import` saves an existing `targets.py` + `pick_events.csv` (from before saved picks) under
 the site and window in its header.
 
-`pyoccult.py` then computes these events exactly (JPL Horizons orbit, exact solver, maps). Run it over the same window
+`pyoccult/search.py` then computes these events exactly (JPL Horizons orbit, exact solver, maps). Run it over the same window
 (`ct`, `days` in `pyoccult_config.py`; the pick tool uses them as its defaults).
 
 Tune it like OWC: with the same aperture, frames and MagAdjust as in OWC you get OWC's selection. Raise `mag_adjust`
@@ -516,14 +534,14 @@ for a dark site or a sensitive camera, lower it for light pollution or a less se
 **How wide is the corridor?** An event is kept when the shadow's centre line passes the site within
 **r_max + reach**: r_max is the upper bound of the asteroid's radius, reach is how far you can travel (the site's
 **Reach** in the GUI, `reach_km` in `sites.py`, `--reach` on the command line; default `max_shadow_dist`). It is the
-same rule `pyoccult.py` uses for logging, and Reach is the only setting for it. Example: reach 25 km and a 10 km
+same rule `pyoccult/search.py` uses for logging, and Reach is the only setting for it. Example: reach 25 km and a 10 km
 asteroid (r_max about 5 km) keep events whose centre line passes within 30 km of the site, on either side.
 
 * Sigmas: only the size has one. r_max comes from the SBDB diameter + 3 sigma (sigma 15 % of the diameter when SBDB
   gives none); with only H it is the diameter for albedo 0.05 instead of the nominal 0.14 (about 1.7x larger). The
   orbit uncertainty is not added: an event whose path is uncertain by more than your reach can be missed or kept
   wrongly. Raise Reach for such poorly known orbits, and check the 3-sigma lines on the map of the final prediction.
-* Positions in the pick are good to about 2 km (orbits integrated from SBDB elements); `pyoccult.py` then computes
+* Positions in the pick are good to about 2 km (orbits integrated from SBDB elements); `pyoccult/search.py` then computes
   the kept events exactly with the JPL Horizons orbit.
 * The stars are first gathered from a wider strip (Earth radius + r_max + reach on each side, plus a margin for proper
   motion). That strip is only a coarse pre-filter before the exact solve for the site and does not change the result.
@@ -544,11 +562,11 @@ except ImportError:
 
 ## Web interface (GUI)
 
-`pyoccult_gui.py` is a local web interface (NiceGUI) for everyday use:
+`pyoccult/gui.py` is a local web interface (NiceGUI) for everyday use:
 
 ```bash
-python pyoccult_gui.py                 # opens http://127.0.0.1:8080 in your browser
-python pyoccult_gui.py --port 8090 --no-browser
+pyoccult                 # opens http://127.0.0.1:8080 in your browser
+pyoccult --port 8090 --no-browser
 ```
 
 * **Site for all runs** and **Catalog** (top right, on every tab): the site and the local Gaia catalog the search
@@ -579,23 +597,23 @@ python pyoccult_gui.py --port 8090 --no-browser
   button does not appear.
 * **Log**: the live output of the running job, with **Stop**.
 
-Settings chosen in the GUI apply to that run only (via `pyoccult_runner.py`); `pyoccult_config.py` is not changed.
+Settings chosen in the GUI apply to that run only (via `pyoccult/runner.py`); `pyoccult_config.py` is not changed.
 Each run is its own process. The GUI listens on this computer only (127.0.0.1), because it can start programs.
 
 
 ## Quick start: hits_log.csv to HTML report
 
-`pyoccult_report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, offset from the centre line) and a **Map** button for each event. Standard library only, no install needed.
+`pyoccult/report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, offset from the centre line) and a **Map** button for each event. Standard library only, no install needed.
 The page header shows the site, its equipment, the magnitude and observing limits, the statistics of the run with the
 saved pick its targets came from, and the Earth orientation data it used (from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column. The **Preview** button shows
 the event preview: the star field around the target star at the event date (local Gaia catalog), the camera frame
 (`focal_mm`, `sensor_mm` of the site), the target star, the asteroid's position and track, north up and east left.
 
 ```bash
-python pyoccult_report.py hits_log.csv                           # writes hits_report.html next to the CSV
-python pyoccult_report.py hits_log.csv -o hits_report.md         # Markdown instead
-python pyoccult_report.py hits_log.csv --kml-dir maps --max-miss 200 --min-drop 0.3 --title "My events"
-python pyoccult_report.py hits_log.csv --sort date               # by event time (default --sort mag: brightest star first)
+pyoccult report hits_log.csv                           # writes hits_report.html next to the CSV
+pyoccult report hits_log.csv -o hits_report.md         # Markdown instead
+pyoccult report hits_log.csv --kml-dir maps --max-miss 200 --min-drop 0.3 --title "My events"
+pyoccult report hits_log.csv --sort date               # by event time (default --sort mag: brightest star first)
 ```
 
 * The site (header, compass directions, map pin) comes from the run summary in `hits_log.runs.jsonl`, else from

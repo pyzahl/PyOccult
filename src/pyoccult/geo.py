@@ -1,12 +1,12 @@
-"""pyoccult_geo.py - approximate observer positions: from the IP address (ipinfo.io), a place name (Open-Meteo geocoding),
-observatories with their MPC codes (Minor Planet Center), ground elevation and time zone (Open-Meteo). Used by pyoccult_setup.py and
-pyoccult_gui.py. Standard library only.
+"""geo.py - approximate observer positions: from the IP address (ipinfo.io), a place name (Open-Meteo geocoding),
+observatories with their MPC codes (Minor Planet Center), ground elevation and time zone (Open-Meteo). Used by setup.py and
+gui.py. Standard library only.
 
 All results are approximate: IP positions are city level (10-100 km off, wrong behind a VPN), place names give the town
 centre. Use an exact position (GPS, map) for observing.
 """
-from pyoccult_version import __version__
-import pyoccult_urls as U
+from pyoccult.version import __version__
+from pyoccult import urls as U
 import json, urllib.parse, urllib.request
 
 

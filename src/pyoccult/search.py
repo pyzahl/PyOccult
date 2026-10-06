@@ -1,6 +1,5 @@
-#!.venv/bin/python3
-from pyoccult_version import __version__
-import pyoccult_urls as U
+from pyoccult.version import __version__
+from pyoccult import urls as U
 import sys, base64, functools, os, re, time
 T_START = time.time()                    # run statistics: start-up time is measured from here
 from datetime import datetime
@@ -25,12 +24,12 @@ from astroquery.gaia import Gaia
 import warnings, erfa
 warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
-import pyoccult_config as config
-from pyoccult_paths import shadow_path, path_sigma3_km, write_shadow_kml
-import pyoccult_corridor as corridor
-import pyoccult_astrometry as astrometry
-import pyoccult_sbdb as sbdb_cache
-import pyoccult_screen as screen          # OWC observability formula, extinction
+from pyoccult import config
+from pyoccult.paths import shadow_path, path_sigma3_km, write_shadow_kml
+from pyoccult import corridor
+from pyoccult import astrometry
+from pyoccult import sbdb as sbdb_cache
+from pyoccult import screen          # OWC observability formula, extinction
 
 ########################## PROLOGUE KERNEL INIT SECTION
 
@@ -47,7 +46,7 @@ spice.clpool()
 
 
 
-from pyoccult_kernels import check_file_age, download_kernels, pck_comment_dates
+from pyoccult.kernels import check_file_age, download_kernels, pck_comment_dates
 
 
 # ==========================================
@@ -301,7 +300,7 @@ SIZE_OVERRIDES = {}   # curate best values here: {"19": (r_km, r_sigma_km, "sour
 
 def sbdb_phys(target_id, timeout=30):
     """Raw SBDB physical parameters {name: {value, sigma, ref, ...}} plus '_fullname', from the shared cache
-    (pyoccult_sbdb.py; also filled by pyoccult_pick.py) or the SBDB API. Returns None if SBDB cannot be reached and
+    (sbdb.py; also filled by pick.py) or the SBDB API. Returns None if SBDB cannot be reached and
     nothing is cached (failures are not cached)."""
     n = str(target_id).strip()
     hit, fresh = sbdb_cache.get(n, config.cache_path, getattr(config, "sbdb_max_age_days", 30))
@@ -654,9 +653,9 @@ LOCAL = None             # the local Gaia catalog (set by the driver), for the e
 
 
 def write_preview(record, target_id, stem):
-    """Event preview SVG (pyoccult_preview.py): stars of the local catalog around the target star at the event date,
+    """Event preview SVG (preview.py): stars of the local catalog around the target star at the event date,
     camera frame, asteroid track +/- 1 h. Written to <map_dir>/<stem>.svg next to the KML."""
-    import pyoccult_preview as preview
+    from pyoccult import preview
     fov = preview.camera_fov_arcmin(config.camera_focal_mm, config.camera_sensor_mm)
     field = max(config.preview_field_factor * max(fov), 10.0)
     et = record["best_et"]
@@ -683,8 +682,8 @@ def write_preview(record, target_id, stem):
 
 
 def write_globe(record, target_id, stem, star_dir, paths, sigma3, size, corr):
-    """Occult-style whole-Earth event plot (pyoccult_globe.py) as <map_dir>/<stem>_globe.svg."""
-    import pyoccult_globe as globe
+    """Occult-style whole-Earth event plot (globe.py) as <map_dir>/<stem>_globe.svg."""
+    from pyoccult import globe
     stars = None
     if LOCAL is not None:
         cat = LOCAL.cone(record["star_ra"], record["star_dec"], 1.42, min(float(record["mag"]) + 1.5, 13.0))
@@ -804,7 +803,7 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
 
 def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
     """Print the run statistics and the site/limits, and append them as one JSON line to <hits log>.runs.jsonl
-    (read by pyoccult_report.py for the page header)."""
+    (read by report.py for the page header)."""
     t_end = time.time()
     n_ok = max(n_targets, 1)
     s = dict(run_utc=datetime.fromtimestamp(T_START, tz=__import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), mode=mode,
@@ -840,7 +839,7 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
 
 def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=None):
     """Replacement for the per-window target_test(): one call per asteroid for the whole run.
-    plan = corridor.plan_corridor(...) (needs SPICE, build serially). local = pyoccult_gaia_local.LocalGaia.
+    plan = corridor.plan_corridor(...) (needs SPICE, build serially). local = gaia_local.LocalGaia.
     stars_cands = (stars, candidates) if already computed. Returns the number of logged hits."""
     obs_geo = {'lon': loc.lon.to(u.rad).value, 'lat': loc.lat.to(u.rad).value, 'alt': loc.height.to(u.km).value}
     r_search = size['r_max_km']
@@ -870,12 +869,12 @@ def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=Non
 
 
 def resolve_targets():
-    """targets_source "auto": the saved pick of this site covering the search window (pyoccult_picks), else the
+    """targets_source "auto": the saved pick of this site covering the search window (picks), else the
     config list (targets.py or the manual one). Sets config.targets; returns a description for the run summary."""
     if getattr(config, "targets_source", "auto") != "auto":
         return f"list ({len(config.targets)} targets)"
-    import pyoccult_picks
-    p = pyoccult_picks.best_for(config.site_name, str(config.ct)[:10], config.days, getattr(config, "picks_dir", "picks"),
+    from pyoccult import picks
+    p = picks.best_for(config.site_name, str(config.ct)[:10], config.days, getattr(config, "picks_dir", "picks"),
                                 config.LAT, config.LON)
     if p is None:
         print(f"* No saved pick for site {config.site_name} covers {str(config.ct)[:10]} + {config.days:g} d: "
@@ -883,8 +882,8 @@ def resolve_targets():
         return f"targets.py / config list ({len(config.targets)} targets)"
     config.targets = p["targets"]
     config.target_names = p["names"]
-    print(f"* Targets: {pyoccult_picks.describe(p)}")
-    return pyoccult_picks.describe(p)
+    print(f"* Targets: {picks.describe(p)}")
+    return picks.describe(p)
 
 
 if __name__ == "__main__":
@@ -915,11 +914,11 @@ if __name__ == "__main__":
         spice.kclear()
         sys.exit(0)
 
-    # stars come from the local Gaia copy (python pyoccult_gaia_local.py build); checked first, before any SPK work
+    # stars come from the local Gaia copy (python gaia_local.py build); checked first, before any SPK work
     if not getattr(config, "gaia_local_dir", None):
-        sys.exit("corridor mode needs the local Gaia catalog: set gaia_local_dir and run  python pyoccult_setup.py")
-    import pyoccult_gaia_local
-    local = pyoccult_gaia_local.LocalGaia(config.gaia_local_dir)         # raises if the catalog is incomplete
+        sys.exit("corridor mode needs the local Gaia catalog: set gaia_local_dir and run  pyoccult setup")
+    from pyoccult import gaia_local
+    local = gaia_local.LocalGaia(config.gaia_local_dir)         # raises if the catalog is incomplete
     LOCAL = local
     print(f"Using local Gaia catalog {config.gaia_local_dir} (G <= {local.gmax})")
 

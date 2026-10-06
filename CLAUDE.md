@@ -4,81 +4,95 @@ Portable Python replacement for the old Windows occultation predictor (Occult / 
 occultations of Gaia stars for one observer site. Read `ABOUT.md` for the computations and sources, `README.md` for usage.
 
 ## Files
-- `pyoccult_version.py`: the one place for `__version__` and `__codename__` ("New Horizons"; changes at major
+- Layout (since 2026-10-06): PEP 621 package, src layout like PyMovie/PyOTE. `pyproject.toml` (setuptools, version
+  from `pyoccult.version`, dependencies, entry point `pyoccult = pyoccult.__main__:main`); code in `src/pyoccult/`
+  (paths below are relative to `src/`); install `pip install -e .` (later: uv). Imports are `from pyoccult import x`,
+  never file paths. `pyoccult/home.py`: `HOME` = data folder (env `PYOCCULT_HOME`, else the checkout root with
+  pyproject.toml, else cwd) and `PKG` (package dir: logo, `data/ne_110m_earth.json`, `templates/`). Every command
+  chdirs to HOME, so data paths in the config stay relative (kernels, catalogs, sites.py, maps/, picks/, ...).
+  `pyoccult/__main__.py`: dispatcher `pyoccult [command] ...` (no command = GUI; `COMMANDS` maps names to modules).
+  It imports the module and calls `main()`, so functions sent to spawn workers (pick, gaia build) pickle as
+  `pyoccult.<module>.<fn>`; never run those modules via runpy as `__main__`. Exception: `search` (not import-safe)
+  runs via `runpy.run_module(..., run_name="__main__")`. The GUI starts runs as `[sys.executable, "-u", "-m",
+  "pyoccult", <command>, ...]` with `PYOCCULT_HOME` and `PYTHONPATH` set. Tests put `src/` on sys.path.
+- `pyoccult/config.py`: loader. Runs `templates/pyoccult_config.py` (defaults), then the user's `HOME/pyoccult_config.py`
+  (gitignored; copied from the template if missing) into this module's globals, so older user files get new keys.
+  Puts HOME on sys.path (sites.py, targets.py) and templates/ (sites_example for old config copies).
+- `pyoccult/version.py`: the one place for `__version__` and `__codename__` ("New Horizons"; changes at major
   milestones), `__author__`, `__copyright__`, `__license__`, `__url__` (GUI About box). Releases: GitHub tag `vX.Y.Z` (matching
   `__version__`) -> Zenodo DOI automatically; concept DOI 10.5281/zenodo.23149371 (README badge, CITATION.cff `doi`).
   Every version increase gets a
   `CHANGELOG.md` entry (Keep a Changelog style, newest first) (semver; keep CITATION.cff `version` and the README line in step);
   every module imports it, tools have `--version`, GUI header, run summary/report, picks and favorites record it.
-- `pyoccult.py`: main search script. Kernel setup runs at import time (not import-safe). Driver is the `__main__` block.
-- `sites.py` (private, not in git; layout `sites_example.py`): named observing sites with view (min_alt, max_sun_alt,
+- `pyoccult/search.py`: main search script. Kernel setup runs at import time (not import-safe). Driver is the `__main__` block.
+- `sites.py` (private, not in git, in HOME; layout `pyoccult/templates/sites_example.py`): named observing sites with view (min_alt, max_sun_alt,
   reach_km) and equipment (aperture_cm, frames, mag_adjust, extinction, ...); `pyoccult_config.py` derives `LAT`, `LON`,
   `ELE`, `MIN_STAR_ALT`, `MAX_SUN_ALT`, `MAG_MIN`, `pick_*` from `default_site` or env `PYOCCULT_SITE`. Never put real coordinates in tracked files.
   Env `PYOCCULT_CATALOG=<folder>` overrides `gaia_local_dir` for one run (GUI header selector sets it).
-- `pyoccult_config.py`: run config (targets, window, site, thresholds). Optional: `map_dir`, `min_mag_drop`, `search_mode` (`corridor`/`windows`), `corridor_step_s`,
+- `pyoccult_config.py` (user file in HOME, not in git; template `pyoccult/templates/pyoccult_config.py`): run config (targets, window, site, thresholds). Optional: `map_dir`, `min_mag_drop`, `search_mode` (`corridor`/`windows`), `corridor_step_s`,
   `gaia_local_dir` (required by corridor mode), `gaia_local_gmax`.
-- `pyoccult_paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.
-- `pyoccult_report.py`: `hits_log.csv` (+ last run of `hits_log.runs.jsonl` for the header) to HTML/Markdown with an embedded Leaflet map. Standard library only.
-- `pyoccult_pick.py`: event finder over all asteroids (OWC-style) for a window; writes `pick_events.csv` and
-  `targets.py`, and saves both per site + window in `picks/` (`pyoccult_picks.py`; pyoccult.py with
+- `pyoccult/paths.py`: shadow ground track (centre, limits, 3-sigma) as KML.
+- `pyoccult/report.py`: `hits_log.csv` (+ last run of `hits_log.runs.jsonl` for the header) to HTML/Markdown with an embedded Leaflet map. Standard library only.
+- `pyoccult/pick.py`: event finder over all asteroids (OWC-style) for a window; writes `pick_events.csv` and
+  `targets.py`, and saves both per site + window in `picks/` (`pyoccult/picks.py`; pyoccult/search.py with
   `targets_source = "auto"` uses the newest saved pick of its site covering the search window; an explicit
-  `targets` override sets `"list"`). Engine `pyoccult_screen.py` (site solve, OWC observability formula), orbits `pyoccult_orbits.py` (SBDB full-precision
+  `targets` override sets `"list"`). Engine `pyoccult/screen.py` (site solve, OWC observability formula), orbits `pyoccult/orbits.py` (SBDB full-precision
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= index_gmax(cam_limit) = max(15, ceil(limit)), cells sorted by G; a missing one is
   built by `run_screen` in the parent before the workers start, low-memory via a memmap). Worker processes.
-- `pyoccult_corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
+- `pyoccult/corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
-- `linux_install.sh` (user's quick install, Linux/macOS): creates `.venv` with python3, installs requirements via
-  `.venv/bin/python -m pip` (never `activate`: sh runs it in a subshell; system pip is refused by PEP 668), runs
-  `pyoccult_setup.py` then `exec`s the GUI; `set -e`, rerunnable. Keep it in step with setup/GUI changes.
-- `pyoccult_setup.py`: one-time bootstrap (kernels via `pyoccult_kernels.py`, local Gaia catalog, bright-star index);
-  rerunnable, resumes. `pyoccult_kernels.py`: the kernel download, also called by pyoccult.py at start-up.
-- `pyoccult_gaia_local.py`: builds/reads a local G-limited Gaia DR3 copy from ESA's CDN bulk files (`build`, `status`);
+- `linux_install.sh` (user's quick install, Linux/macOS): creates `.venv` with python3, installs the project via
+  `.venv/bin/python -m pip install -e .` (never `activate`: sh runs it in a subshell; system pip is refused by PEP 668),
+  runs `.venv/bin/pyoccult setup` then `exec`s `.venv/bin/pyoccult`; `set -e`, rerunnable. Keep it in step with setup/GUI changes.
+- `pyoccult/setup.py`: one-time bootstrap (kernels via `pyoccult/kernels.py`, local Gaia catalog, bright-star index);
+  rerunnable, resumes. `pyoccult/kernels.py`: the kernel download, also called by pyoccult/search.py at start-up.
+- `pyoccult/gaia_local.py`: builds/reads a local G-limited Gaia DR3 copy from ESA's CDN bulk files (`build`, `status`);
   one `.npy` per source file plus `.cells.npy` (1x1 deg cell index) and `.hpm.npy` (pm > 1500 mas/yr). No healpy.
   Ready-made copies (G <= 16, 18; no bright index) on Zenodo, concept DOI 10.5281/zenodo.23113337 (first version
   ...338, packed by `release/pack.sh`, untracked): `fetch_zenodo` (resumable, SHA-256, unpacks into any folder name);
   setup `--source auto|zenodo|esa` (auto: ask, Enter = zenodo; resumes a partial ESA build; esa for other limits).
-- `pyoccult_sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
-  `pyoccult.sbdb_phys()` (per-object API) and by `pyoccult_pick.py` for its top targets (bulk rows: size fields only); `get_full()` fetches the per-object
+- `pyoccult/sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
+  `pyoccult.search.sbdb_phys()` (per-object API) and by `pyoccult/pick.py` for its top targets (bulk rows: size fields only); `get_full()` fetches the per-object
   record (rotation, pole, extent, type) for favorites; standard library only.
-- `pyoccult_gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult_runner.py`
-  (JSON config overrides per run). `pyoccult_geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult_preview.py`:
+- `pyoccult/gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult/runner.py`
+  (JSON config overrides per run). `pyoccult/geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult/preview.py`:
   event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.
-- `pyoccult_globe.py` (0.11.0): Occult-style whole-Earth plot `maps/<stem>_globe.svg` (written by
+- `pyoccult/globe.py` (0.11.0): Occult-style whole-Earth plot `maps/<stem>_globe.svg` (written by
   `pyoccult.write_globe` after the KML; `write_globes`, `globe_style` "color"/"lines"); `globe_data(spice, ...)` +
   pure `render_svg(d)`. Data `data/ne_110m_earth.json` (Natural Earth 110m coast/borders/land, public domain).
   Report "Globe" button (prevbtn with data-wide); favorites copy it as files["globe"] (+ `backfill_globes` from maps/
   at GUI start). Preview lookups exclude `*_globe.svg`.
-- MPC observatories: `pyoccult_geo.mpc_observatories()` downloads https://minorplanetcenter.net/iau/lists/ObsCodes.html
+- MPC observatories: `pyoccult.geo.mpc_observatories()` downloads https://minorplanetcenter.net/iau/lists/ObsCodes.html
   once to `data/ObsCodes.html` (gitignored) and parses the fixed columns (code [0:3], east lon [4:13], rho cos phi'
   [13:21], rho sin phi' [21:30], name [30:]); `mpc_geodetic` turns the parallax constants into WGS84 lat/lon/height
   (ele_ok False below 5 decimals: look the height up). GUI Site tab select (code + name only, so a code search does
   not match coordinates) and the `mpc_code` site key (report header, run summary). Replaced Occult's InstallSites.zip
   (0.12.0: mainly cities) and astropy's EarthLocation registry (no MPC codes).
-- `pyoccult_kstars.py`: KStars D-Bus control (Linux only, `gdbus` with `--` before args, else `dbus-send`; never raises).
+- `pyoccult/kstars.py`: KStars D-Bus control (Linux only, `gdbus` with `--` before args, else `dbus-send`; never raises).
   setGPSLocation(site) -> setLocalTime (KStars local time: re-read `tz` from location(), it follows DST of the shown
   date) -> setRaDecJ2000 (RA in hours) -> setTracking -> setApproxFOV. `set_location` (GUI Results checkbox,
   `KSTARS_OPT`): move KStars to the site (message names the old place) or keep it (warn if > 50 km). KStars ignores
   the tz passed to setGPSLocation and picks its own (Long Island got -6): label only, UT is right. GUI routes `/api/kstars/status|show`; the report's
   hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
-- `pyoccult_favorites.py`: favorites in `favorites/` (private, gitignored): `favorites.json` (entry = hits_log record,
+- `pyoccult/favorites.py`: favorites in `favorites/` (private, gitignored): `favorites.json` (entry = hits_log record,
   site and run context from the run summary, status, note) and `favorites/<target>_<YYYYMMDDTHHMM>/` with copies of
   KML and preview SVG. Report: hidden `.favbtn` stars, shown only via the GUI (`/api/favorites/keys|add`; add looks
   the event up in hits_log.csv by target + minute, site from the last run summary). GUI tab Favorites: iframe of
   `favorites/favorites.html` (`write_page`: report `to_html` with `meta["favorites"]`, rows get `e["fav"]`/`e["site"]`;
   select boxes, Site/Status/Note/Added, per-row KStars site) rebuilt after every change; mass actions call
   `/api/favorites/update|remove|cleanup`; row click -> `parent.emitEvent('fav_select', key)` -> detail panel (preview,
-  map from the KML copy, size line, status, note). Entry key `phys`: the pyoccult_sbdb cache data (H, G, diameter,
+  map from the KML copy, size line, status, note). Entry key `phys`: the pyoccult.sbdb cache data (H, G, diameter,
   diameter_sigma, extent, albedo as (value, ref)) copied at add time (/dev/shm cache is volatile); GUI start
   backfills it for older entries. `favorites.csv` is rewritten by every `_save` (flat: key/status/note/added/site,
   all record columns, sbdb_*, file paths).
 - OWC twilight events carry the Sun altitude after the time ("☼ -5°"); `read_owc` parses it (`sun_alt_deg`) and then
   sets MAX_SUN_ALT to the brightest + 1 (fixed 2026-10-04: before, such lines were silently skipped).
-- OWC online computes at sea level (ignores the site elevation); `pyoccult_owc_check.py --sea-level` sets ELE = 0 for
+- OWC online computes at sea level (ignores the site elevation); `pyoccult/owc_check.py --sea-level` sets ELE = 0 for
   a like-for-like check. Effect up to h x cos(star alt) across the track (958 m: up to 0.9 km).
-- `pyoccult_owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
-  text; the script parses events and filter settings, reruns pyoccult.py at the sites.py site and compares.
+- `pyoccult/owc_check.py` + `owc_reference.txt` (private, not in git: names the site): an OWC search result pasted as
+  text; the script parses events and filter settings, reruns pyoccult/search.py at the sites.py site and compares.
 - `owc_refs/` (private, not in git): stored OWC search results (`<site>_<date>_<filter>.txt`, `--ref` for
-  pyoccult_owc_check.py) with the matching pick runs (`.pick.csv/.log`) and a README of settings and findings. Keep
+  pyoccult/owc_check.py) with the matching pick runs (`.pick.csv/.log`) and a README of settings and findings. Keep
   adding sets there; never delete them.
 - `CONTRIBUTING.md`: fork/branch workflow, setup, tests, working with Claude Code, private files, pull requests,
   GPL-3.0-or-later for contributions. `LICENSE` (GPL-3.0 text), `CITATION.cff` (validated with cffconvert).
@@ -86,7 +100,7 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 
 ## Conventions that matter
 - Asteroid position: `spkpos(id, et, 'J2000', 'CN', '399')`. Earth centre is 399, not 3. `CN` is astrometric (matches Gaia).
-- Star direction (0.10.0): `pyoccult_astrometry.corrected_star_dir` in `handle_star`, once per candidate at et_guess:
+- Star direction (0.10.0): `pyoccult.astrometry.corrected_star_dir` in `handle_star`, once per candidate at et_guess:
   Gaia (propagated) + stellar parallax + light deflection by Sun/Jupiter/Saturn as star MINUS asteroid (asteroid stays
   SPICE 'CN'). Switches `star_parallax`, `light_deflection` (off = old results exactly). Log `star_ra/star_dec` are the
   corrected direction; `corr_parallax_mas`, `corr_deflection_mas`. Not in the pick screen yet.
@@ -107,9 +121,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   lines and `null` for missing values.
 - Gaia archive (windows mode only): never use synchronous `Gaia.launch_job`; it silently truncates at 2000 rows. Use
   `launch_job_async`. `Gaia.ROW_LIMIT = -1` does not lift the sync cap.
-- Every download/web address lives in `pyoccult_urls.py` (`URL_*` names; no side effects, so setup/geo/kernels/report
+- Every download/web address lives in `pyoccult/urls.py` (`URL_*` names; no side effects, so setup/geo/kernels/report
   can import it before a sites.py exists). Never hard-code an http(s) address elsewhere; exceptions: XML namespaces
-  (SVG, KML) and `pyoccult_version.__url__`. Tests that exec code excerpts must put `U` (pyoccult_urls) in their ns.
+  (SVG, KML) and `pyoccult.version.__url__`. Tests that exec code excerpts must put `U` (pyoccult.urls) in their ns.
 - Write cache files atomically (temp file + `os.replace`). Every cache (asteroid SPKs, SBDB bulk list, per-asteroid SBDB size data
   `PyOccult_sbdb_phys.json`; both SBDB caches refetched after `sbdb_max_age_days`) goes to `config.cache_path`
   (`/dev/shm` if present, else the system temp folder); never hard-code a path. Gaia is not cached: corridor mode
@@ -122,13 +136,13 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   signatures.
 
 ## Status
-- Validated 2026-10-02 (`python pyoccult_owc_check.py`, 16 OWC events at the user's site, Oct 2-9): all 16 found, same
+- Validated 2026-10-02 (`pyoccult owc-check`, 16 OWC events at the user's site, Oct 2-9): all 16 found, same
   stars (our G equals OWC's "V" column to 0.01, so OWC shows Gaia G), times within 5.4 s (13 within 3 s). Drops match within
   0.25 mag below 5 mag. Durations match within 10 % wherever both use the same diameter; 4 events differ only by
   diameter (H+albedo estimates, or OWC using another source than NEOWISE). Open: 218001 (OWC drop 1.56 mag, ours 12.97;
   OWC diameter 3.56 km, ours 1.77 km from H). Hypothesis, unverified: the 5.6 mag star's angular diameter makes it
   partial; not modelled yet (idea: Gaia `radius_gspphot`, `distance_gspphot`).
-- Corridor search is merged into `pyoccult.py` (`handle_star` shared by both modes, `target_test_corridor`, 2-pass driver;
+- Corridor search is merged into `pyoccult/search.py` (`handle_star` shared by both modes, `target_test_corridor`, 2-pass driver;
   `search_mode = "windows"` keeps the old path). The Gaia archive was far too slow for strip queries (2026-10-01), so the
   corridor reads only the local catalog `gaia_dr3_g18` (built 2026-10-01: 280.3 M stars of 1811.7 M, 11.2 GB, 101 min).
   Whole run for 23 asteroids x 20 days: 75 s.
@@ -140,10 +154,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   the fixed solver.
 - Corridor solver bracket: the scan estimates the Earth-centre closest approach; the observer's can be margin/speed
   (10-20 min) away, so the bracket is `corridor.solver_bracket_s` (+/- 1.3 margin/speed, >= 1 step, <= 4 h).
-- Not run against live services: Horizons RSS 3-sigma column names in `pyoccult_paths.py`.
+- Not run against live services: Horizons RSS 3-sigma column names in `pyoccult/paths.py`.
 - Pick tool validated 2026-10-01: blind screen of all 465k asteroids (H < 17), Oct 1 + 8 d, 20 km reach, min alt 5:
   39 events incl. all 13 OWC reference events with H < 17 (same stars, times within 5 s, drops/durations as
-  pyoccult.py); 819762 (H 18.45) needs `--all`. 875 s in one process, 318 s with 4 workers, same events.
+  pyoccult/search.py); 819762 (H 18.45) needs `--all`. 875 s in one process, 318 s with 4 workers, same events.
   SBDB bulk elements MUST be full precision (`full-prec=true`): rounded ones give ~40" errors.
 - Report map: OpenStreetMap tiles only (`--tile-url`), so it works through a web server (OSM needs a Referer), not
   from `file://`. Map dialog reopen bug fixed 2026-10-02 (the box was cleared on every open, removing Leaflet's panes).

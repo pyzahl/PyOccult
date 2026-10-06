@@ -1,21 +1,20 @@
-#!.venv/bin/python3
-"""pyoccult_setup.py - one-time setup of everything PyOccult needs locally. Safe to rerun: finished parts are skipped,
+"""setup.py - one-time setup of everything PyOccult needs locally. Safe to rerun: finished parts are skipped,
 an interrupted Gaia build continues where it stopped.
 
-    python pyoccult_setup.py              # kernels + local Gaia catalog + bright-star index
-    python pyoccult_setup.py --source zenodo   # catalog: ready-made copy from Zenodo (G <= 16 or 18), no question
-    python pyoccult_setup.py --source esa      # catalog: build it from ESA's Gaia files instead
-    python pyoccult_setup.py --no-gaia    # SPICE kernels only
-    python pyoccult_setup.py --status     # show what is there
-    python pyoccult_setup.py --no-geoip   # do not guess your site from your IP address
-    python pyoccult_setup.py --gmax 16    # a catalog to G 16 instead (own folder gaia_dr3_g16, ~3 GB)
-    python pyoccult_setup.py --gmax 17 --dir /data/gaia_g17
+    pyoccult setup              # kernels + local Gaia catalog + bright-star index
+    pyoccult setup --source zenodo   # catalog: ready-made copy from Zenodo (G <= 16 or 18), no question
+    pyoccult setup --source esa      # catalog: build it from ESA's Gaia files instead
+    pyoccult setup --no-gaia    # SPICE kernels only
+    pyoccult setup --status     # show what is there
+    pyoccult setup --no-geoip   # do not guess your site from your IP address
+    pyoccult setup --gmax 16    # a catalog to G 16 instead (own folder gaia_dr3_g16, ~3 GB)
+    pyoccult setup --gmax 17 --dir /data/gaia_g17
 
   0. Your observing site (sites.py, private): if missing, guessed from your IP address (ipinfo.io), or from a city or
      place name (Open-Meteo geocoding), or typed in; non-interactive runs copy sites_example.py.
 
   1. SPICE kernels (naif0012.tls, de440.bsp, pck00010.tpc, earth_latest_high_prec.bpc; ~120 MB) into this folder.
-  2. Local Gaia DR3 catalog, G <= gaia_local_gmax, into gaia_local_dir (pyoccult_config.py). Needed by pyoccult.py
+  2. Local Gaia DR3 catalog, G <= gaia_local_gmax, into gaia_local_dir (pyoccult_config.py). Needed by search.py
      (corridor mode). Two ways, same result:
        zenodo: download the ready-made copy (doi:10.5281/zenodo.23113337; G <= 18: 8.2 GB, G <= 16: 2.1 GB), check
                its SHA-256 and unpack it (~11 / ~3 GB). Only for G <= 16 and 18. Resumable.
@@ -24,14 +23,15 @@ an interrupted Gaia build continues where it stopped.
      In a terminal, setup first asks for the limit (Enter = 18; skipped with --gmax), then --source auto (default)
      asks zenodo or esa (Enter = zenodo). Without a terminal: the config's limit, zenodo. auto resumes an interrupted
      esa build, and uses esa for limits Zenodo does not have.
-  3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pyoccult_pick.py. ~30 s.
+  3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pick.py. ~30 s.
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import argparse, os, shutil, sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-os.chdir(os.path.dirname(os.path.abspath(__file__)))                 # kernels live next to the scripts
-import pyoccult_geo as geo
+from pyoccult.home import HOME, PKG
+os.chdir(HOME)                                                      # kernels, catalogs, sites.py live in the data folder
+EXAMPLE = os.path.join(PKG, "templates", "sites_example.py")
+from pyoccult import geo
 
 SITES_HINT = """   Edit sites.py and enter your observing site(s), then rerun or just start searching:
      - lat, lon: geodetic degrees, longitude east-positive (west is negative); ele: metres
@@ -93,9 +93,9 @@ def _write_sites(lat, lon, ele, label, approx):
     from datetime import date
     note = (f"  # {APPROX} ({label}): replace with your exact position" if approx else f"  # {label}")
     with open("sites.py", "w") as f:
-        f.write(f"""# Your observing sites (not in git). Layout and optional keys: see sites_example.py.
+        f.write(f"""# Your observing sites (not in git). Layout and optional keys: see src/pyoccult/templates/sites_example.py.
 # pyoccult_config.py uses `default_site`, or the site named in the environment variable PYOCCULT_SITE.
-# Created by pyoccult_setup.py on {date.today()}.
+# Created by setup.py on {date.today()}.
 
 sites = {{
     "home": dict(lat={lat:.5f}, lon={lon:.5f}, ele={ele or 0:.0f}, name="Home",{note}
@@ -111,8 +111,8 @@ def ensure_sites(geoip=True):
     or ask for a place name or lat/lon/ele; otherwise copy sites_example.py. True if just created."""
     if os.path.isfile("sites.py"):
         return False
-    if not os.path.isfile("sites_example.py"):
-        sys.exit("sites.py and sites_example.py are both missing: restore sites_example.py from git")
+    if not os.path.isfile(EXAMPLE):
+        sys.exit(f"sites.py and {EXAMPLE} are both missing: reinstall PyOccult (git checkout or pip)")
     if sys.stdin.isatty():
         print("No sites.py yet: let us set up your observing site.")
         guess = None
@@ -135,13 +135,13 @@ def ensure_sites(geoip=True):
             elif k.startswith("m"):
                 guess = _manual() or guess
             elif k.startswith("s"):
-                shutil.copyfile("sites_example.py", "sites.py")
+                shutil.copyfile(EXAMPLE, "sites.py")
                 break
         print("   wrote sites.py")
         print(SITES_HINT)
         print()
         return True
-    shutil.copyfile("sites_example.py", "sites.py")
+    shutil.copyfile(EXAMPLE, "sites.py")
     print("WARNING: no sites.py found: created it from sites_example.py (example site: New York City Hall).")
     print(SITES_HINT)
     print()
@@ -149,14 +149,14 @@ def ensure_sites(geoip=True):
 
 
 SITES_CREATED = ensure_sites(geoip="--no-geoip" not in sys.argv)   # before the config reads it
-import pyoccult_config as config
-import pyoccult_gaia_local as gaia
-from pyoccult_kernels import KERNELS, download_kernels
+from pyoccult import config
+from pyoccult import gaia_local as gaia
+from pyoccult.kernels import KERNELS, download_kernels
 
 
 def show_status(d=None):
     with open("sites.py") as f:
-        example = f.read() == open("sites_example.py").read() if os.path.isfile("sites_example.py") else False
+        example = f.read() == open(EXAMPLE).read() if os.path.isfile(EXAMPLE) else False
     print(f"  site {config.site_name!r:26s} {config.LAT:.4f} {config.LON:.4f}, {config.ELE:g} m, "
           f"{config.pick_aperture_cm:g} cm, stars G <= {config.MAG_MIN:g}" + ("   <- example site" if example else ""))
     if example:
@@ -253,14 +253,14 @@ def network_failure(e, d, source):
     """Message for a failed catalog step (no traceback): what failed, the likely cause, how to go on."""
     other = {"zenodo": "--source esa (build from ESA's files)", "esa": "--source zenodo (ready-made, G <= 16 or 18)"}
     return (f"\n   catalog step failed: {type(e).__name__}: {str(e)[:300]}\n"
-            f"   Likely: offline, the server is down, or a proxy/firewall blocks the address (see pyoccult_urls.py).\n"
+            f"   Likely: offline, the server is down, or a proxy/firewall blocks the address (see urls.py).\n"
             f"   - behind a proxy: export https_proxy=http://<proxy>:<port>  (and HTTPS_PROXY), then rerun\n"
             f"   - rerun later: setup resumes, files already in {d} are kept\n"
-            + (f"   - or try the other source: python pyoccult_setup.py {other[source]}\n" if source in other else "")
+            + (f"   - or try the other source: pyoccult setup {other[source]}\n" if source in other else "")
             + "   - or copy a finished catalog folder from another computer (gaia_dr3_g16 / gaia_dr3_g18)")
 
 
-if __name__ == "__main__":
+def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--no-gaia", action="store_true", help="kernels only")
@@ -329,5 +329,9 @@ if __name__ == "__main__":
     print()
     show_status(d)
     if not a.no_gaia:
-        print("\n  Another catalog later: python pyoccult_setup.py --gmax 16   (or 18, or any limit via ESA); "
+        print("\n  Another catalog later: pyoccult setup --gmax 16   (or 18, or any limit via ESA); "
               "it goes into its own folder\n  gaia_dr3_g<limit>, and the GUI's catalog selector lists it.")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

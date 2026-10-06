@@ -1,16 +1,16 @@
-"""pyoccult_sbdb.py - shared on-disk cache of per-asteroid SBDB physical data (diameter, extent, H, G, albedo, name).
+"""sbdb.py - shared on-disk cache of per-asteroid SBDB physical data (diameter, extent, H, G, albedo, name).
 
 One JSON file, <cache_path>/PyOccult_sbdb_phys.json, keyed by asteroid number:
     {"19": {"fetched": unix time, "source": "sbdb.api" | "sbdb_query", "phys": {name: {"value", "sigma", "ref"}, ...,
                                                                                "_fullname": "19 Fortuna (A852 QA)"}}}
-Written by pyoccult.py (per-object SBDB API, all fields with references) and by pyoccult_pick.py (from its bulk
+Written by search.py (per-object SBDB API, all fields with references) and by pick.py (from its bulk
 download: diameter, diameter sigma, extent, albedo, H, G, name; no references). pyoccult.get_asteroid_size() derives the
 size from it, the same way for either source. The raw data is cached, not the derived size, so SIZE_OVERRIDES and the
 size rules always apply. Entries older than sbdb_max_age_days (config, default 30) are refetched.
 
 Standard library only (the pick tool must not need SPICE/astropy).
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import json, os, tempfile, time
 
 FILE = "PyOccult_sbdb_phys.json"
@@ -19,8 +19,8 @@ BULK_FIELDS = ["diameter", "diameter_sigma", "extent", "albedo", "H", "G"]     #
 
 def _config(name, default):
     try:
-        import pyoccult_config
-        return getattr(pyoccult_config, name, default)
+        from pyoccult import config
+        return getattr(config, name, default)
     except ImportError:
         return default
 
@@ -78,7 +78,7 @@ def get_full(number, cache_path=None, timeout=15):
     with references): the cached one if it came from the per-object API, else fetched now and cached. The pick tool's
     bulk rows hold only the size fields. Falls back to the cached entry (or None) if SBDB cannot be reached."""
     import urllib.parse, urllib.request
-    import pyoccult_urls as U
+    from pyoccult import urls as U
     n = str(number).strip()
     e, fresh = get(n, cache_path)
     if e and fresh and e.get("source") == "sbdb.api":

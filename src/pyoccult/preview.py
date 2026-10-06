@@ -1,13 +1,13 @@
-"""pyoccult_preview.py - event preview: the star field around the occulted star at the event time, as an SVG image.
+"""preview.py - event preview: the star field around the occulted star at the event time, as an SVG image.
 
 Shows the stars of the local Gaia catalog (moved by proper motion to the event date) in a finder field a few times
 larger than the camera's field of view, the camera frame centred on the target star, the target star, the asteroid's
 position and its track (+/- 1 h), a scale bar and the north/east directions. Orientation: north up, east left, as seen
 on the sky (a telescope may flip or rotate this).
 
-Standard library + numpy; the caller supplies the stars and the asteroid track (pyoccult.py does, with SPICE).
+Standard library + numpy; the caller supplies the stars and the asteroid track (search.py does, with SPICE).
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import math
 import numpy as np
 

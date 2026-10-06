@@ -1,7 +1,7 @@
 import os, types, numpy as np
 from scipy.optimize import minimize_scalar
 # star_test from pyoccult.py (not importable: kernel setup at import), run against a stand-in closest approach
-src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pyoccult.py')).read()
+src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'pyoccult', 'search.py')).read()
 func = src[src.index("def star_test ("):src.index("def screen_stars(")]
 
 ET0 = 8.45e8                                   # real ephemeris times are ~8.4e8 s: the bounded solver's relative tolerance bites

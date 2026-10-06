@@ -1,9 +1,9 @@
 import os, sys, re, json, time, types, functools, tempfile, numpy as np
 from pathlib import Path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_sbdb
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import sbdb as pyoccult_sbdb
 # sbdb_phys + get_asteroid_size from pyoccult.py (not importable: kernel setup at import), with a stand-in SBDB
-src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pyoccult.py')).read()
+src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'pyoccult', 'search.py')).read()
 code = src[src.index("SIZE_OVERRIDES = {}"):src.index("def get_asteroid_ra_dec(")]
 
 calls = []
@@ -23,7 +23,7 @@ def get(url, params, timeout):
     return Resp(DB[params["sstr"]])
 cache_dir = tempfile.mkdtemp()
 cfg = types.SimpleNamespace(cache_path=cache_dir, sbdb_max_age_days=30)
-ns = dict(U=__import__('pyoccult_urls'), np=np, re=re, json=json, time=time, os=os, Path=Path, functools=functools, config=cfg, sbdb_cache=pyoccult_sbdb,
+ns = dict(U=__import__('pyoccult.urls', fromlist=['urls']), np=np, re=re, json=json, time=time, os=os, Path=Path, functools=functools, config=cfg, sbdb_cache=pyoccult_sbdb,
           requests=types.SimpleNamespace(get=get, RequestException=RequestException))
 exec(code, ns)
 

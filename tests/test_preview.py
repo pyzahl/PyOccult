@@ -1,6 +1,6 @@
 import os, sys, math, xml.etree.ElementTree as ET, numpy as np
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_preview as P
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import preview as P
 
 # camera field of view: 2 atan(s / 2f); 5.6 x 3.2 mm at 2500 mm is 7.70' x 4.40'
 w, h = P.camera_fov_arcmin(2500.0, (5.6, 3.2))

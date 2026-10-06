@@ -1,29 +1,28 @@
-#!.venv/bin/python3
-"""pyoccult_pick.py - find the actual occultation events at your site for all asteroids, OWC-style, and choose the
-`targets` list for pyoccult.py from the best of them.
+"""pick.py - find the actual occultation events at your site for all asteroids, OWC-style, and choose the
+`targets` list for search.py from the best of them.
 
 Pipeline
   1. asteroids : JPL SBDB bulk query, full-precision elements (numbered, H < --hmax, or --all), cached as JSON
-  2. paths     : every asteroid integrated with the planets over the window (pyoccult_orbits, ~0.01" vs Horizons)
+  2. paths     : every asteroid integrated with the planets over the window (orbits, ~0.01" vs Horizons)
   3. events    : actual Gaia stars (local catalog, bright-star index) along the path, solved for your site
-                 (pyoccult_screen); only while the asteroid is up and the Sun is down
+                 (screen); only while the asteroid is up and the Sun is down
   4. detection : OWC's General Observability Criterion, StarMag < 5 log10(aperture_cm) + 2.5 log10(duration/frames)
                  + 8.5 + MagAdjust (optionally with atmospheric extinction), plus --min-dur and --min-drop.
                  Durations for this use the upper size bound, so H-only sizes are not dismissed too early.
   5. output    : pick_events.csv (all events), a ranked table, and targets.py with the asteroids of the best events.
-                 Their size data goes to the shared size cache, so pyoccult.py needs no SBDB lookups for them.
-                 pyoccult.py then computes the events exactly (Horizons SPK, exact solver, maps).
+                 Their size data goes to the shared size cache, so search.py needs no SBDB lookups for them.
+                 search.py then computes the events exactly (Horizons SPK, exact solver, maps).
 
 Defaults come from pyoccult_config.py (site, window ct/days, reach, altitude limits, pick_* settings).
-Needs the kernels and the local Gaia catalog with its bright-star index: python pyoccult_setup.py
+Needs the kernels and the local Gaia catalog with its bright-star index: pyoccult setup
 """
-from pyoccult_version import __version__
-import pyoccult_urls as U
+from pyoccult.version import __version__
+from pyoccult import urls as U
 import argparse, datetime as dt, json, math, os, sys, tempfile, time, urllib.parse, urllib.request
 from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import pyoccult_sbdb                                     # shared per-asteroid size cache
+from pyoccult.home import HOME
+from pyoccult import sbdb                                     # shared per-asteroid size cache
 
 SBDB_URL = U.URL_JPL_SBDB_QUERY_API
 SBDB_FIELDS = ["spkid", "full_name", "H", "G", "diameter", "diameter_sigma", "extent", "albedo", "a", "e", "i", "om",
@@ -35,7 +34,7 @@ def fetch_sbdb(hmax, cache, max_age_s=None):
     """Bulk SBDB download of numbered asteroids with H < hmax (hmax None: all), full-precision elements. Cached (atomic
     write); reused while it covers hmax, has all SBDB_FIELDS in full precision and is younger than max_age_s (config
     sbdb_max_age_days). Returns (fields, data, fetched)."""
-    max_age_s = pyoccult_sbdb.max_age_s() if max_age_s is None else max_age_s
+    max_age_s = sbdb.max_age_s() if max_age_s is None else max_age_s
     want = math.inf if hmax is None else hmax
     if cache and os.path.exists(cache):
         with open(cache) as f:
@@ -98,7 +97,7 @@ _W = {}
 
 def _init(folder, catalog_dir, cam_limit, lat, lon, ele):
     import spiceypy as spice
-    import pyoccult_screen as SC, pyoccult_gaia_local as L
+    from pyoccult import screen as SC, gaia_local as L
     os.chdir(folder)
     SC.load_kernels(spice, folder)
     _W.update(spice=spice, SC=SC, index=L.BrightIndex(catalog_dir, L.index_gmax(cam_limit)),
@@ -116,8 +115,8 @@ def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000, mp_start="sp
     files and share their read position, so parallel reads of de440.bsp collide (SPICE(RECORDNOTFOUND),
     SPICE(INVALIDRADIUS), corrupted DAF), more often the more workers run."""
     import multiprocessing
-    import pyoccult_gaia_local as L
-    folder = os.path.dirname(os.path.abspath(__file__))
+    from pyoccult import gaia_local as L
+    folder = HOME                                          # kernels and catalogs (workers start there)
     # build a missing bright-star index here, once: workers only open it (before, each worker built it at the same
     # time, reading the whole catalog into memory: swap and a stalled system with a star limit above G 15)
     L.BrightIndex(site_args[0], L.index_gmax(site_args[1]))
@@ -139,7 +138,7 @@ def write_targets(path, best, a):
     """Write an importable module:  from targets import targets, target_names  (and pick_meta: site, window, settings)"""
     now = dt.datetime.now(dt.timezone.utc)
     with open(path, "w", encoding="utf-8") as f:
-        f.write(f"# generated by pyoccult_pick.py on {now:%Y-%m-%d %H:%M} UTC\n")
+        f.write(f"# generated by pyoccult pick on {now:%Y-%m-%d %H:%M} UTC\n")
         f.write(f"# events {a.start} + {a.days:g} d, site {a.site or a.lat}, reach {a.reach:g} km, G <= {a.cam_limit:g}, "
                 f"{a.aperture:g} cm aperture, {a.frames} frames, MagAdjust {a.mag_adjust:+g}, extinction {a.extinction:g}, "
                 f"min duration {a.min_dur:g} s, min drop {a.min_drop:g}\n")
@@ -164,8 +163,7 @@ SORT_ASC = {"mag": True, "date": True, "margin": False, "drop": False}
 def main(argv=None):
     cfg = {}
     try:
-        sys.path.insert(0, os.getcwd())
-        import pyoccult_config as C
+        from pyoccult import config as C
         g = lambda k, d: getattr(C, k, d)
         cfg = dict(site=g("site_name", None), picks_dir=g("picks_dir", "picks"), lat=C.LAT, lon=C.LON, ele=C.ELE, reach=C.max_shadow_dist, min_alt=C.MIN_STAR_ALT,
                    sun=C.MAX_SUN_ALT, cache=C.cache_path, start=str(C.ct)[:10], days=C.days,
@@ -220,8 +218,8 @@ def main(argv=None):
     fields, data, fetched = fetch_sbdb(hmax, a.sbdb_cache)
     rows = build_rows(fields, data, hmax)
     import spiceypy as spice
-    import pyoccult_screen as SC
-    SC.load_kernels(spice, os.path.dirname(os.path.abspath(__file__)))
+    from pyoccult import screen as SC
+    SC.load_kernels(spice, HOME)
     et0 = spice.str2et(a.start + "T00:00:00")
     et1 = et0 + a.days * 86400.0
     opt = dict(reach_km=a.reach, min_alt=a.min_alt, max_sun_alt=a.max_sun_alt, min_drop=a.min_drop,
@@ -252,14 +250,14 @@ def main(argv=None):
     if a.targets_file:
         write_targets(a.targets_file, best, a)
     saved = None
-    if a.picks_dir and a.site:                          # kept per site and window: pyoccult.py reuses it
-        import pyoccult_picks
+    if a.picks_dir and a.site:                          # kept per site and window: search.py reuses it
+        from pyoccult import picks
         os.makedirs(a.picks_dir, exist_ok=True)
-        saved, saved_csv = pyoccult_picks.paths(a.site, a.start, a.days, a.picks_dir)
+        saved, saved_csv = picks.paths(a.site, a.start, a.days, a.picks_dir)
         write_targets(saved, best, a)
         E[cols].to_csv(saved_csv, index=False, float_format="%.6g")
     raw = {int(r[fields.index("spkid")]): dict(zip(fields, r)) for r in data}
-    n_put = pyoccult_sbdb.put({str(e["number"]): pyoccult_sbdb.entry_from_bulk(raw[int(e["spkid"])], fetched)
+    n_put = sbdb.put({str(e["number"]): sbdb.entry_from_bulk(raw[int(e["spkid"])], fetched)
                                for e in best if int(e["spkid"]) in raw}, c("cache"))
     print(f"\nall events: {a.output}   (~ = diameter from H; dur is nominal, detection uses the upper size bound;\n"
           f"marg = magnitudes below the OWC observability limit)")
@@ -267,7 +265,7 @@ def main(argv=None):
         print(f"targets of the best {len(best)} events: {a.targets_file}   ->   from targets import targets")
     if saved:
         print(f"saved for site {a.site}, {a.start} + {a.days:g} d: {saved} (+ .csv); searches of this site and window use it")
-    print(f"size data of {n_put} targets -> {pyoccult_sbdb.cache_file(c('cache'))}", file=sys.stderr)
+    print(f"size data of {n_put} targets -> {sbdb.cache_file(c('cache'))}", file=sys.stderr)
     return 0
 
 

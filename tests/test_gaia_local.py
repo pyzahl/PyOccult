@@ -1,7 +1,7 @@
 import sys, os, gzip, math, tempfile, numpy as np, pandas as pd
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_corridor as C
-import pyoccult_gaia_local as L
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import corridor as C
+from pyoccult import gaia_local as L
 rng = np.random.default_rng(3)
 
 # ---------- synthetic path (as in test_corridor): 20 days, ~0.4 deg/day, distance ~2 AU

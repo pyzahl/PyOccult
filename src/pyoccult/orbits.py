@@ -1,9 +1,9 @@
-"""pyoccult_orbits.py - fast, vectorised asteroid positions from SBDB osculating elements, for screening many asteroids.
+"""orbits.py - fast, vectorised asteroid positions from SBDB osculating elements, for screening many asteroids.
 
 Why: Horizons SPKs are exact but one web request per asteroid; a two-body (Kepler) orbit drifts by ~0.5-2' over a few
 months, far more than a shadow corridor (~5"). This integrates the elements with the gravity of the Sun and the planets
 (DE440 via SPICE), thousands of asteroids at once, and returns astrometric geocentric directions (same 'CN' convention
-as the solver). Final predictions still use the exact Horizons SPK (pyoccult.py).
+as the solver). Final predictions still use the exact Horizons SPK (search.py).
 
 Model: barycentric equations of motion, Sun + planet-system barycentres 1-9 (Earth-Moon as EMB), RK4 with a fixed step,
 Hermite interpolation between steps, one-step light-time correction. No asteroid perturbers, no relativity, no
@@ -11,7 +11,7 @@ non-gravitational forces. Not for close Earth approaches (flagged).
 
 Needs spiceypy with an LSK and de440.bsp loaded (call serially: SPICE is not thread-safe).
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import numpy as np
 
 AU_KM = 149597870.7

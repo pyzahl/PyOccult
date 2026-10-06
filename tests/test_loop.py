@@ -1,5 +1,5 @@
 import sys, math, numpy as np, pandas as pd
-sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..')); import pyoccult_corridor as C
+sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src')); from pyoccult import corridor as C
 from scipy.optimize import minimize_scalar
 rng = np.random.default_rng(3); AU = C.AU_KM
 STEP = 600.0; DAYS = 40; ets = np.arange(0, DAYS*86400+STEP, STEP); t = ets/86400.0

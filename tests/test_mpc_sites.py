@@ -1,7 +1,7 @@
 """pyoccult_geo.mpc_observatories / mpc_geodetic: MPC ObsCodes.html parsing and parallax constants -> geodetic."""
 import os, sys, tempfile
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_geo as G
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import geo as G
 
 # parallax constants -> geodetic: a point on the WGS84 ellipsoid at lat 45, height 1000 m round-trips
 import math

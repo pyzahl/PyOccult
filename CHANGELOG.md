@@ -7,6 +7,22 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 ## [Unreleased]
 
 ### Changed
+- **Standard Python package** (PEP 517/518/621, src layout as PyMovie and PyOTE use): `pyproject.toml` replaces
+  `requirements.txt`; the code moved from the project root into `src/pyoccult/` with short module names
+  (`pyoccult_pick.py` -> `pyoccult/pick.py`, `pyoccult.py` -> `pyoccult/search.py`, ...); imports are
+  `from pyoccult import ...`. One command, `pyoccult`, starts everything: `pyoccult` (web interface),
+  `pyoccult setup`, `pyoccult pick ...`, `pyoccult search`, `pyoccult report hits_log.csv`, `pyoccult owc-check`,
+  `pyoccult gaia ...`, `pyoccult picks ...` (`pyoccult --help`; options unchanged); also `python -m pyoccult`.
+  Your data stays where it is: the project folder is the data folder (`PYOCCULT_HOME` chooses another one).
+  `pyoccult_config.py` is now your own file there (not in git): it is created from
+  `src/pyoccult/templates/pyoccult_config.py` when missing, and settings it lacks keep the template's default.
+  `sites_example.py`, the logo and the globe's map data moved into the package. Checked: tests on Python 3.10 and
+  3.14, a clean install with uv (Python 3.10), and pick (spawn workers), search, report, setup and the GUI run
+  through the new command from another folder.
+  **Upgrading an existing install:** `git pull`, then once `pip install -e .` in your virtual environment (or
+  `.venv/bin/python -m pip install -e .`); start the GUI with `pyoccult` (`.venv/bin/pyoccult`) instead of
+  `python pyoccult_gui.py`. If you changed `pyoccult_config.py`, keep a copy before pulling (git removes the tracked
+  file; PyOccult then recreates it from the template, so copy your changes back in).
 - All download and web addresses moved into one file, `pyoccult_urls.py`, each with its own name (`URL_NAIF_DE440`,
   `URL_JPL_HORIZONS_API`, `URL_MPC_OBSCODES`, ...), so they are maintained in one place. A separate file rather than
   `pyoccult_config.py`, which reads `sites.py` when imported: setup and the report need addresses without it.

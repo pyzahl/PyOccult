@@ -1,8 +1,8 @@
 """pyoccult_globe: projection, hidden-side clipping, day side and SVG output, without SPICE (pure render_svg)."""
 import math, os, sys, xml.etree.ElementTree as ET
 import numpy as np
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_globe as G
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import globe as G
 
 # Earth orientation: ITRF = J2000 (identity); star straight above lon 0, lat 0 -> that point is the disk centre
 R = np.eye(3)

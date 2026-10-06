@@ -1,6 +1,6 @@
 import os, sys, json, math, time, types, tempfile, numpy as np
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-import pyoccult_pick as P, pyoccult_screen as SC
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
+from pyoccult import pick as P, screen as SC
 
 # ---------- 1. OWC General Observability Criterion: StarMag < 5 log10(ap_cm) + 2.5 log10(dur/frames) + 8.5 + adj
 opt = dict(aperture=25.0, frames=4, mag_adjust=0.0)
@@ -77,7 +77,8 @@ t, miss, _, _ = SC.solve_site(None, FakeSite(), track, sdir, np.array([2300.0]),
 assert abs(t[0] - 2200.0) < 1e-9, "the solution must stay inside the bracket"
 # worker processes must start with "spawn": with "fork" (Linux default before Python 3.14) they share the parent's open
 # SPICE kernel files and their read position, and parallel reads of de440.bsp collide (regression 2026-10-05)
-import inspect, pyoccult_pick as _pk
+import inspect
+from pyoccult import pick as _pk
 assert inspect.signature(_pk.run_screen).parameters["mp_start"].default == "spawn"
 assert 'mp_context=multiprocessing.get_context(mp_start)' in inspect.getsource(_pk.run_screen)
 print("PICK TESTS PASSED")

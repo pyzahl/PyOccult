@@ -1,4 +1,4 @@
-# generated data and downloads (pyoccult_setup.py recreates them)
+# generated data and downloads (pyoccult setup recreates them)
 *.bsp
 *.bpc
 *.tls
@@ -10,7 +10,8 @@ sbdb_cache.json
 owc_reference.txt
 owc_reference.csv
 owc_refs/
-sites.py
+/sites.py
+/pyoccult_config.py
 run.sh
 # run outputs
 hits_log.csv
@@ -28,6 +29,9 @@ favorites/
 # python and editor leftovers
 __pycache__/
 .venv/
+*.egg-info/
+build/
+dist/
 *~
 \#*\#
 .#*

@@ -1,4 +1,4 @@
-"""pyoccult_corridor.py - all stars an asteroid can occult in one run, from the local Gaia copy, in one vectorized scan.
+"""corridor.py - all stars an asteroid can occult in one run, from the local Gaia copy, in one vectorized scan.
 
 Why: an asteroid's shadow can only reach the Earth if a star lies within (Earth radius + shadow radius + your travel
 reach) of its path, which is a few arcseconds wide. Instead of ~200 overlapping 10' archive cones per asteroid, this module
@@ -6,14 +6,14 @@ reach) of its path, which is a few arcseconds wide. Instead of ~200 overlapping 
   2. caps the Gaia magnitude per target: a drop >= min_drop needs  m_star <= m_ast + 2.5*log10(1/(10^(0.4*min_drop)-1))
      (2.54 mag for 0.1), so a 15.5 mag asteroid never needs stars fainter than ~18.5,
   3. takes the stars within margin_km/distance + a proper-motion pad of the path from the local Gaia copy
-     (pyoccult_gaia_local.LocalGaia; the Gaia archive was far too slow for this), plus all high-proper-motion stars,
+     (gaia_local.LocalGaia; the Gaia archive was far too slow for this), plus all high-proper-motion stars,
   4. scans all star/time pairs at once (matrix product) and returns the candidates, each with an estimated
      closest-approach time, to be refined by the exact solver (star_test).
 
 Only numpy and pandas are required at import; astropy (propagation) is imported when used, spiceypy only by
 asteroid_path() (SPICE is not thread-safe: call it serially).
 """
-from pyoccult_version import __version__
+from pyoccult.version import __version__
 import math
 import numpy as np
 import pandas as pd
@@ -226,7 +226,7 @@ def propagate_exact(df, utc_time):
 
 # ----------------------------------------------------------------------------------------------- one-call helpers
 def corridor_candidates(plan, local, include_high_pm=True, verbose=True):
-    """plan -> (stars, candidates). local: a pyoccult_gaia_local.LocalGaia (or anything with corridor_stars(plan,
+    """plan -> (stars, candidates). local: a gaia_local.LocalGaia (or anything with corridor_stars(plan,
     include_high_pm) returning Gaia rows at epoch 2016.0). Candidates index into `stars`."""
     stars = local.corridor_stars(plan, include_high_pm)
     cands = find_candidates(stars, plan["path"], plan["margin_km"])
