@@ -18,6 +18,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `pyoccult.<module>.<fn>`; never run those modules via runpy as `__main__`. Exception: `search` (not import-safe)
   runs via `runpy.run_module(..., run_name="__main__")`. The GUI starts runs as `[sys.executable, "-u", "-m",
   "pyoccult", <command>, ...]` with `PYOCCULT_HOME` and `PYTHONPATH` set. Tests put `src/` on sys.path.
+- uv (2026-10-06): `uv run pyoccult` in a clone (or unpacked ZIP) creates `.venv` with `.python-version` (3.12) and the
+  pinned set of `uv.lock` (universal: Linux/macOS/Windows; 94 packages). After any change to `dependencies` run
+  `uv lock` and commit `uv.lock`; `uv run --locked ...` fails if the lock is stale. Tested on Linux only so far.
 - `pyoccult/config.py`: loader. Runs `templates/pyoccult_config.py` (defaults), then the user's `HOME/pyoccult_config.py`
   (gitignored; copied from the template if missing) into this module's globals, so older user files get new keys.
   Puts HOME on sys.path (sites.py, targets.py) and templates/ (sites_example for old config copies).

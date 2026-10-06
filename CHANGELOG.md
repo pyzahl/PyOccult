@@ -37,6 +37,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- **uv support** (as PyMovie and PyOTE): `uv run pyoccult` in the PyOccult folder installs Python 3.12
+  (`.python-version`) and the exact package versions of `uv.lock` (Linux, macOS, Windows) into `.venv` by itself;
+  then `uv run pyoccult setup` and `uv run pyoccult`. README: install steps for uv on each system (also from the
+  GitHub ZIP, without git). The pip way still works.
+- README: **Windows, step by step (with uv)**: installing uv, the ZIP (or git), a folder outside OneDrive, setup,
+  start, an optional `PyOccult.bat` start icon, updating and removing. Not yet tested on Windows.
 - **Data folder setting** for installed copies (pip/uv without a clone): the first `pyoccult setup` asks where to keep
   the data (Enter = `~/PyOccult`) and saves the choice in the system's settings folder (Linux
   `~/.config/pyoccult/home`, macOS `~/Library/Application Support/PyOccult/home`, Windows `%APPDATA%\PyOccult\home`);
@@ -63,6 +69,7 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- README: the logo at the top pointed to its old place in the project root (moved into `src/pyoccult/`).
 - GUI Favorites tab: the **CSV** download was saved as "true.csv" (the link's `download` attribute); it is now a
   button like in the Pick and Results tabs and saves `favorites_<date>.csv`.
 - Pick tool with a star limit above G 15 (now easy to reach with the GUI's **Faintest star** field): the deeper

@@ -24,7 +24,8 @@ git rebase upstream/main            # or: git merge upstream/main
 
 ## 2. Install and set up
 
-As in the README (sections 1-4):
+With uv (as in the README, "Easiest: with uv"): `uv run pyoccult setup --gmax 16 --source zenodo`, then
+`uv run pyoccult` or `uv run python tests/test_home.py`. Or with pip, as in the README (sections 1-4):
 
 ```bash
 python -m venv .venv
@@ -69,6 +70,7 @@ Good practice:
   next developer and the next session.
 - Review what it wrote before you commit; you are responsible for the change.
 - Add a line for your change to `CHANGELOG.md` (section of the coming version).
+- A new package: add it to `dependencies` in `pyproject.toml` and run `uv lock`; commit `uv.lock` with it.
 - Mark commits made with its help with this last line in the commit message:
   `Co-Authored-By: Claude <noreply@anthropic.com>` (Claude Code adds the exact model name for you).
 

@@ -1,4 +1,4 @@
-# PyOccult <img src="pyoccult_logo.svg" alt="" width="96" align="right">
+# PyOccult <img src="src/pyoccult/pyoccult_logo.svg" alt="" width="96" align="right">
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
 
 Python Occultation Searcher by PyZahl (C) 2026, version 0.12.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
@@ -64,6 +64,91 @@ See `ABOUT.md` for the computations, data sources and open points:
 https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 # Install
+
+## Easiest: with uv (Linux, macOS, Windows)
+
+[uv](https://docs.astral.sh/uv/) installs the right Python and all packages by itself, like for PyMovie and PyOTE;
+nothing else is needed (no Python installation, no virtual environment by hand, no admin rights).
+
+1. Install uv once:
+   * Linux / macOS: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+   * Windows (PowerShell): `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+
+   (then open a new terminal, so the `uv` command is found)
+2. Get PyOccult: `git clone https://github.com/pyzahl/PyOccult.git`, or download the ZIP from GitHub (green "Code"
+   button, "Download ZIP") and unpack it.
+3. In the PyOccult folder:
+
+   ```bash
+   cd PyOccult
+   uv run pyoccult setup     # one-time: your site, SPICE kernels, Gaia catalog (asks; resumable)
+   uv run pyoccult           # the web interface, in your browser
+   ```
+
+The first `uv run` downloads Python 3.12 (`.python-version`) and the packages in the exact versions of `uv.lock`
+into `.venv` in the PyOccult folder (about a minute); later starts are instant. Every tool works the same way:
+`uv run pyoccult pick ...`, `uv run pyoccult search`, `uv run pyoccult --help`. To update: `git pull` (or a new ZIP),
+then `uv run pyoccult` as before; uv brings the packages up to date by itself. Your data (sites, settings, kernels,
+catalogs, results) stays in the PyOccult folder, see "Your data folder" below.
+
+## Windows, step by step (with uv)
+
+Not tested on Windows yet: please report what works and what does not (GitHub issue or e-mail).
+
+1. **Install uv.** Open PowerShell (Start menu, type "PowerShell", Enter) and paste:
+
+   ```powershell
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+
+   Close PowerShell and open a new one, so the `uv` command is found (`uv --version` shows it).
+2. **Get PyOccult.** On https://github.com/pyzahl/PyOccult click the green "Code" button, then "Download ZIP".
+   Unpack it (right-click, "Extract All...") and give the folder a simple place and name, e.g. `C:\PyOccult`
+   (the ZIP's folder is called `PyOccult-main`; rename it if you like). With Git for Windows installed you can
+   instead run `git clone https://github.com/pyzahl/PyOccult.git C:\PyOccult`, which makes updates easier.
+
+   Choose a folder that is **not** synced to OneDrive (Documents and Desktop often are): PyOccult keeps everything
+   in this folder, including the Gaia catalog (3 GB, or 11 GB for G 18), which you do not want uploaded to the cloud.
+   You need about 5 GB free on that drive for the default catalog.
+3. **One-time setup.** In PowerShell:
+
+   ```powershell
+   cd C:\PyOccult
+   uv run pyoccult setup
+   ```
+
+   The first run downloads Python and the packages (about a minute), then setup asks for your site (it can guess
+   it from your internet address or look up a place name) and the catalog: Enter takes G 16 from Zenodo (2.1 GB
+   download). Setup can be stopped and rerun; it resumes.
+4. **Start PyOccult.**
+
+   ```powershell
+   cd C:\PyOccult
+   uv run pyoccult
+   ```
+
+   Your browser opens the PyOccult page (http://127.0.0.1:8080). Keep the PowerShell window open while you use it;
+   close it, or press Ctrl+C in it, to stop PyOccult. If Windows asks whether Python may use the network, allowing
+   private networks is enough (the page is only reachable from your own computer).
+
+**A start icon (optional).** In `C:\PyOccult` create a text file `PyOccult.bat` (Notepad, "Save as type: All
+files") with these two lines, then double-click it (or right-click, "Send to", "Desktop (create shortcut)"):
+
+```bat
+cd /d "%~dp0"
+uv run pyoccult
+```
+
+**Updating.** With git: `cd C:\PyOccult`, `git pull`. With the ZIP: download it again and copy its contents over
+your folder (your own files, `sites.py`, `pyoccult_config.py`, the catalog, picks, favorites and results, are not
+in the ZIP, so they stay). Then start as usual; uv updates the packages by itself.
+
+**Good to know on Windows:** caches go to the Windows temp folder (`cache_path` in `pyoccult_config.py` sets
+another one); the SPICE kernels are downloaded with `curl`, which is part of Windows 10 and 11; the KStars buttons
+are Linux-only and hidden. To remove PyOccult, delete its folder (and `%APPDATA%\PyOccult` if it exists); uv itself
+can stay (it is small), or see uv's documentation, "Uninstallation" (https://docs.astral.sh/uv/getting-started/installation/).
+
+## With pip and a virtual environment
 
 General steps: clone this repository, change into its folder PyOccult, set up a Python virtual environment, install
 PyOccult into it (`pip install -e .`, which also installs the packages it needs and the `pyoccult` command) and run
@@ -317,7 +402,8 @@ To include the maps' KML links in the published page, also copy the `maps` folde
 * **Deactivate:** When you are done working, simply type `deactivate` to exit the virtual environment.
 * **Version Control:** Do not upload your `.venv` folder to GitHub (`.gitignore` keeps it out).
 * **Updating the list:** if the code needs a new package, add its name to `dependencies` in `pyproject.toml`
-  (unpinned, no version numbers, like the others) and run `pip install -e .` again.
+  (unpinned, no version numbers, like the others), run `uv lock` to update `uv.lock` (commit both), and
+  `pip install -e .` again in a pip-made environment.
 
 * **Install + run:** Quick Start, all of above for Linux:
   ```
