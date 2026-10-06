@@ -21,14 +21,14 @@ The .npy of a file is written last, atomically; its presence means that file is 
 Network only (no SPICE), so the build uses processes freely. Standard library + numpy, pandas, requests.
 """
 from pyoccult_version import __version__
+import pyoccult_urls as U
 import argparse, json, math, os, re, shutil, sys, tempfile, time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 
-BUCKET = "https://gaia.eu-1.cdn77-storage.com/"                     # S3-style listing behind cdn.gea.esac.esa.int
-CDN = "https://cdn.gea.esac.esa.int/"
-PREFIX = "Gaia/gdr3/gaia_source/"
+BUCKET = U.URL_GAIA_DR3_LISTING                                       # S3-style listing behind the CDN (pyoccult_urls)
+PREFIX = U.GAIA_DR3_LISTING_PREFIX
 COLS = ["source_id", "ra", "dec", "parallax", "pmra", "pmdec", "phot_g_mean_mag"]
 DTYPE = np.dtype([("source_id", "<i8"), ("ra", "<f8"), ("dec", "<f8"), ("parallax", "<f4"),
                   ("pmra", "<f4"), ("pmdec", "<f4"), ("phot_g_mean_mag", "<f4")])
@@ -145,7 +145,7 @@ def _download(name, dst, tries=4):
     import requests
     for k in range(tries):
         try:
-            with requests.get(CDN + PREFIX + name, stream=True, timeout=120) as r:
+            with requests.get(U.URL_GAIA_DR3_FILES + name, stream=True, timeout=120) as r:
                 r.raise_for_status()
                 with open(dst, "wb") as f:
                     for c in r.iter_content(1 << 20):
@@ -201,7 +201,7 @@ def build(out_dir, gmax=18.0, workers=6):
         man = json.load(open(man_path))
         if abs(man["gmax"] - gmax) > 1e-9 or man["ruwe_max"] != RUWE_MAX:
             sys.exit(f"{out_dir} holds a catalog with gmax {man['gmax']}, ruwe < {man['ruwe_max']}; use another folder")
-    man = dict(gmax=gmax, ruwe_max=RUWE_MAX, high_pm_mas=HIGH_PM_MAS, source=CDN + PREFIX,
+    man = dict(gmax=gmax, ruwe_max=RUWE_MAX, high_pm_mas=HIGH_PM_MAS, source=U.URL_GAIA_DR3_FILES,
                files=[n for n, _ in files], created=time.strftime("%Y-%m-%d %H:%M:%S"))
     fd, tmp = tempfile.mkstemp(dir=out_dir, suffix=".tmp")
     with os.fdopen(fd, "w") as f:
@@ -239,7 +239,7 @@ def build(out_dir, gmax=18.0, workers=6):
 
 # ----------------------------------------------------------------------------------------------- ready-made copy
 ZENODO_DOI = "10.5281/zenodo.23113337"                               # concept DOI: always the newest version
-ZENODO_API = "https://zenodo.org/api/records/23113337"
+ZENODO_API = U.URL_ZENODO_CATALOG_RECORD
 ZENODO_GMAX = (16.0, 18.0)                                            # limits published there (gaia_dr3_g16, gaia_dr3_g18)
 
 

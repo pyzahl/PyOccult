@@ -12,6 +12,7 @@ Used by pyoccult_gui.py (report star buttons, Favorites tab). Standard library o
     python pyoccult_favorites.py list
 """
 from pyoccult_version import __version__
+import pyoccult_urls as U
 import glob, json, os, shutil, sys, tempfile
 from datetime import datetime, timezone
 
@@ -182,7 +183,7 @@ def cleanup(before=None, folder=DIR):
     return ok, f"{msg} (events before {day})"
 
 
-def write_page(folder=DIR, tiles="https://tile.openstreetmap.org/{z}/{x}/{y}.png"):
+def write_page(folder=DIR, tiles=None):
     """favorites/favorites.html: the favorites as a report table (as the Results page, plus select box, site, status,
     note, added) with the same tools, using each favorite's own map and preview copies. Returns the path."""
     import pyoccult_report as R
@@ -210,7 +211,8 @@ def write_page(folder=DIR, tiles="https://tile.openstreetmap.org/{z}/{x}/{y}.png
     meta = dict(title="PyOccult favorites", span=span, sort="date", info=None,
                 observer=f"{len(sites)} site{'s' if len(sites) != 1 else ''}: {', '.join(sorted(sites))}" if sites
                 else "no favorites yet: add events with the star button in the Results report",
-                generated=datetime.now().strftime("%Y-%m-%d %H:%M"), paths=paths, tiles=tiles, obs=None, site=None,
+                generated=datetime.now().strftime("%Y-%m-%d %H:%M"), paths=paths, tiles=tiles or U.URL_OSM_TILES,
+                obs=None, site=None,
                 favorites=True, statuses=STATUSES)
     os.makedirs(folder, exist_ok=True)
     out = os.path.join(folder, "favorites.html")

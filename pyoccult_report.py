@@ -24,6 +24,7 @@ limits, the 3-sigma limits and the observer. The path data is embedded in the pa
 is opened straight from disk. A link opens the closest centre-line point in Google Maps. --no-embed turns it off.
 """
 from pyoccult_version import __version__
+import pyoccult_urls as U
 import argparse
 import csv
 import glob
@@ -204,8 +205,8 @@ def find_kml(kml_dir, target_id, when, ext="kml"):
     return found[0] if found else None
 
 
-JPL_SBDB = "https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr="     # asteroid page, + number
-VIZIER_GAIA = "https://vizier.cds.unistra.fr/viz-bin/VizieR-5?-source=I/355/gaiadr3&Source="   # star, + Gaia DR3 id
+JPL_SBDB = U.URL_JPL_SBDB_PAGE                                       # asteroid page, + number
+VIZIER_GAIA = U.URL_VIZIER_GAIA_DR3                                   # star, + Gaia DR3 id
 KML_NS = "{http://www.opengis.net/kml/2.2}"
 LINE_STYLES = (("Centre", "#15803d", 3, None), ("Shadow limit", "#dc2626", 2, None), ("1-sigma", "#7c3aed", 1.5, "2 4"),
                ("3-sigma", "#d97706", 2, "6 6"))
@@ -379,8 +380,8 @@ dialog::backdrop{background:rgba(0,0,0,.55)}
 .legend i.dot{background:repeating-linear-gradient(90deg,#7c3aed 0 2px,transparent 2px 5px)}
 """
 
-LEAFLET_TAGS = ('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">'
-                '<script defer src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>')
+LEAFLET_TAGS = (f'<link rel="stylesheet" href="{U.URL_LEAFLET_CSS}">'
+                f'<script defer src="{U.URL_LEAFLET_JS}"></script>')
 
 TOAST_JS = """<script>
 function pyoToast(msg,stay){var t=document.getElementById('pyotoast');if(!t){t=document.createElement('div');t.id='pyotoast';
@@ -533,7 +534,7 @@ function show(key,title){
     else L.circleMarker([p.lat,p.lon],{radius:3,color:'#15803d',weight:1,fillOpacity:1}).bindTooltip(p.name+(p.desc?' · '+p.desc:'')).addTo(layer);
   });
   near=(obs&&centre&&centre.length>1)?nearest(centre,obs):null;
-  if(near){gm.href='https://www.google.com/maps/search/?api=1&query='+near.lat.toFixed(5)+','+near.lon.toFixed(5);gm.hidden=false;}
+  if(near){gm.href='__GMAPS__'+near.lat.toFixed(5)+','+near.lon.toFixed(5);gm.hidden=false;}
   else gm.hidden=true;
   setTimeout(function(){map.invalidateSize();zoomObs();},0);
 }
@@ -548,7 +549,8 @@ dlg.addEventListener('click',function(ev){if(ev.target===dlg)dlg.close();});
 
 def map_script(paths, meta):
     data = json.dumps(paths, separators=(",", ":")).replace("</", "<\\/")
-    js = MAP_JS.replace("__TILES__", json.dumps(meta["tiles"])).replace("__OBS__", json.dumps(meta["obs"]))
+    js = (MAP_JS.replace("__TILES__", json.dumps(meta["tiles"])).replace("__OBS__", json.dumps(meta["obs"]))
+          .replace("__GMAPS__", U.URL_GOOGLE_MAPS_SEARCH))
     return f'<script id="pathdata" type="application/json">{data}</script><script>{js}</script>'
 
 
@@ -761,7 +763,7 @@ def main(argv=None):
                     help="row order: mag = brightest star first (default), date = by event time")
     ap.add_argument("--title", default="PyOccult asteroid occultation events")
     ap.add_argument("--no-embed", action="store_true", help="do not embed the KML paths and map viewer in the HTML page")
-    ap.add_argument("--tile-url", default="https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    ap.add_argument("--tile-url", default=U.URL_OSM_TILES,
                     help="tile URL template for the embedded map (default: OpenStreetMap, fine for light personal use)")
     a = ap.parse_args(argv)
 

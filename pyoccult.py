@@ -1,5 +1,6 @@
 #!.venv/bin/python3
 from pyoccult_version import __version__
+import pyoccult_urls as U
 import sys, base64, functools, os, re, time
 T_START = time.time()                    # run statistics: start-up time is measured from here
 from datetime import datetime
@@ -277,7 +278,7 @@ def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
     fn = Path(cache_dir) / f"PyOccult_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
     if not fn.is_file():
         resp = requests.get(
-            "https://ssd.jpl.nasa.gov/api/horizons.api",
+            U.URL_JPL_HORIZONS_API,
             params={'format': 'json', 'COMMAND': target_id + ';', 'EPHEM_TYPE': 'SPK',
                     'MAKE_EPHEM': 'YES', 'START_TIME': epochs['start'],
                     'STOP_TIME': epochs['stop'], 'OBJ_DATA': 'NO'},
@@ -307,7 +308,7 @@ def sbdb_phys(target_id, timeout=30):
     if fresh:
         return hit["phys"]
     try:
-        resp = requests.get("https://ssd-api.jpl.nasa.gov/sbdb.api", params={"sstr": n, "phys-par": 1}, timeout=timeout)
+        resp = requests.get(U.URL_JPL_SBDB_API, params={"sstr": n, "phys-par": 1}, timeout=timeout)
         resp.raise_for_status()
         entry = sbdb_cache.entry_from_api(resp.json())
     except (requests.RequestException, ValueError) as e:

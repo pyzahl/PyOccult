@@ -105,6 +105,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   lines and `null` for missing values.
 - Gaia archive (windows mode only): never use synchronous `Gaia.launch_job`; it silently truncates at 2000 rows. Use
   `launch_job_async`. `Gaia.ROW_LIMIT = -1` does not lift the sync cap.
+- Every download/web address lives in `pyoccult_urls.py` (`URL_*` names; no side effects, so setup/geo/kernels/report
+  can import it before a sites.py exists). Never hard-code an http(s) address elsewhere; exceptions: XML namespaces
+  (SVG, KML) and `pyoccult_version.__url__`. Tests that exec code excerpts must put `U` (pyoccult_urls) in their ns.
 - Write cache files atomically (temp file + `os.replace`). Every cache (asteroid SPKs, SBDB bulk list, per-asteroid SBDB size data
   `PyOccult_sbdb_phys.json`; both SBDB caches refetched after `sbdb_max_age_days`) goes to `config.cache_path`
   (`/dev/shm` if present, else the system temp folder); never hard-code a path. Gaia is not cached: corridor mode

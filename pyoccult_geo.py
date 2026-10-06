@@ -6,6 +6,7 @@ All results are approximate: IP positions are city level (10-100 km off, wrong b
 centre. Use an exact position (GPS, map) for observing.
 """
 from pyoccult_version import __version__
+import pyoccult_urls as U
 import json, urllib.parse, urllib.request
 
 
@@ -18,12 +19,12 @@ def get_json(url, timeout=10):
 def elevation(lat, lon):
     """Ground elevation (m) from Open-Meteo, or None."""
     try:
-        return float(get_json(f"https://api.open-meteo.com/v1/elevation?latitude={lat}&longitude={lon}")["elevation"][0])
+        return float(get_json(f"{U.URL_OPENMETEO_ELEVATION}?latitude={lat}&longitude={lon}")["elevation"][0])
     except Exception:
         return None
 
 
-MPC_OBSCODES_URL = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"
+MPC_OBSCODES_URL = U.URL_MPC_OBSCODES
 _MPC = None
 
 
@@ -91,7 +92,7 @@ def mpc_observatories(folder="data", url=MPC_OBSCODES_URL):
 def timezone(lat, lon):
     """IANA time zone name at a place (e.g. "Europe/Zurich") from Open-Meteo, or None."""
     try:
-        return get_json(f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+        return get_json(f"{U.URL_OPENMETEO_FORECAST}?latitude={lat}&longitude={lon}"
                         f"&timezone=auto&forecast_days=1&daily=sunrise").get("timezone") or None
     except Exception:
         return None
@@ -100,7 +101,7 @@ def timezone(lat, lon):
 def ip_location():
     """(lat, lon, ele, label) from the IP address, or None. Sends the IP address to ipinfo.io."""
     try:
-        d = get_json("https://ipinfo.io/json")
+        d = get_json(U.URL_IPINFO)
         lat, lon = (float(x) for x in d["loc"].split(","))
         return lat, lon, elevation(lat, lon), ", ".join(x for x in (d.get("city"), d.get("region"), d.get("country")) if x)
     except Exception:
@@ -110,7 +111,7 @@ def ip_location():
 def places(name, count=5):
     """Places matching a name: list of (lat, lon, ele, label), best first (Open-Meteo geocoding). Empty if none/offline."""
     try:
-        res = get_json("https://geocoding-api.open-meteo.com/v1/search?"
+        res = get_json(U.URL_OPENMETEO_GEOCODING + "?"
                        + urllib.parse.urlencode(dict(name=name, count=count))).get("results", [])
     except Exception:
         return []

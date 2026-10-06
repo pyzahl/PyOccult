@@ -23,7 +23,7 @@ def get(url, params, timeout):
     return Resp(DB[params["sstr"]])
 cache_dir = tempfile.mkdtemp()
 cfg = types.SimpleNamespace(cache_path=cache_dir, sbdb_max_age_days=30)
-ns = dict(np=np, re=re, json=json, time=time, os=os, Path=Path, functools=functools, config=cfg, sbdb_cache=pyoccult_sbdb,
+ns = dict(U=__import__('pyoccult_urls'), np=np, re=re, json=json, time=time, os=os, Path=Path, functools=functools, config=cfg, sbdb_cache=pyoccult_sbdb,
           requests=types.SimpleNamespace(get=get, RequestException=RequestException))
 exec(code, ns)
 

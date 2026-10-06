@@ -18,13 +18,14 @@ Defaults come from pyoccult_config.py (site, window ct/days, reach, altitude lim
 Needs the kernels and the local Gaia catalog with its bright-star index: python pyoccult_setup.py
 """
 from pyoccult_version import __version__
+import pyoccult_urls as U
 import argparse, datetime as dt, json, math, os, sys, tempfile, time, urllib.parse, urllib.request
 from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pyoccult_sbdb                                     # shared per-asteroid size cache
 
-SBDB_URL = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"
+SBDB_URL = U.URL_JPL_SBDB_QUERY_API
 SBDB_FIELDS = ["spkid", "full_name", "H", "G", "diameter", "diameter_sigma", "extent", "albedo", "a", "e", "i", "om",
                "w", "ma", "epoch", "condition_code", "neo", "class"]
 

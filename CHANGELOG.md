@@ -7,6 +7,9 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 ## [Unreleased]
 
 ### Changed
+- All download and web addresses moved into one file, `pyoccult_urls.py`, each with its own name (`URL_NAIF_DE440`,
+  `URL_JPL_HORIZONS_API`, `URL_MPC_OBSCODES`, ...), so they are maintained in one place. A separate file rather than
+  `pyoccult_config.py`, which reads `sites.py` when imported: setup and the report need addresses without it.
 - GUI Site tab: the site list is now the Minor Planet Center's list of observatory codes (ObsCodes.html, ~2700
   observatories, downloaded once into `data/`, not in git; `pyoccult_geo.mpc_observatories`), searchable by code or
   name. It replaces Occult's site list of 0.12.0, which turned out to hold mainly reference cities. Positions and

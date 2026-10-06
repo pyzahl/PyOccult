@@ -46,6 +46,7 @@ This is where PyOccult comes in: it predicts such events for observation plannin
 | `pyoccult_report.py` | turns `hits_log.csv` into an HTML (or Markdown) event list with an embedded map |
 | `pyoccult_pick.py` | finds the events at your site for all asteroids (OWC-style), writes `pick_events.csv` and `targets.py`, and saves both per site and window in `picks/` |
 | `pyoccult_picks.py` | the saved picks: which one a search uses, `list`, `import` |
+| `pyoccult_urls.py` | every download and web address PyOccult uses (NAIF, ESA Gaia, Zenodo, JPL, MPC, Open-Meteo, maps), each with its own name: change them there only |
 | `pyoccult_kstars.py` | points a running KStars at an event (Linux, D-Bus); used by the report's KStars button in the GUI |
 | `pyoccult_favorites.py` | the favorites list (`favorites/`, private): events starred in the report, with copies of map and preview; `list` |
 | `pyoccult_setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |

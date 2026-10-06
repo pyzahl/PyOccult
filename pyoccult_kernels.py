@@ -2,6 +2,7 @@
 orientation file is refreshed after earth_pck_max_age days). Used by pyoccult.py at start-up and by pyoccult_setup.py.
 Standard library only (downloads with the system curl)."""
 from pyoccult_version import __version__
+import pyoccult_urls as U
 import os, subprocess
 from datetime import datetime
 from pathlib import Path
@@ -57,10 +58,10 @@ def pck_comment_dates(path="earth_latest_high_prec.bpc"):
 def download_kernels(earth_pck_max_age=7):
     urls = {
         # fname: [url, maxage]
-        "naif0012.tls": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls", -1],
-        "de440.bsp": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp", -1],
-        "pck00010.tpc": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc", -1],
-        "earth_latest_high_prec.bpc": ["https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc", earth_pck_max_age],
+        "naif0012.tls": [U.URL_NAIF_LSK, -1],
+        "de440.bsp": [U.URL_NAIF_DE440, -1],
+        "pck00010.tpc": [U.URL_NAIF_PCK, -1],
+        "earth_latest_high_prec.bpc": [U.URL_NAIF_EARTH_PCK, earth_pck_max_age],
     }
     
     # Complete browser headers to clear security checks
