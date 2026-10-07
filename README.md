@@ -327,9 +327,11 @@ Start the GUI and work through its tabs from left to right:
 pyoccult                 # opens http://127.0.0.1:8080 in your browser (local only)
 ```
 
-1. **Site**: set your observing site on the map (or by place name / IP address, or from Occult's list of about 800
+1. **Site**: set your observing site on the map (or by place name / IP address, or from the Minor Planet Center's list of
    ~2700 observatories with their official MPC codes: type a code or name in **MPC observatory**; the **MPC code**
-   field holds your site's code, if it has one) and enter its equipment. **Add as new site** (next to the list) adds
+   field holds your site's code, if it has one) and enter its equipment (**Sensor (cameras)**: pick your camera's sensor, e.g.
+   type "174" or your camera's name, to fill the sensor width and height; MM / MC, M / C are a camera's mono and
+   color versions). **Add as new site** (next to the list) adds
    what the map and form show as a new site to the site selector, named as in **New site name**, and saves it;
    **Save sites.py** instead stores the form into the site selected at the top right; **Remove site** deletes the
    selected site from `sites.py` (after asking): aperture,
@@ -674,7 +676,7 @@ pyoccult --port 8090 --no-browser
   and the pick tool use (every complete catalog in the project folder is offered). The Search and Pick tabs repeat
   the site.
 * **Site**: edit the selected site or add one: set its position by clicking the map (the elevation is looked up), by
-  searching a place or from your IP address, and edit its view and equipment; the derived star limit and camera field
+  searching a place or from your IP address, and edit its view and equipment (the **Sensor (cameras)** list fills the sensor size); the derived star limit and camera field
   are shown, and "unsaved changes" while the form differs from `sites.py`. Runs read `sites.py`, so unsaved changes
   to the selected site are saved automatically when you start a run. **Save sites.py** rewrites `sites.py` (comments
   in it are not kept); "Default for command-line runs" sets `default_site`, used when the scripts run without the GUI.

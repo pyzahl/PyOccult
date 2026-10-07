@@ -17,6 +17,7 @@ os.chdir(ROOT)
 from nicegui import app, run, ui
 from pyoccult import geo
 from pyoccult import favorites
+from pyoccult import cameras
 
 PY = sys.executable
 PYOCCULT = [PY, "-u", "-m", "pyoccult"]                             # how runs are started: PYOCCULT + [command, ...]
@@ -193,14 +194,23 @@ def index():
                         ui.button("My IP location", on_click=lambda: ip_loc()).props("outline")
                     hits = ui.column().classes("w-full gap-1")
                     occ = geo.mpc_observatories()               # MPC observatory codes (downloaded once into data/)
-                    occ_sel = ui.select({i: f"{x['code']} {x['name']}" for i, x in enumerate(occ)},  # searchable:
-                                                                                  # code and name only
-                                        with_input=True, clearable=True,
-                                        label="MPC observatory (type code or name)" if occ else
-                                        "MPC observatory list: not available (offline?)").classes("w-full").props(
-                        "dense options-dense" + ("" if occ else " disable")).tooltip(
-                        f"{len(occ)} observatories with their official MPC codes (Minor Planet Center): sets position, "
-                        "elevation, description and MPC code; the equipment stays as it is")
+                    with ui.row().classes("w-full no-wrap gap-4"):
+                        occ_sel = ui.select({i: f"{x['code']} {x['name']}" for i, x in enumerate(occ)},  # searchable:
+                                                                                      # code and name only
+                                            with_input=True, clearable=True,
+                                            label="MPC observatory (type code or name)" if occ else
+                                            "MPC observatory list: not available (offline?)").classes("w-1/2").props(
+                            "dense options-dense" + ("" if occ else " disable")).tooltip(
+                            f"{len(occ)} observatories with their official MPC codes (Minor Planet Center): sets position, "
+                            "elevation, description and MPC code; the equipment stays as it is")
+                        cam_sel = ui.select({i: cameras.label(c) for i, c in enumerate(cameras.SENSORS)},
+                                            with_input=True, clearable=True,
+                                            label="Sensor (cameras; type a name)").classes(
+                            "grow").props("dense options-dense").tooltip(
+                            "Sensors common in occultation work, each with the cameras built with it (MM / MC, M / C: "
+                            "the mono and color versions of a camera, same sensor size). Picking one fills sensor "
+                            "width and height, computed from pixel count and pixel size. Not listed, or a cropped "
+                            "readout: enter width and height yourself")
                     ui.button("Add as new site", on_click=lambda: add_site()).props("outline").tooltip(
                         "Add the current map site (position, description, MPC code and the equipment in the form) as a "
                         "new site to the site selector at the top right, named as in 'New site name'; saved at once")
@@ -450,6 +460,17 @@ def index():
                   multi_line=True, timeout=9000)
 
     occ_sel.on_value_change(pick_occult)
+
+    def pick_camera(e):
+        if e.value is None:
+            return
+        c = cameras.SENSORS[e.value]
+        w, h = cameras.sensor_mm(c)
+        fields["sensor_w_mm"].value, fields["sensor_h_mm"].value = w, h       # updates the camera field line too
+        ui.notify(f"{c[0]} ({c[4]}): sensor {w:.2f} × {h:.2f} mm; 'Save sites.py' keeps it for this site",
+                  timeout=6000)
+
+    cam_sel.on_value_change(pick_camera)
 
     async def find_place():
         hits.clear()

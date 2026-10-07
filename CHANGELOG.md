@@ -37,6 +37,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- GUI Site tab: **Sensor (cameras)** list next to the MPC observatory list: 21 sensors common in occultation work, one
+  entry each as "Sony IMX174: 11.34 x 7.13 mm, 1936 x 1216 px of 5.86 um (ZWO ASI174MM / MC, QHY174M-GPS, ...,
+  DVTI+CAM 174)", with the ZWO, QHY, ASTRID, DVTI+CAM, Seestar and Unistellar cameras built with them, plus analog
+  video formats. Searchable by sensor or camera name (e.g. "174", "QHY600", "ASTRID"); picking one fills sensor width
+  and height (computed from pixels x pixel size; `pyoccult/cameras.py`). The Site
+  form now has MagAdjust next to the focal length, and sensor width, height and detection frames in one row.
 - **uv support** (as PyMovie and PyOTE): `uv run pyoccult` in the PyOccult folder installs Python 3.12
   (`.python-version`) and the exact package versions of `uv.lock` (Linux, macOS, Windows) into `.venv` by itself;
   then `uv run pyoccult setup` and `uv run pyoccult`. README: install steps for uv on each system (also from the
