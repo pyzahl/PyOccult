@@ -37,6 +37,9 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- Favorites: the close/double-star check also for favorites added before it (filled in once at GUI start from the
+  local catalog), shown in the favorites table (⚠ after the drop) and as a "close or double star" line in the
+  detail panel.
 - **Close and double stars** (`pyoccult/doubles.py`): each event checks the local catalog for neighbours within
   4" (`companion_radius_arcsec`) whose light stays in the camera image, and recomputes the drop with it
   (`mag_drop_blended`; the report shows e.g. "3.61 ⚠ 3.31" with details on hover when the drop is 0.1 mag or
@@ -89,6 +92,9 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- Favorites tab: the check boxes' mass actions (**Remove**, **Set status**, the "selected" count) did nothing since
+  0.12.0: the times selector's script variable `sel` replaced the selection helper `sel()` of the same script
+  (seen as "cannot remove a favorite"). Renamed; the favorites test now guards against it.
 - README: the logo at the top pointed to its old place in the project root (moved into `src/pyoccult/`).
 - GUI Favorites tab: the **CSV** download was saved as "true.csv" (the link's `download` attribute); it is now a
   button like in the Pick and Results tabs and saves `favorites_<date>.csv`.

@@ -243,6 +243,36 @@ def backfill_phys(lookup, folder=DIR):
     return n
 
 
+def backfill_doubles(check, folder=DIR):
+    """Give favorites added before the close/double-star check (doubles.py) its fields: check(record) -> dict of
+    fields, or None when it cannot be done now (no catalog). Done once per favorite (the record then has
+    double_check). Returns the number updated."""
+    items, n = load(folder), 0
+    for e in items:
+        r = e["record"]
+        if str(r.get("double_check") or "") not in ("", "none", "nan"):
+            continue
+        f = check(r)
+        if f:
+            r.update({k: (None if isinstance(v, float) and v != v else v) for k, v in f.items()})   # NaN -> null
+            n += 1
+    if n:
+        _save(items, folder)
+    return n
+
+
+def double_text(entry):
+    """'companion G 17.4 at 2.8″: drop 3.31 mag with its light (local catalog)', 'none known (local catalog and
+    Gaia online)', or '' when the favorite has not been checked."""
+    r = entry["record"]
+    src = str(r.get("double_check") or "")
+    if src in ("", "none", "nan"):
+        return ""
+    where = {"local": "local catalog", "gaia online": "local catalog and Gaia online"}.get(src, src)
+    hint = str(r.get("double_hint") or "")
+    return f"{hint} ({where})" if hint and hint != "nan" else f"none known ({where})"
+
+
 def backfill_globes(map_dir="maps", folder=DIR):
     """Give favorites added before globe plots existed the plot of a later search (<key>*_globe.svg in map_dir),
     copied into their own folder. Returns the number added."""

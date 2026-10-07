@@ -47,7 +47,11 @@ assert F.cleanup("2050-01-01", fav)[1].startswith("no favorites before")
 page = F.write_page(fav)
 html = open(page, encoding="utf-8").read()
 assert 'class="favrow" data-key="70141_20990103T0707"' in html and 'id="favall"' in html and "favsetst" in html
+from pyoccult import report as R
 assert 'class="mapbtn favbtn"' not in html, "no star buttons on the favorites page"
+import re
+assert not re.search(r"[,\s(]sel\s*=", R.FAVPAGE_JS if hasattr(R, "FAVPAGE_JS") else ""), \
+    "a variable named sel replaces the selection helper sel() (mass actions broke in 0.12.0)"
 assert F.remove_many(["70141_20990103T0707", "nope"], fav)[0] and F.keys(fav) == []
 # size data kept with a favorite, the size line, the CSV, filling in old favorites
 import csv
@@ -95,4 +99,17 @@ F.add(F.find_record(log, "19714", "2026-10-04T06:38:06"), run, maps, fav)       
 open(os.path.join(maps, "19714_20261004T0638_globe.svg"), "w").write("<svg/>")      # ... until a later search
 assert F.backfill_globes(maps, fav) == 1 and F.backfill_globes(maps, fav) == 0
 assert "globe" in F.load(fav)[0]["files"]
+# close/double stars for favorites added before the check: filled in once, shown as a line
+seen = []
+def check(r):
+    seen.append(r["target_id"])
+    return dict(blend_n=1, blend_sep_arcsec=2.8, blend_g=17.4, mag_drop_blended=3.31, double_check="local",
+                double_hint="companion G 17.4 at 2.8\u2033: drop 3.31 mag with its light", gaia_ruwe=float("nan"))
+n0 = len(F.load(fav))
+assert F.backfill_doubles(check, fav) == n0 and F.backfill_doubles(check, fav) == 0, "once per favorite"
+e = F.load(fav)[0]
+assert e["record"]["gaia_ruwe"] is None and F.double_text(e).endswith("with its light (local catalog)")
+e["record"]["double_hint"] = ""
+assert F.double_text(e) == "none known (local catalog)"
+assert F.backfill_doubles(lambda r: None, fav) == 0
 print("FAVORITES TESTS PASSED")

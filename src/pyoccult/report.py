@@ -450,8 +450,9 @@ document.querySelectorAll('tr.favrow').forEach(function(tr){tr.addEventListener(
  document.querySelectorAll('tr.favrow.cur').forEach(function(x){x.classList.remove('cur');});
  tr.classList.add('cur');tell('fav_select',tr.dataset.key);});});
 upd();
-// event times: UT (default), this computer's time zone, or each site's time zone; remembered in this browser
-var cells=[].slice.call(document.querySelectorAll('td.evtime')),sel=document.getElementById('favtime'),
+// event times: UT (default), this computer's time zone, or each site's time zone; remembered in this browser.
+// (tsel, not sel: sel() above is the selection helper, a var of the same name in this function would replace it)
+var cells=[].slice.call(document.querySelectorAll('td.evtime')),tsel=document.getElementById('favtime'),
     head=document.getElementById('evtimehead'),M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 cells.forEach(function(c){c.dataset.ut=c.textContent;});
 function zoned(c,tz){var o={year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',
@@ -465,8 +466,8 @@ function show(mode){cells.forEach(function(c){c.textContent=mode==='local'?zoned
   c.dataset.ut+' UT (site zone unknown)'):c.dataset.ut;});
   if(head)head.firstChild.textContent={ut:'Event time (UT)',local:'Event time (local)',site:'Event time (site)'}[mode];
   try{localStorage.setItem('fav_time',mode);}catch(e){}}
-if(sel){try{var m=localStorage.getItem('fav_time');if(m)sel.value=m;}catch(e){}
-  sel.addEventListener('change',function(){show(sel.value);});if(sel.value!=='ut')show(sel.value);}
+if(tsel){try{var m=localStorage.getItem('fav_time');if(m)tsel.value=m;}catch(e){}
+  tsel.addEventListener('change',function(){show(tsel.value);});if(tsel.value!=='ut')show(tsel.value);}
 })();
 </script>"""
 

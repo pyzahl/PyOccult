@@ -360,6 +360,10 @@ def index():
                     f_facts = ui.label().classes("text-sm text-slate-600")
                     f_size = ui.label().classes("text-sm text-slate-600")
                     f_shape = ui.label().classes("text-sm text-slate-600")
+                    f_dbl = ui.label().classes("text-sm text-slate-600").tooltip(
+                        "Close and double stars: neighbours within a few arcseconds whose light stays in the camera "
+                        "image (the drop with their light), and Gaia's hints that the star itself is double (online "
+                        "check of a search run)")
                     f_occ = ui.label().classes("text-sm text-slate-600").tooltip(
                         "Earlier occultations of this asteroid in NASA's archive of observed occultations (PDS Small "
                         "Bodies Node; Herald, Dunham et al.; doi:10.26033/ehqs-jp27). Reference only: the prediction "
@@ -740,6 +744,7 @@ def index():
                         f"added {e.get('added', '')[:16].replace('T', ' ')} UT")
         f_size.text = "size: " + (favorites.size_text(e) or "not recorded")
         f_shape.text = "shape and rotation: " + (favorites.shape_text(e) or "not known (no SBDB data for this asteroid)")
+        f_dbl.text = "close or double star: " + (favorites.double_text(e) or "not checked yet")
         f_occ.text = occultations.text(e["record"].get("target_id", ""))
         f_status.value, f_note.value = e.get("status", "planned"), e.get("note", "")
         f_img.set_visibility("svg" in files)
@@ -847,6 +852,34 @@ def index():
         await run_process(args, log, env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
 
 
+def local_double_check(config):
+    """check(record) for favorites.backfill_doubles: the close/double-star check (doubles.py) from the local catalog,
+    without SPICE; None for every record when no complete catalog is there."""
+    from pyoccult import doubles, gaia_local
+    state = {}
+
+    def check(r):
+        if "local" not in state:
+            try:
+                state["local"] = gaia_local.LocalGaia(config.gaia_local_dir)
+            except Exception:                                    # no or incomplete catalog: try again next start
+                state["local"] = None
+        local = state["local"]
+        try:
+            ra, dec, g, et = (float(r[k]) for k in ("star_ra", "star_dec", "mag", "best_et"))
+            m_ast = float(r.get("m_ast")) if str(r.get("m_ast", "")) not in ("", "nan", "None") else None
+        except (KeyError, TypeError, ValueError):
+            return None
+        if local is None:
+            return None
+        rad = float(getattr(config, "companion_radius_arcsec", 4.0))
+        years = 2000.0 + et / (365.25 * 86400) - doubles.GAIA_EPOCH
+        comps = doubles.companions(local.cone(ra, dec, (rad + 3.0) / 3600.0), int(str(r["star"]).split(".")[0]), ra, dec, g,
+                                   years, rad)
+        return doubles.fields(comps, g, m_ast, "local")
+    return check
+
+
 KSTARS_OPT = dict(set_location=True)                   # Results tab option, read by /api/kstars/show
 
 
@@ -873,6 +906,7 @@ def main():
     from pyoccult import sbdb                                        # full SBDB data (shape, rotation) for older favorites
     favorites.backfill_phys(lambda t: sbdb.get_full(t, config.cache_path))
     favorites.backfill_globes(config.map_dir)                   # globe plots of later searches for older favorites
+    favorites.backfill_doubles(local_double_check(config))      # close/double stars for favorites added before
     favorites.backfill_timezones(geo.timezone)                  # site time zones (online, once per site)
     favorites.write_csv()
     app.add_static_files("/fav", os.path.join(ROOT, favorites.DIR), max_cache_age=0)
