@@ -293,7 +293,8 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs, preview=preview,
                 m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")), calc=num(r.get("calc_s")),
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
-                size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(), ra=ra, dec=dec, fov=fov,
+                size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(),
+                drop_blend=num(r.get("mag_drop_blended")), dhint=(r.get("double_hint") or "").strip(), ra=ra, dec=dec, fov=fov,
                 globe=globe)
 
 
@@ -354,6 +355,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .badge{display:inline-block;padding:0 8px;border-radius:99px;font-size:.78rem}
 .in{background:var(--in-bg);color:var(--in-ink)}.near{background:var(--near-bg);color:var(--near-ink)}
 a{color:var(--accent)}
+span.dbl{color:#b26a00;font-weight:600;cursor:help;white-space:nowrap}
 sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
 .notes{color:var(--muted);font-size:.85rem;margin-top:16px}
 .notes li{margin:3px 0}
@@ -615,6 +617,15 @@ def map_cell(e):
     return f"<td>{out}</td>"
 
 
+def double_mark(e):
+    """' <span class=dbl>⚠ 0.82</span>' after the drop when a close or double star is known (doubles.py): the drop
+    with the neighbours' light, details on hover; empty otherwise."""
+    if not e.get("dhint"):
+        return ""
+    val = f" {e['drop_blend']:.2f}" if e.get("drop_blend") is not None else ""
+    return f' <span class="dbl" title="{esc(e["dhint"])}">\u26a0{val}</span>'
+
+
 def html_row(e):
     size = f"D≈{2 * e['rad']:.1f} km" if e["rad"] is not None else ""
     tip_ast = esc(f"Gaia DR3 {e['star']} · {size} ({e['size_src']})")
@@ -661,7 +672,7 @@ def html_row(e):
         + (f'<a href="{esc(VIZIER_GAIA)}{urllib.parse.quote(str(e["star"]))}" target="_blank" rel="noopener" '
            f'title="Gaia DR3 {esc(e["star"])} in VizieR. {mag_tip}">{fmt(e["mag"])}</a>' if e.get("star") else fmt(e["mag"]))
         + '</td>'
-        f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}</td>'
+        f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}{double_mark(e)}</td>'
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
         f'<td data-s="{s(moon["sep"], 1) if moon else ""}" title="{moon_tip}">{esc(moon_text(e))}</td>'
@@ -722,6 +733,7 @@ def to_html(events, meta):
 {table}
 <ul class="notes">
 <li>Star magnitude is Gaia G. The drop assumes the star is fully covered and ignores the star's angular size and diffraction, so bright stars and very small bodies can show a smaller real drop.</li>
+<li><b>\u26a0</b> after a drop: a close or double star. The number is the drop with the light of neighbours within a few arcseconds, which stays in the camera image when the star is covered; hover for details (neighbours from the local catalog; with the online check also Gaia's double-star hints and neighbours the catalog leaves out).</li>
 <li><b>*</b> after an asteroid: no measured diameter; its size is estimated from H with an assumed albedo, so diameter, duration and shadow width are uncertain by a factor of about 1.7 (typical for small asteroids, H above ~15).</li>
 <li>Offset is the observer's distance from the shadow centre line in the fundamental plane. "Inside" means within the shadow radius; otherwise it is the gap to the shadow edge. Radius comes from the size lookup (hover the asteroid name).</li>
 <li>Altitude is the star's altitude at closest approach. The Moon is shown only while above the horizon. Click a column heading to sort.</li>
@@ -749,7 +761,8 @@ def to_markdown(events, meta):
         kml = " ".join(x for x in (f"[KML]({e['kml']})" if e["kml"] else "", f"[Preview]({e['preview']})"
                                    if e.get("preview") else "") if x) or "—"
         star = " \\*" if size_estimated(e) else ""                      # size from H only (footnote)
-        out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])} | {fmt(e['dur'])} "
+        dbl = (" \u26a0" + (f" {e['drop_blend']:.2f}" if e.get("drop_blend") is not None else "")) if e.get("dhint") else ""
+        out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])}{dbl} | {fmt(e['dur'])} "
                    f"| {alt_text(e)} | {moon_text(e)} | {off} | {fmt(e['calc'])} | {kml} |")
     if any(size_estimated(e) for e in events):
         out.append("\n\\* size estimated from H with an assumed albedo (no measured diameter): diameter, duration and "

@@ -37,6 +37,14 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- **Close and double stars** (`pyoccult/doubles.py`): each event checks the local catalog for neighbours within
+  4" (`companion_radius_arcsec`) whose light stays in the camera image, and recomputes the drop with it
+  (`mag_drop_blended`; the report shows e.g. "3.61 ⚠ 3.31" with details on hover when the drop is 0.1 mag or
+  more smaller). Optional online check after a search (`gaia_online_check`, default on, GUI Search tab): one query to
+  the Gaia DR3 archive for all events adds Gaia's double-star hints for the event star (`non_single_star`,
+  `ipd_frac_multi_peak`, `duplicated_source`, `ruwe`) and neighbours the local catalog leaves out; skipped when
+  offline. New hit-log columns at the end (`blend_*`, `mag_drop_blended`, `double_hint`, `double_check`, `gaia_*`).
+  Still open (ABOUT.md Part 6): known-double catalogs, events on stars the catalog drops (RUWE >= 1.4), step events.
 - **Earlier occultations** of an asteroid in the favorites panel, e.g. "Occultations (NASA PDS archive, to 2023-12):
   8 events 1991-2021 (1 reliable size, ...); shape-model diameter 107.8 +- 5.6 km (6 events); best profile
   2008-06-06: 119.1 x 101.7 km". From NASA PDS Small Bodies Node "Small Bodies Occultations" V4.0 (Herald, Dunham et

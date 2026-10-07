@@ -63,6 +63,12 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `pyoccult/gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult/runner.py`
   (JSON config overrides per run). `pyoccult/geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult/preview.py`:
   event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.
+- `pyoccult/doubles.py`: close/double stars per event. Local: `companions()` from `LOCAL.cone` (radius
+  `companion_radius_arcsec`, <= 5 mag fainter, proper motion to the event date), `blended_drop`, `fields()` (blend_*,
+  mag_drop_blended, double_hint only if the drop changes >= 0.1 mag or Gaia flags). Online (`gaia_online_check`):
+  `search.online_double_check` after pass 2: one async ADQL job (OR of circles, daemon thread, 120 s timeout) ->
+  `online_fields` -> `update_hits_csv` rewrites only this run's rows (csv module, atomic; new columns appended).
+  New record fields go at the END of the hit record (the log is appended; mixed headers otherwise).
 - `pyoccult/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
   list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
 - `pyoccult/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi

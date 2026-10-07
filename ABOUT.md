@@ -402,6 +402,20 @@ size source (before NEOWISE) is a possible next step; Occult's own archive (D. H
 
 ## Part 6: Open items
 
+- **Close and double stars** (since 2026-10-06 partly handled, `pyoccult/doubles.py`): every event checks the local
+  catalog for neighbours within `companion_radius_arcsec` (4") that are at most 5 mag fainter; their light stays in
+  the camera image when the star is covered, so the drop is recomputed with it (`mag_drop_blended`), and noted with
+  a warning sign in the report when it is at least 0.1 mag smaller. With `gaia_online_check` (default on) one query
+  per run to the Gaia DR3 archive adds what the local catalog lacks: Gaia's hints that the star itself is double
+  (`non_single_star`, `ipd_frac_multi_peak` > 2 %, `duplicated_source`, `ruwe`) and neighbours it leaves out (fainter
+  than its limit, or RUWE >= 1.4). Still open, in order of value:
+  1. Known doubles: match the event stars with the occultation-discovered doubles of the PDS archive
+     (`DoubleStars` table; 76 discoveries before 2020, 61 closer than 50 mas) and the Washington Double Star Catalog.
+  2. Events on poorly measured stars: the local catalogs drop RUWE >= 1.4, often unresolved doubles, so such events
+     are never predicted (OWC may list them). Fix only if comparisons show real misses: rebuild the catalogs with
+     RUWE and `non_single_star` kept and flagged instead of removed (new Zenodo versions).
+  3. Step events: for a known pair, the two shadows (offset by separation x distance) and the drop of each step.
+
 - **218001**: OWC lists a 1.56 mag drop and 0.51 s, PyOccult 12.97 mag and 0.25 s. The duration difference is the
   diameter (OWC 3.56 km, PyOccult 1.77 km from H). The drop is unexplained; hypothesis (unverified): the 5.6 mag star's
   angular diameter is comparable to the shadow, making the event partial. Idea: Gaia `radius_gspphot` and

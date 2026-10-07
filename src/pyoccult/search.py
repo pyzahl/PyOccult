@@ -27,6 +27,7 @@ warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 from pyoccult import config
 from pyoccult.paths import shadow_path, path_sigma3_km, write_shadow_kml
 from pyoccult import corridor
+from pyoccult import doubles          # close and double stars at an event
 from pyoccult import astrometry
 from pyoccult import sbdb as sbdb_cache
 from pyoccult import screen          # OWC observability formula, extinction
@@ -649,6 +650,7 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
 
 
 RUN = dict(candidates=0, gated=0, solves=0, hits=0, maps_s=0.0, calc_s=0.0)      # run statistics (see run_summary)
+RUN_RECORDS = []         # this run's hits (for the online double-star check after the search)
 LOCAL = None             # the local Gaia catalog (set by the driver), for the event previews
 
 
@@ -773,6 +775,15 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     record.update(airmass=float(screen.airmass(star_alt)), extinction_mag=ext,
                   mag_margin=float(screen.owc_limit(2*size['r_max_km']/met['speed_kms'], opt)) - row.phot_g_mean_mag - ext,
                   calc_s=time.time() - t_start)
+    # close and double stars (doubles.py): neighbours whose light stays in the camera image; online check after the run
+    rad = float(getattr(config, "companion_radius_arcsec", 4.0))
+    comps = []
+    if LOCAL is not None:
+        years = 2000.0 + res['best_et'] / (365.25 * 86400) - corridor.GAIA_EPOCH_YEAR
+        comps = doubles.companions(LOCAL.cone(record["star_ra"], record["star_dec"], (rad + 3.0) / 3600.0),
+                                   row.source_id, record["star_ra"], record["star_dec"], row.phot_g_mean_mag, years, rad)
+    record.update(doubles.fields(comps, row.phot_g_mean_mag, m_ast, "local" if LOCAL is not None else "none"))
+    RUN_RECORDS.append(record)
     print(record)
     pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
                                   header=not os.path.isfile(config.hits_output_cvs_file))
@@ -835,6 +846,22 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
     with open(stem + ".runs.jsonl", "a") as f:
         f.write(json.dumps(s) + "\n")
     return s
+
+
+def online_double_check(records):
+    """After the search: Gaia archive check of this run's event stars (doubles.py; config gaia_online_check), one
+    query for all; updates their rows in the hit log. Skipped quietly when off, offline or slow."""
+    if not records or not getattr(config, "gaia_online_check", True):
+        return
+    rad = float(getattr(config, "companion_radius_arcsec", 4.0))
+    print(f"* Gaia online check of {len(records)} event star(s) (close and double stars) ...")
+    archive = doubles.fetch_online([(r["star_ra"], r["star_dec"]) for r in records], rad)
+    if archive is None:
+        return
+    upd = doubles.online_fields(records, rad, archive)
+    n = doubles.update_hits_csv(config.hits_output_cvs_file, records, upd)
+    flagged = sum(1 for u in upd if u["double_hint"])
+    print(f"* Gaia online check: {n} event(s) updated, {flagged} with a close or double star note")
 
 
 def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=None):
@@ -954,5 +981,7 @@ if __name__ == "__main__":
     for t, (size, plan) in plans.items():
         n = target_test_corridor(obs_loc, plan, t, size, local=local)
         print(f"{t}: {n} hit(s) logged")
-    run_summary("corridor", t_main, t_p1, time.time() - t_p2, len(plans))
+    t_p2 = time.time() - t_p2
+    online_double_check(RUN_RECORDS)
+    run_summary("corridor", t_main, t_p1, t_p2, len(plans))
     spice.kclear()

@@ -258,6 +258,11 @@ def index():
                                      value=bool(getattr(config, "light_deflection", True))).tooltip(
                     "Gravitational light bending, star minus asteroid; up to ~6 km away from opposition. "
                     "Both off reproduce results before version 0.10.0")
+                s_dbl = ui.checkbox("Online Gaia check of the event stars",
+                                    value=bool(getattr(config, "gaia_online_check", True))).tooltip(
+                    "After the search, one query to the Gaia archive: Gaia's double-star hints for each event star, "
+                    "and close neighbours the local catalog leaves out. Close neighbours from the local catalog "
+                    "are always checked. Skipped when offline")
             with ui.row():
                 ui.button("Run search", on_click=lambda: run_search()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
@@ -595,7 +600,8 @@ def index():
         ensure_saved()
         over = dict(ct=f"{s_start.value}T00:00:00", days=int(s_days.value), min_mag_drop=float(s_drop.value),
                     write_maps=bool(s_maps.value), write_previews=bool(s_prev.value),
-                    star_parallax=bool(s_plx.value), light_deflection=bool(s_defl.value))
+                    star_parallax=bool(s_plx.value), light_deflection=bool(s_defl.value),
+                    gaia_online_check=bool(s_dbl.value))
         if not s_use_file.value:
             over["targets"] = [t for t in s_targets.value.replace(",", " ").split() if t]
         if s_fresh.value and os.path.isfile(config.hits_output_cvs_file):

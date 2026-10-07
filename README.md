@@ -509,6 +509,7 @@ for s in home field; do PYOCCULT_SITE=$s pyoccult pick -o pick_$s.csv --targets-
 | `max_shadow_dist` | `20` | km you can travel: an event is logged if the shadow edge passes within this of your site (0 = only from home); a site's `reach_km` overrides it |
 | `search_mode` | `"corridor"` | `"corridor"` (default, fast, needs the local Gaia catalog) or `"windows"` (old per-hour archive queries) |
 | `write_globes`, `globe_style` | `True`, `"color"` | Occult-style whole-Earth plot per event (`maps/<event>_globe.svg`, needs `write_maps`): `"color"` (sea, land, night side, like OWC's globe) or `"lines"` (black on white, like Occult's plot) |
+| `companion_radius_arcsec`, `gaia_online_check` | `4.0`, `True` | close and double stars: neighbours within this radius blend into the star image, so the drop is recomputed with their light (marked with a warning sign in the report); the online check asks the Gaia archive once per run for Gaia's double-star hints and neighbours the local catalog leaves out (GUI Search tab switch; skipped when offline). ABOUT.md Part 6 |
 | `star_parallax`, `light_deflection` | `True`, `True` | astrometric corrections of the star: seen from the Earth (Gaia parallax), and the light bending by Sun, Jupiter and Saturn (ABOUT.md Part 6). Off reproduces the results before 0.10.0 |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
 | `corridor_step_s` | `600` | path step of the corridor candidate scan, s |
