@@ -8,6 +8,34 @@ its **About** box show both, the report and `--version` of every tool show the v
 
 Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy and NiceGUI for a local Webinterface to plan and run all tasks for easy event explorations.
 
+## Contents
+
+- [What is it?](#what-is-it)
+- [Occultation Data](#occultation-data)
+- [Tools in this project](#tools-in-this-project)
+- [Install](#install)
+  - [Easiest: with uv (Linux, macOS, Windows)](#easiest-with-uv-linux-macos-windows)
+  - [Windows, step by step (with uv)](#windows-step-by-step-with-uv)
+  - [With pip and a virtual environment](#with-pip-and-a-virtual-environment)
+- [Python Virtual Environment Setup Guide](#python-virtual-environment-setup-guide)
+  - [1. Create the Virtual Environment](#1-create-the-virtual-environment)
+  - [2. Activate the Virtual Environment](#2-activate-the-virtual-environment)
+  - [3. Install PyOccult](#3-install-pyoccult)
+  - [4. One-time data setup](#4-one-time-data-setup)
+  - [5. Run it: the web interface](#5-run-it-the-web-interface)
+    - [The core command-line tools](#the-core-command-line-tools)
+  - [Quick Tips](#quick-tips)
+- [Site Configuration and Run Setup](#site-configuration-and-run-setup)
+- [Local Gaia catalog (required)](#local-gaia-catalog-required)
+- [Quick start: choose targets (pick tool)](#quick-start-choose-targets-pick-tool)
+- [Web interface (GUI)](#web-interface-gui)
+- [Quick start: hits_log.csv to HTML report](#quick-start-hits_logcsv-to-html-report)
+- [GUI Step by Step in Screenshots](#gui-step-by-step-in-screenshots)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
+- [References](#references)
+
 ## What is it?
 Scientific background, start here; International Occultation Timing Association (IOTA):
 
