@@ -37,6 +37,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- **Earlier occultations** of an asteroid in the favorites panel, e.g. "Occultations (NASA PDS archive, to 2023-12):
+  8 events 1991-2021 (1 reliable size, ...); shape-model diameter 107.8 +- 5.6 km (6 events); best profile
+  2008-06-06: 119.1 x 101.7 km". From NASA PDS Small Bodies Node "Small Bodies Occultations" V4.0 (Herald, Dunham et
+  al., doi:10.26033/ehqs-jp27): a compact extract ships with PyOccult (`pyoccult/occultations.py`,
+  `data/occultations_pds.json`, 2903 asteroids, 387 kB). Reference only; the prediction's size source is unchanged.
+  ABOUT.md 4.1 explains what Horizons/SBDB holds (no chords) and what the archive adds.
 - GUI Site tab: **Sensor (cameras)** list next to the MPC observatory list: 21 sensors common in occultation work, one
   entry each as "Sony IMX174: 11.34 x 7.13 mm, 1936 x 1216 px of 5.86 um (ZWO ASI174MM / MC, QHY174M-GPS, ...,
   DVTI+CAM 174)", with the ZWO, QHY, ASTRID, DVTI+CAM, Seestar and Unistellar cameras built with them, plus analog

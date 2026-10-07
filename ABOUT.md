@@ -314,8 +314,35 @@ records which list was used, and the report header shows it.
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
 | Stars, ready-made | Zenodo [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (G <= 16, G <= 18) | local catalog without the build |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
+| Earlier occultations | NASA PDS Small Bodies Node, "Small Bodies Occultations" V4.0 (Herald, Dunham et al., [doi:10.26033/ehqs-jp27](https://doi.org/10.26033/ehqs-jp27)), extract shipped as `pyoccult/data/occultations_pds.json` | reference line in the favorites panel (not used for the prediction) |
 | Map | Leaflet 1.9.4 (cdnjs); OpenStreetMap tiles (`--tile-url` for others) | report |
 | Reference | Occult / OWC search results, pasted as text into `owc_reference.txt` (private, not in git) | validation |
+
+### 4.1 Sizes: what Horizons/SBDB has, and what occultations measured
+
+Horizons and the Small-Body Database hold no occultation chords or profiles. Their physical data is one summary per
+asteroid: `diameter` (+- sigma, mostly from NEOWISE, AKARI, IRAS or radar), `extent` (three axes, only for a few dozen
+well-studied bodies), albedo, rotation period, pole, taxonomic type. Occultation results reach Horizons only through
+the orbit: an occultation gives a precise position, reported to the Minor Planet Center as astrometry.
+
+The accepted occultation results are archived by NASA's Planetary Data System, Small Bodies Node: "Small Bodies
+Occultations" (D. Herald, D. W. Dunham et al., about yearly; https://sbn.psi.edu/pds/resource/occ.html). Version 4.0
+(2024-04-22) holds 9645 asteroid events of 2907 asteroids, 1958 to 2023-12:
+
+* `AsteroidSummary`: per event the fitted ellipse (major/minor axis, position angle, uncertainties), a flag when the
+  diameter was assumed rather than measured, and a quality code: 0 no reliable position or size (399 events),
+  1 astrometry only (7374), 2 limits on size but no shape (1261), 3 reliable size (521), 4 resolution better than
+  shape models (77).
+* `AsteroidDiameters`: for 512 asteroids, the volume-equivalent diameter from fitting all their events to 3-D shape
+  models (DAMIT, ISAM), with uncertainty: the best sizes available.
+* `AsteroidTimes`: the chords (every observer's disappearance and reappearance), with names and positions.
+
+Reliable measured sizes (codes 3-4, size not assumed) exist for 343 asteroids, median 120 km (90 % above 52 km): the
+archive improves the large asteroids, while the small typical targets (a few km) mostly have no measured size, or
+only astrometry. PyOccult ships a compact extract (`pyoccult/occultations.py`, `data/occultations_pds.json`, 387 kB:
+per asteroid the number of events and years, quality counts, the best measured profile and the shape-model diameter;
+no chords, no observer data) and shows it as a reference line with the size in the favorites panel. Using it as a
+size source (before NEOWISE) is a possible next step; Occult's own archive (D. Herald) is newer than the PDS version.
 
 ---
 

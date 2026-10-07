@@ -18,6 +18,7 @@ from nicegui import app, run, ui
 from pyoccult import geo
 from pyoccult import favorites
 from pyoccult import cameras
+from pyoccult import occultations
 
 PY = sys.executable
 PYOCCULT = [PY, "-u", "-m", "pyoccult"]                             # how runs are started: PYOCCULT + [command, ...]
@@ -354,6 +355,11 @@ def index():
                     f_facts = ui.label().classes("text-sm text-slate-600")
                     f_size = ui.label().classes("text-sm text-slate-600")
                     f_shape = ui.label().classes("text-sm text-slate-600")
+                    f_occ = ui.label().classes("text-sm text-slate-600").tooltip(
+                        "Earlier occultations of this asteroid in NASA's archive of observed occultations (PDS Small "
+                        "Bodies Node; Herald, Dunham et al.; doi:10.26033/ehqs-jp27). Reference only: the prediction "
+                        "uses the size above. Event quality: astrometry only < limits on size < reliable size < "
+                        "better than shape models")
                     with ui.row().classes("items-end gap-4"):
                         f_status = ui.select(list(favorites.STATUSES), label="Status").classes("w-40")
                         f_kml = ui.link("KML (ground track)", "#")
@@ -728,6 +734,7 @@ def index():
                         f"added {e.get('added', '')[:16].replace('T', ' ')} UT")
         f_size.text = "size: " + (favorites.size_text(e) or "not recorded")
         f_shape.text = "shape and rotation: " + (favorites.shape_text(e) or "not known (no SBDB data for this asteroid)")
+        f_occ.text = occultations.text(e["record"].get("target_id", ""))
         f_status.value, f_note.value = e.get("status", "planned"), e.get("note", "")
         f_img.set_visibility("svg" in files)
         if "svg" in files:

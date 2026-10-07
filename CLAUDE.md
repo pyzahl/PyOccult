@@ -63,6 +63,12 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `pyoccult/gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult/runner.py`
   (JSON config overrides per run). `pyoccult/geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult/preview.py`:
   event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.
+- `pyoccult/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
+  list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
+- `pyoccult/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi
+  10.26033/ehqs-jp27): compact extract `data/occultations_pds.json` (per numbered asteroid: events, years, quality
+  counts, best profile of codes >= 2 with measured size, shape-model diameter; no chords/observers), rebuilt with
+  `python -m pyoccult.occultations build <zip>`. Reference line in the favorites panel only; not a size source yet.
 - `pyoccult/globe.py` (0.11.0): Occult-style whole-Earth plot `maps/<stem>_globe.svg` (written by
   `pyoccult.write_globe` after the KML; `write_globes`, `globe_style` "color"/"lines"); `globe_data(spice, ...)` +
   pure `render_svg(d)`. Data `data/ne_110m_earth.json` (Natural Earth 110m coast/borders/land, public domain).

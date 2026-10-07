@@ -28,6 +28,10 @@ URL_JPL_SBDB_API = "https://ssd-api.jpl.nasa.gov/sbdb.api"                      
 URL_JPL_SBDB_QUERY_API = "https://ssd-api.jpl.nasa.gov/sbdb_query.api"          # all asteroids in bulk (pick tool)
 URL_JPL_SBDB_PAGE = "https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr="   # web page, + asteroid number (report)
 
+# --- earlier occultation results (pyoccult/occultations.py): NASA PDS Small Bodies Node archive
+URL_PDS_OCCULTATIONS_PAGE = "https://sbn.psi.edu/pds/resource/occ.html"                       # all versions
+URL_PDS_OCCULTATIONS_ZIP = "https://sbnarchive.psi.edu/pds4/non_mission/smallbodiesoccultations_V4_0.zip"  # V4.0
+
 # --- Minor Planet Center (geo.py, GUI Site tab)
 URL_MPC_OBSCODES = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"      # observatory codes
 

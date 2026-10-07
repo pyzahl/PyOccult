@@ -860,6 +860,14 @@ DOI 10.1016/j.pss.2017.02.013
 - [NEOWISE] Masiero, J. R., et al. (2014). Main-belt asteroids with WISE/NEOWISE: near-infrared albedos. The Astrophysical Journal, 791, 121 (diameters via SBDB; see also the PDS NEOWISE diameters and albedos dataset, Mainzer et al.).
    https://doi.org/10.1088/0004-637X/791/2/121
 
+- [Occultations] Herald, D., Dunham, D. W., et al. Small Bodies Occultations, NASA Planetary Data System, Small
+  Bodies Node (V4.0, 2024). https://doi.org/10.26033/ehqs-jp27 , https://sbn.psi.edu/pds/resource/occ.html
+  (earlier occultations of an asteroid, shown in the favorites panel).
+
+- [Occultation diameters] Herald, D., et al. (2020). Precise astrometry and diameters of asteroids from occultations
+  - a data set of observations and their interpretation. Monthly Notices of the Royal Astronomical Society.
+  https://arxiv.org/abs/2010.06086
+
 - [OpenStreetMap] Map data © OpenStreetMap contributors, ODbL: https://www.openstreetmap.org/copyright
 
 ### Methods
