@@ -193,6 +193,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `m_before` / `m_during` columns in the log.
 - Favorites, next steps (simple version built 2026-10-04, see Files): re-predict one favorite with the latest orbit
   (single-target search; keep old map/preview versions next to new ones), export (CSV, KML bundle, report page),
-  share/pull with Occult Watcher Cloud (campaign events, multi-site chords; how TBD, no known public OWC interface),
+  share/pull with Occult Watcher Cloud (campaign events, multi-site chords; how TBD, no known public OWC interface;
+  findings 2026-10-06: OWC Cloud is a JS app over a private REST API `https://www.occultwatcher.net/api2/v1/...`
+  (login), its profile can issue a per-user API key / OAuth client (undocumented), deep link
+  `api2/ext/locate?ast=&tag=&date=` (or `&occelmntId=`: Occult element id); no public export/iCal. Plan: ask H. Pavlov
+  for API docs and permission, never scrape with the user's login. Without it: prediction feeds (IBEROC etc., Occult
+  elements read by OW desktop) may be public files to mark campaign events; the user plans this with the community),
   observation data per favorite (result, D/R times, chord, link to the SODIS report from DVTI+CAM / ASTRID).
 
