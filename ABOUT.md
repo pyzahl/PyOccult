@@ -314,6 +314,7 @@ records which list was used, and the report header shows it.
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
 | Stars, ready-made | Zenodo [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (G <= 16, G <= 18) | local catalog without the build |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
+| Asteroid satellites | W. R. Johnston, Binary Minor Planets Compilation V3.0 (NASA PDS 2019, [doi:10.26033/bb68-pw96](https://doi.org/10.26033/bb68-pw96)) plus satellites seen in occultations (archive below); extract `pyoccult/data/binaries.json` | "+moon" in the tables, satellite line in the favorites panel, satellite zone on the maps |
 | Earlier occultations | NASA PDS Small Bodies Node, "Small Bodies Occultations" V4.0 (Herald, Dunham et al., [doi:10.26033/ehqs-jp27](https://doi.org/10.26033/ehqs-jp27)), extract shipped as `pyoccult/data/occultations_pds.json` | reference line in the favorites panel (not used for the prediction) |
 | Map | Leaflet 1.9.4 (cdnjs); OpenStreetMap tiles (`--tile-url` for others) | report |
 | Reference | Occult / OWC search results, pasted as text into `owc_reference.txt` (private, not in git) | validation |
@@ -343,6 +344,23 @@ only astrometry. PyOccult ships a compact extract (`pyoccult/occultations.py`, `
 per asteroid the number of events and years, quality counts, the best measured profile and the shape-model diameter;
 no chords, no observer data) and shows it as a reference line with the size in the favorites panel. Using it as a
 size source (before NEOWISE) is a possible next step; Occult's own archive (D. Herald) is newer than the PDS version.
+
+### 4.2 Asteroid satellites
+
+About 650 asteroids and TNOs have known companions (W. R. Johnston, "Asteroids with satellites", kept current at
+https://www.johnstonsarchive.net/astro/asteroidmoons.html). The citable, downloadable version is his Binary Minor
+Planets Compilation in NASA's PDS (V3.0, complete to 2019-03-31: 370 companions in 351 systems): per companion the
+primary's and the companion's diameter, the distance (semimajor axis, km) and the orbital period. The occultation
+archive (4.1) adds satellites seen in occultations (57 events of 40 asteroids: date, separation in mas, position
+angle, size), including old reports that were never confirmed (e.g. Hebe 1977, Juno 1978).
+
+PyOccult ships an extract of both (`pyoccult/binaries.py`, `data/binaries.json`, 325 numbered systems, 43 kB) and
+shows it as reference information: "+moon" (or "+2 moons"; "+moon?" when only reported in an occultation and not in
+Johnston's list) after the asteroid in the Results and Favorites tables, a "Satellites" line in the favorites panel,
+and on the event maps (KML, report map, globe plot) a dotted **satellite zone** at the primary's shadow edge plus
+the largest known moon distance plus its radius: a satellite's own shadow passes somewhere inside it. The satellite's
+position at the event is not predicted: that needs its orbit (orientation and phase), known well for only a few
+systems. Moons found after 2019 are not in the extract (Johnston's Archive has them).
 
 ---
 

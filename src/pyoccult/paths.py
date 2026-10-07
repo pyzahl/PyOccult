@@ -26,12 +26,14 @@ def plane_basis(star_vector):
     return x, y, z
 
 
-def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, step=None):
+def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, step=None, sat_km=None):
     """Ground track of the shadow axis and its limits.
 
     Returns {name: [(et, lon_deg, lat_deg, duration_s_or_None), ...]} for
     'center', 'edge_plus', 'edge_minus' (+/- r_km), 'sigma1_plus', 'sigma1_minus' (+/- (r_km + sigma3_km / 3), the
-    1-sigma limits) and 'sigma_plus', 'sigma_minus' (+/- (r_km + sigma3_km)).
+    1-sigma limits) and 'sigma_plus', 'sigma_minus' (+/- (r_km + sigma3_km)); with sat_km (a known satellite's distance
+    plus radius, binaries.zone_km) also 'satellite_plus', 'satellite_minus' (+/- (r_km + sat_km)): where the
+    satellite's shadow can pass.
     '+' is the side 90 deg counter-clockwise of the shadow's motion in the plane (x east, y north).
     duration_s is the centre-line duration 2*r/(shadow speed relative to the ground point).
 
@@ -64,6 +66,8 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
     offsets = {'center': 0.0, 'edge_plus': r_km, 'edge_minus': -r_km,
                'sigma1_plus': r_km + sigma3_km / 3.0, 'sigma1_minus': -(r_km + sigma3_km / 3.0),
                'sigma_plus': r_km + sigma3_km, 'sigma_minus': -(r_km + sigma3_km)}
+    if sat_km:
+        offsets.update(satellite_plus=r_km + sat_km, satellite_minus=-(r_km + sat_km))
     out = {k: [] for k in offsets}
 
     for et in ets:
@@ -137,6 +141,9 @@ def write_shadow_kml(paths, filename, title, observer=None, tick_every=10):
              line("1-sigma limit B", paths.get('sigma1_minus', []), "ffff66cc", 1),
              line("3-sigma limit A", paths['sigma_plus'], "ff00ffff", 2),
              line("3-sigma limit B", paths['sigma_minus'], "ff00ffff", 2)]
+    if paths.get('satellite_plus'):                                         # known satellite: where its shadow can pass
+        parts += [line("Satellite zone A", paths['satellite_plus'], "ffffaa00", 1),
+                  line("Satellite zone B", paths['satellite_minus'], "ffffaa00", 1)]
     for i, (et, lon, lat, dur) in enumerate(paths['center']):
         if i % tick_every == 0:
             parts.append(pin(spice.et2utc(et, 'ISOC', 0)[11:16] + " UTC", lon, lat,

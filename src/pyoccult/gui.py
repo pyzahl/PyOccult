@@ -19,6 +19,7 @@ from pyoccult import geo
 from pyoccult import favorites
 from pyoccult import cameras
 from pyoccult import occultations
+from pyoccult import binaries
 
 PY = sys.executable
 PYOCCULT = [PY, "-u", "-m", "pyoccult"]                             # how runs are started: PYOCCULT + [command, ...]
@@ -364,6 +365,10 @@ def index():
                         "Close and double stars: neighbours within a few arcseconds whose light stays in the camera "
                         "image (the drop with their light), and Gaia's hints that the star itself is double (online "
                         "check of a search run)")
+                    f_bin = ui.label().classes("text-sm text-slate-600").tooltip(
+                        "Known satellites of this asteroid (W. R. Johnston, Binary Minor Planets Compilation, NASA PDS "
+                        "2019; and satellites seen in occultations). Their shadows pass within the dotted 'satellite "
+                        "zone' lines on the map. Newer discoveries: johnstonsarchive.net/astro/asteroidmoons.html")
                     f_occ = ui.label().classes("text-sm text-slate-600").tooltip(
                         "Earlier occultations of this asteroid in NASA's archive of observed occultations (PDS Small "
                         "Bodies Node; Herald, Dunham et al.; doi:10.26033/ehqs-jp27). Reference only: the prediction "
@@ -746,6 +751,7 @@ def index():
         f_shape.text = "shape and rotation: " + (favorites.shape_text(e) or "not known (no SBDB data for this asteroid)")
         f_dbl.text = "close or double star: " + (favorites.double_text(e) or "not checked yet")
         f_occ.text = occultations.text(e["record"].get("target_id", ""))
+        f_bin.text = binaries.text(e["record"].get("target_id", "")) or "Satellites: none known (Johnston 2019)"
         f_status.value, f_note.value = e.get("status", "planned"), e.get("note", "")
         f_img.set_visibility("svg" in files)
         if "svg" in files:

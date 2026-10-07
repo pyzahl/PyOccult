@@ -37,6 +37,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   looked up instead.
 
 ### Added
+- **Asteroid satellites** (`pyoccult/binaries.py`, `data/binaries.json`: 325 systems from W. R. Johnston's Binary
+  Minor Planets Compilation V3.0, NASA PDS 2019, doi:10.26033/bb68-pw96, plus satellites seen in occultations):
+  "+moon" / "+2 moons" ("+moon?": only reported in an occultation) after the asteroid in the Results and Favorites
+  tables with sizes, distances and periods on hover, a "Satellites" line in the favorites panel, and a dotted
+  **satellite zone** on the event maps (KML, report map, globe plot): the primary's shadow plus the largest known
+  moon distance and radius, where a moon's shadow can pass (its position is not predicted). ABOUT.md 4.2.
 - Favorites: the close/double-star check also for favorites added before it (filled in once at GUI start from the
   local catalog), shown in the favorites table (⚠ after the drop) and as a "close or double star" line in the
   detail panel.

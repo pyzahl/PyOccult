@@ -28,6 +28,7 @@ from pyoccult import config
 from pyoccult.paths import shadow_path, path_sigma3_km, write_shadow_kml
 from pyoccult import corridor
 from pyoccult import doubles          # close and double stars at an event
+from pyoccult import binaries         # known asteroid satellites
 from pyoccult import astrometry
 from pyoccult import sbdb as sbdb_cache
 from pyoccult import screen          # OWC observability formula, extinction
@@ -795,7 +796,8 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
     if config.write_maps and res['min_distance'] < r_search + config.max_shadow_dist:   # shadow + reach, as logged
         os.makedirs(config.map_dir, exist_ok=True)
-        paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3)
+        paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3,
+                            sat_km=binaries.zone_km(target_id))    # known satellite: its zone on the map
         write_shadow_kml(paths, f"{config.map_dir}/{stem}.kml",
                          f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
         if getattr(config, "write_globes", True):

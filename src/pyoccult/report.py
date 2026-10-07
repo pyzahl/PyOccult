@@ -221,7 +221,7 @@ JPL_SBDB = U.URL_JPL_SBDB_PAGE                                       # asteroid 
 VIZIER_GAIA = U.URL_VIZIER_GAIA_DR3                                   # star, + Gaia DR3 id
 KML_NS = "{http://www.opengis.net/kml/2.2}"
 LINE_STYLES = (("Centre", "#15803d", 3, None), ("Shadow limit", "#dc2626", 2, None), ("1-sigma", "#7c3aed", 1.5, "2 4"),
-               ("3-sigma", "#d97706", 2, "6 6"))
+               ("3-sigma", "#d97706", 2, "6 6"), ("Satellite zone", "#0891b2", 1.5, "1 5"))
 
 
 def kml_to_data(path):
@@ -355,6 +355,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .badge{display:inline-block;padding:0 8px;border-radius:99px;font-size:.78rem}
 .in{background:var(--in-bg);color:var(--in-ink)}.near{background:var(--near-bg);color:var(--near-ink)}
 a{color:var(--accent)}
+sup.bin{color:#0891b2;font-weight:600;margin-left:3px;cursor:help;white-space:nowrap}
 span.dbl{color:#b26a00;font-weight:600;cursor:help;white-space:nowrap}
 sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
 .notes{color:var(--muted);font-size:.85rem;margin-top:16px}
@@ -618,6 +619,14 @@ def map_cell(e):
     return f"<td>{out}</td>"
 
 
+def binary_mark(tid):
+    """'<sup class=bin>+moon</sup>' after the asteroid when it has known satellites (binaries.py), with details on
+    hover; empty otherwise."""
+    from pyoccult import binaries
+    tag = binaries.short(tid)
+    return f'<sup class="bin" title="{esc(binaries.text(tid))}">{esc(tag)}</sup>' if tag else ""
+
+
 def double_mark(e):
     """' <span class=dbl>⚠ 0.82</span>' after the drop when a close or double star is known (doubles.py): the drop
     with the neighbours' light, details on hover; empty otherwise."""
@@ -662,6 +671,7 @@ def html_row(e):
         lead +
         f'<td data-s="{esc(e["tid"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
         f'target="_blank" rel="noopener">{esc(e["label"])}</a>'
+        + binary_mark(e["tid"])
         + (f'<sup class="est" title="Size estimated from H with an assumed albedo: diameter, duration and shadow width '
            f'are uncertain by a factor of about 1.7 (no measured diameter in SBDB)">*</sup>' if size_estimated(e) else '')
         + '</td>' + mid +
@@ -734,6 +744,7 @@ def to_html(events, meta):
 {table}
 <ul class="notes">
 <li>Star magnitude is Gaia G. The drop assumes the star is fully covered and ignores the star's angular size and diffraction, so bright stars and very small bodies can show a smaller real drop.</li>
+<li><b>+moon</b> after an asteroid: it has known satellites (W. R. Johnston's compilation, NASA PDS 2019; "+moon?": only reported in an occultation, not confirmed); hover for their sizes and distances. A satellite casts its own shadow, somewhere within the dotted "satellite zone" lines on the map (its distance from the asteroid plus its radius): observers outside the main path may see a short extra event. Newer discoveries: Johnston's Archive (johnstonsarchive.net).</li>
 <li><b>\u26a0</b> after a drop: a close or double star. The number is the drop with the light of neighbours within a few arcseconds, which stays in the camera image when the star is covered; hover for details (neighbours from the local catalog; with the online check also Gaia's double-star hints and neighbours the catalog leaves out).</li>
 <li><b>*</b> after an asteroid: no measured diameter; its size is estimated from H with an assumed albedo, so diameter, duration and shadow width are uncertain by a factor of about 1.7 (typical for small asteroids, H above ~15).</li>
 <li>Offset is the observer's distance from the shadow centre line in the fundamental plane. "Inside" means within the shadow radius; otherwise it is the gap to the shadow edge. Radius comes from the size lookup (hover the asteroid name).</li>
@@ -761,7 +772,9 @@ def to_markdown(events, meta):
             off = f"{e['miss']:.1f} km" + (f" ({e['margin']:.1f} outside)" if e["margin"] is not None else "")
         kml = " ".join(x for x in (f"[KML]({e['kml']})" if e["kml"] else "", f"[Preview]({e['preview']})"
                                    if e.get("preview") else "") if x) or "—"
+        from pyoccult import binaries
         star = " \\*" if size_estimated(e) else ""                      # size from H only (footnote)
+        star += f" {binaries.short(e['tid'])}" if binaries.short(e["tid"]) else ""   # known satellites
         dbl = (" \u26a0" + (f" {e['drop_blend']:.2f}" if e.get("drop_blend") is not None else "")) if e.get("dhint") else ""
         out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])}{dbl} | {fmt(e['dur'])} "
                    f"| {alt_text(e)} | {moon_text(e)} | {off} | {fmt(e['calc'])} | {kml} |")

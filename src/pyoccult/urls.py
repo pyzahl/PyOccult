@@ -32,6 +32,10 @@ URL_JPL_SBDB_PAGE = "https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr="   
 URL_PDS_OCCULTATIONS_PAGE = "https://sbn.psi.edu/pds/resource/occ.html"                       # all versions
 URL_PDS_OCCULTATIONS_ZIP = "https://sbnarchive.psi.edu/pds4/non_mission/smallbodiesoccultations_V4_0.zip"  # V4.0
 
+# --- asteroid satellites (pyoccult/binaries.py)
+URL_PDS_BINARIES_ZIP = "https://sbnarchive.psi.edu/pds4/non_mission/ast_binary_parameters_compilation_V3_0.zip"
+URL_JOHNSTON_ASTEROID_MOONS = "https://www.johnstonsarchive.net/astro/asteroidmoons.html"   # current list (web)
+
 # --- Minor Planet Center (geo.py, GUI Site tab)
 URL_MPC_OBSCODES = "https://minorplanetcenter.net/iau/lists/ObsCodes.html"      # observatory codes
 

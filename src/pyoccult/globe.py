@@ -20,12 +20,13 @@ AU_KM = 1.495978707e8
 RAD2MAS = math.degrees(1.0) * 3.6e6
 LINES = (("center", "#111827", 2.4, None), ("edge_plus", "#dc2626", 1.4, None), ("edge_minus", "#dc2626", 1.4, None),
          ("sigma1_plus", "#7c3aed", 1.0, "2 3"), ("sigma1_minus", "#7c3aed", 1.0, "2 3"),
-         ("sigma_plus", "#d97706", 1.0, "6 4"), ("sigma_minus", "#d97706", 1.0, "6 4"))
+         ("sigma_plus", "#d97706", 1.0, "6 4"), ("sigma_minus", "#d97706", 1.0, "6 4"),
+         ("satellite_plus", "#0891b2", 1.0, "1 4"), ("satellite_minus", "#0891b2", 1.0, "1 4"))   # known satellite
 # styles: "color" (blue sea, land, dark night side, like OWC's globe) or "lines" (black on white, like Occult's plot)
 STYLE = {
     "color": dict(sea="#1d4e89", land="#7b8f55", land_edge="#56663a", night=0.5, day=None, grid="#ffffff",
                   grid_op=0.22, coast=None, border="#e5e7eb", path={"center": "#fde047", "edge": "#f87171",
-                  "sigma1": "#c4b5fd", "sigma": "#fdba74"}, mark="#fde047", label="#ffffff", halo="#0f172a",
+                  "sigma1": "#c4b5fd", "sigma": "#fdba74", "satellite": "#5eead4"}, mark="#fde047", label="#ffffff", halo="#0f172a",
                   site="#22d3ee", legend="yellow: centre line (dots: minutes UT) \u00b7 red: shadow limits \u00b7 "
                   "violet dotted: 1-sigma \u00b7 orange dashed: 3-sigma", legend2="dashed: shadow axis off the Earth "
                   "\u00b7 dark: night side \u00b7 cyan: site"),
@@ -261,7 +262,9 @@ def render_svg(d):
     o.append("</g>")
     # legend
     o.append(f'<text x="8" y="{H - 30}" fill="#374151" font-size="10">{st["legend"]}</text>')
-    o.append(f'<text x="8" y="{H - 18}" fill="#374151" font-size="10">{st["legend2"]}</text>')
+    sat = "" if not (d.get("paths") or {}).get("satellite_plus") else \
+        " \u00b7 " + ("teal" if st["path"] else "blue") + " dotted: satellite zone (known moon)"
+    o.append(f'<text x="8" y="{H - 18}" fill="#374151" font-size="10">{st["legend2"]}{sat}</text>')
     o.append(f'<text x="8" y="{H - 5}" fill="#374151" font-size="10">{_esc(d["footer"])}</text>')
     o += _inset(d.get("inset"))
     o.append("</svg>")

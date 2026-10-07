@@ -760,6 +760,7 @@ pyoccult report hits_log.csv --sort date               # by event time (default 
 | shadow limits (red) | radius r | the asteroid's **size** (best estimate) |
 | 1-sigma limits (purple, dotted) | r + 1 sigma | the **orbit** uncertainty: where the shadow edge may lie |
 | 3-sigma limits (orange, dashed) | r + 3 sigma | the **orbit** uncertainty |
+| satellite zone (cyan, dotted; only for asteroids with a known moon) | r + the moon's distance + its radius | where a **satellite's** shadow can pass: its position at the event is not predicted, so it can be anywhere in this band; observers outside the main path may see a short extra event |
 
 * The sigma lines are **not** a size uncertainty. Sigma is the uncertainty of the asteroid's **position** (its
   orbit) at the event time: JPL Horizons' 3-sigma value (RSS), converted to km at the asteroid's distance and divided
@@ -896,6 +897,11 @@ DOI 10.1016/j.pss.2017.02.013
 - [Occultation diameters] Herald, D., et al. (2020). Precise astrometry and diameters of asteroids from occultations
   - a data set of observations and their interpretation. Monthly Notices of the Royal Astronomical Society.
   https://arxiv.org/abs/2010.06086
+
+- [Binary asteroids] Johnston, W. R. (2019). Binary Minor Planets Compilation V3.0, NASA Planetary Data System.
+  https://doi.org/10.26033/bb68-pw96 ; kept current at Johnston's Archive, "Asteroids with satellites":
+  https://www.johnstonsarchive.net/astro/asteroidmoons.html (known moons: "+moon" in the tables, satellite zone on
+  the maps).
 
 - [OpenStreetMap] Map data © OpenStreetMap contributors, ODbL: https://www.openstreetmap.org/copyright
 

@@ -69,6 +69,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `search.online_double_check` after pass 2: one async ADQL job (OR of circles, daemon thread, 120 s timeout) ->
   `online_fields` -> `update_hits_csv` rewrites only this run's rows (csv module, atomic; new columns appended).
   New record fields go at the END of the hit record (the log is appended; mixed headers otherwise).
+- `pyoccult/binaries.py`: known asteroid satellites, `data/binaries.json` from Johnston's PDS compilation V3.0
+  (fixed-width `binarytable.tab`, layout read from its PDS4 label) + SAT_* columns of the occultations archive's
+  `Asteroid_*.psv` (separation in mas). `short()` "+moon"/"+moon?" (report label, Markdown), `text()` (favorites
+  panel, hover), `zone_km()` = max(a + d2/2) -> `shadow_path(sat_km=)` adds 'satellite_plus/minus' -> KML
+  "Satellite zone A/B", report LINE_STYLES, globe LINES. Reference only; moon positions not predicted.
 - `pyoccult/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
   list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
 - `pyoccult/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi
