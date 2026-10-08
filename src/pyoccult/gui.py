@@ -112,6 +112,36 @@ def stop_process(log):
         log.push("--- stopped")
 
 
+# ---------------------------------------------------------------- resizable list boxes
+RESIZE_JS = """<script>
+// list boxes the user can make taller or shorter (drag the bottom-right corner): .pyo-resize[data-key][data-vh].
+// The height is saved only after a drag, as a share of the window height, and restored only when plausible
+// (25-92 % of the window); otherwise the box keeps its default. (Saving on every size change stored the box's
+// minimum height while the tab was being laid out, so after a restart only a sliver of the list was left.)
+(function(){
+ var LO=25,HI=92;
+ function vh(px){return 100*px/window.innerHeight;}
+ function setup(b){if(b.dataset.ready)return;b.dataset.ready='1';var k='pyoccult_box_'+b.dataset.key;
+  try{var v=parseFloat(localStorage.getItem(k));if(v>=LO&&v<=HI)b.style.height=v+'vh';}catch(e){}
+  var h0=null;
+  b.addEventListener('pointerdown',function(){h0=b.offsetHeight;});
+  document.addEventListener('pointerup',function(){if(h0===null)return;var h=b.offsetHeight;
+   if(Math.abs(h-h0)>4&&h>0){var v=Math.min(HI,Math.max(LO,vh(h)));b.style.height=v+'vh';
+    try{localStorage.setItem(k,v.toFixed(1));}catch(e){}}h0=null;});}
+ function scan(){document.querySelectorAll('.pyo-resize[data-key]').forEach(setup);}
+ scan();setInterval(scan,1000);
+})();
+</script>"""
+
+
+def resizable_box(key, default_vh, scroll=False):
+    """A box for a list (iframe or table) whose height the user drags at its bottom-right corner, remembered per box
+    in the browser (RESIZE_JS). scroll=True: the content scrolls inside (tables); else it fills the box (iframes)."""
+    return ui.element("div").classes("w-full pyo-resize").props(f'data-key="{key}"').style(
+        f"height: {default_vh}vh; min-height: 160px; resize: vertical; padding-bottom: 14px; "
+        f"overflow: {'auto' if scroll else 'hidden'}; border: 1px solid #ddd; background: #f1f5f9")
+
+
 # ---------------------------------------------------------------- page
 @ui.page("/")
 def index():
@@ -119,6 +149,7 @@ def index():
     sites, default_site = load_sites()
     state = dict(name=default_site)
     ui.page_title("PyOccult")
+    ui.add_body_html(RESIZE_JS)                                  # resizable list boxes (resizable_box)
     with ui.header().classes("items-center bg-slate-800"):
         ui.element("img").props('src=/pyoccult_logo.svg alt=""').classes("w-9 h-9")
         ui.label("PyOccult").classes("text-xl font-semibold")
@@ -304,7 +335,9 @@ def index():
                     (("target", "Target"), ("number", "#"), ("name", "Asteroid"), ("H", "H"), ("utc", "UT"),
                      ("star_mag", "G"), ("drop", "Drop"), ("dur_s", "Dur (s)"), ("mag_margin", "Margin"),
                      ("miss_km", "Miss (km)"), ("star_alt", "Alt"))]
-            p_table = ui.table(columns=cols, rows=[], row_key="key", pagination=15).classes("w-full")
+            with resizable_box("pick", 55, scroll=True):                # drag the corner to resize (remembered)
+                p_table = ui.table(columns=cols, rows=[], row_key="key", pagination=0).classes("w-full").props(
+                    "flat dense")
 
         # ------------------------------------------------ results
         with ui.tab_panel(t_res):
@@ -317,7 +350,8 @@ def index():
                             on_change=lambda e: KSTARS_OPT.update(set_location=bool(e.value))).tooltip(
                     "The report's KStars buttons (Linux, KStars running). Off: KStars keeps its location; "
                     "you are told if that is far from the site.")
-            frame = ui.element("iframe").classes("w-full").style("height: 75vh; border: 1px solid #ddd")
+            with resizable_box("results", 75):                            # drag the corner to resize (remembered)
+                frame = ui.element("iframe").style("width: 100%; height: 100%; border: 0; display: block")
 
         # ------------------------------------------------ favorites
         with ui.tab_panel(t_fav):
@@ -332,17 +366,8 @@ def index():
                      "its own copy of map and preview, so later searches do not change it. Click a row for its preview, "
                      "map and note below; check rows for the actions above the table. Drag the table's bottom-right corner to make "
                      "it taller or shorter (remembered).").classes("text-xs text-slate-500")
-            with ui.element("div").classes("w-full favbox").style(       # drag the corner to resize
-                    "height: 60vh; min-height: 160px; resize: vertical; overflow: hidden; padding-bottom: 14px; "
-                    "border: 1px solid #ddd; background: #f1f5f9"):
+            with resizable_box("favorites", 60):                          # drag the corner to resize (remembered)
                 f_frame = ui.element("iframe").style("width: 100%; height: 100%; border: 0; display: block")
-            ui.add_body_html("""<script>
-(function(){function go(){var b=document.querySelector('.favbox');if(!b){return setTimeout(go,300);}
- try{var h=localStorage.getItem('pyoccult_favbox_h');if(h)b.style.height=h;}catch(e){}
- if(window.ResizeObserver)new ResizeObserver(function(){if(b.offsetHeight>0){
-  try{localStorage.setItem('pyoccult_favbox_h',b.offsetHeight+'px');}catch(e){}}}).observe(b);}
- go();})();
-</script>""")
             with ui.column().classes("w-full gap-3") as f_detail:
                 with ui.row().classes("w-full no-wrap gap-4 items-stretch"):
                     f_img = ui.element("img").style("width: 420px; max-width: 45vw; border: 1px solid #ddd")

@@ -5,7 +5,7 @@ Semantic versioning: MAJOR.MINOR.PATCH. Raise PATCH for fixes, MINOR for new fea
 existing files or results (and update CITATION.cff's version with it). The code name changes at major milestones.
 Every version increase gets its entry in CHANGELOG.md.
 """
-__version__ = "0.12.0"
+__version__ = "0.13.0"
 __codename__ = "New Horizons"      # JPL Horizons orbits; and New Horizons' target Arrokoth was first shaped by occultations
 __author__ = "Percy Zahl (pyzahl)"
 __copyright__ = "(C) 2026 Percy Zahl"

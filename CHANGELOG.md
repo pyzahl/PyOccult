@@ -6,6 +6,13 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.13.0] "New Horizons" - 2026-10-07
+
+A standard Python package now (`pyproject.toml`, code in `src/pyoccult/`, one `pyoccult` command; install with
+`pip install -e .` or run with `uv run pyoccult`): **after updating, run `pip install -e .` once** in your virtual
+environment, or use uv. New reference information with each event: close and double stars, known asteroid
+satellites, earlier occultations; plus the camera list, the data folder setting and several fixes.
+
 ### Changed
 - Default Gaia catalog G <= 16 (`gaia_dr3_g16`, 2.1 GB download, ~3 GB on disk; enough for most amateur
   telescopes): template `gaia_local_dir`/`gaia_local_gmax`, setup's limit question (Enter = 16) and the pick's
@@ -27,14 +34,19 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   `.venv/bin/python -m pip install -e .`); start the GUI with `pyoccult` (`.venv/bin/pyoccult`) instead of
   `python pyoccult_gui.py`. If you changed `pyoccult_config.py`, keep a copy before pulling (git removes the tracked
   file; PyOccult then recreates it from the template, so copy your changes back in).
-- All download and web addresses moved into one file, `pyoccult_urls.py`, each with its own name (`URL_NAIF_DE440`,
+- All download and web addresses moved into one file, `pyoccult/urls.py`, each with its own name (`URL_NAIF_DE440`,
   `URL_JPL_HORIZONS_API`, `URL_MPC_OBSCODES`, ...), so they are maintained in one place. A separate file rather than
   `pyoccult_config.py`, which reads `sites.py` when imported: setup and the report need addresses without it.
 - GUI Site tab: the site list is now the Minor Planet Center's list of observatory codes (ObsCodes.html, ~2700
-  observatories, downloaded once into `data/`, not in git; `pyoccult_geo.mpc_observatories`), searchable by code or
+  observatories, downloaded once into `data/`, not in git; `pyoccult.geo.mpc_observatories`), searchable by code or
   name. It replaces Occult's site list of 0.12.0, which turned out to hold mainly reference cities. Positions and
   heights come from the MPC parallax constants (WGS84); for old entries with fewer than 5 decimals the height is
   looked up instead.
+
+- Documentation: README table of contents, how to type the commands (uv, pip, alias), where data and settings
+  live (data folder, setting, cache, per system); ABOUT.md 3.5 memory and CPU use of the pick (per worker ~0.5 GB +
+  ~55 MB per day of window; NumPy threads per worker), 4.1 what Horizons/SBDB hold vs the occultation archive,
+  4.2 asteroid satellites; open items for close and double stars (Part 6).
 
 ### Added
 - **Asteroid satellites** (`pyoccult/binaries.py`, `data/binaries.json`: 325 systems from W. R. Johnston's Binary
@@ -92,19 +104,24 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 - Results, Favorites and Pick tables: an **\*** after the asteroid name marks a size estimated from H with an
   assumed albedo (no measured diameter; uncertain by a factor of about 1.7); hover text and a note below the table.
 - Favorites detail panel: a **shape and rotation** line (axes from SBDB `extent`, rotation period, pole, taxonomic
-  type) where SBDB has them. Favorites get SBDB's full per-object record once (`pyoccult_sbdb.get_full`; the pick
+  type) where SBDB has them. Favorites get SBDB's full per-object record once (`pyoccult.sbdb.get_full`; the pick
   tool's bulk rows hold only size fields); older favorites when the GUI starts.
 - Site key `mpc_code` (the official MPC observatory code), a **MPC code** field in the GUI Site tab (filled in when
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- GUI: the Favorites table's height (drag the corner) was sometimes restored as a sliver after a restart: it was saved
+  on every size change, including the box's minimum height while the tab was laid out. Now it is saved only after
+  you drag, as a share of the window height, and restored only between 25 and 92 % of the window (else the
+  default, 60 %). The Results report (default 75 %) and the Pick table (55 %; all rows in one scrollable box instead
+  of pages of 15) got the same resizable box, each remembered separately in the browser.
 - Favorites tab: the check boxes' mass actions (**Remove**, **Set status**, the "selected" count) did nothing since
   0.12.0: the times selector's script variable `sel` replaced the selection helper `sel()` of the same script
   (seen as "cannot remove a favorite"). Renamed; the favorites test now guards against it.
 - README: the logo at the top pointed to its old place in the project root (moved into `src/pyoccult/`).
 - GUI Favorites tab: the **CSV** download was saved as "true.csv" (the link's `download` attribute); it is now a
   button like in the Pick and Results tabs and saves `favorites_<date>.csv`.
-- Pick tool with a star limit above G 15 (now easy to reach with the GUI's **Faintest star** field): the deeper
+- Pick tool with a star limit above G 15 (now easy to reach with the GUI's **Star G limit** field): the deeper
   bright-star index it needs (`bright_G16.0.v2.npy`, ...) was built by every worker at once, each reading the whole
   catalog into memory, so the system ran into swap and the browser stalled. The pick now builds a missing index once,
   before starting workers, and the build is low-memory (three passes through a memory-mapped file; peak about one
@@ -223,6 +240,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[0.13.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.12.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.11.1]: https://github.com/pyzahl/PyOccult/releases/tag/V0.11.1-NewHorizons
 [0.11.0]: https://github.com/pyzahl/PyOccult/commit/5abc5f6

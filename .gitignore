@@ -41,3 +41,5 @@ release/
 *.tar.xz
 # downloaded MPC observatory code list (minorplanetcenter.net), see pyoccult_geo.mpc_observatories
 data/ObsCodes.html
+# private reading and notes (not in git)
+private-docs/

@@ -785,7 +785,7 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
                                    row.source_id, record["star_ra"], record["star_dec"], row.phot_g_mean_mag, years, rad)
     record.update(doubles.fields(comps, row.phot_g_mean_mag, m_ast, "local" if LOCAL is not None else "none"))
     RUN_RECORDS.append(record)
-    print(record)
+    print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT")
     pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
                                   header=not os.path.isfile(config.hits_output_cvs_file))
     RUN["hits"] += 1
@@ -935,7 +935,7 @@ if __name__ == "__main__":
             if size is None:
                 print(f"No size data for {t}, skipping")
                 continue
-            print(f"Estimated/known target {t} size data: {size}")
+            print(f"Estimated/known target {t} size: {size['r_max_km']:.1f} km (H={size.get('H')}, G={size.get('G')})")
             fetch_target_orbit(t, epochs)                          # once per target
             for ctp in periods:
                 target_test(obs_loc, ctp, config.spn + 600, t, size, mag_min)   # +10 min so windows overlap

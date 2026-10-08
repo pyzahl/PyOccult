@@ -1,7 +1,7 @@
 # PyOccult <img src="src/pyoccult/pyoccult_logo.svg" alt="" width="96" align="right">
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
 
-Python Occultation Searcher by PyZahl (C) 2026, version 0.12.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.13.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).
@@ -25,6 +25,7 @@ Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spice
   - [5. Run it: the web interface](#5-run-it-the-web-interface)
     - [The core command-line tools](#the-core-command-line-tools)
   - [Quick Tips](#quick-tips)
+- [Where your data and settings live](#where-your-data-and-settings-live)
 - [Site Configuration and Run Setup](#site-configuration-and-run-setup)
 - [Local Gaia catalog (required)](#local-gaia-catalog-required)
 - [Quick start: choose targets (pick tool)](#quick-start-choose-targets-pick-tool)
@@ -92,6 +93,18 @@ See `ABOUT.md` for the computations, data sources and open points:
 https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
 
 # Install
+
+> **How to type the commands in this README.** They are written as `pyoccult …`. Depending on how you installed:
+>
+> | installed with | type | where |
+> |---|---|---|
+> | uv | `uv run pyoccult …` | in the PyOccult folder |
+> | pip, environment activated (`source .venv/bin/activate`; Windows: `.venv\Scripts\activate`) | `pyoccult …` | anywhere, in that terminal |
+> | pip, not activated | `.venv/bin/pyoccult …` (Windows: `.venv\Scripts\pyoccult …`) | in the PyOccult folder |
+>
+> Activation lasts for one terminal only. To type just `pyoccult` in every terminal, add an alias once, e.g. in
+> `~/.bashrc`: `alias pyoccult=~/PyOccult/.venv/bin/pyoccult` (with your folder), or with uv
+> `alias pyoccult='uv run --project ~/PyOccult pyoccult'`, which also works from any folder.
 
 ## Easiest: with uv (Linux, macOS, Windows)
 
@@ -240,21 +253,7 @@ again (only when `pyproject.toml` gains a new package, run it once more). It als
 `pyoccult` alone starts the web interface, `pyoccult <command>` runs a tool (`pyoccult --help` lists them; options
 as before). Without activating the environment, use `.venv/bin/pyoccult` (Windows: `.venv\Scripts\pyoccult`).
 
-**Your data folder.** All your files live in one folder: `sites.py` (your
-sites), `pyoccult_config.py` (run settings; created from `src/pyoccult/templates/pyoccult_config.py` on first use,
-settings it lacks keep the template's default), the SPICE kernels, the Gaia catalogs, `picks/`, `favorites/`,
-`maps/` and the results. None of them are in git. Which folder:
-
-* a clone (as above): the PyOccult folder itself;
-* an installed copy (later via `pip`/`uv` without a clone): the folder you choose at the first `pyoccult setup`
-  (Enter = `~/PyOccult`, a normal folder in your home directory). The choice is saved in your system's settings
-  folder (Linux `~/.config/pyoccult/home`, macOS `~/Library/Application Support/PyOccult/home`, Windows
-  `%APPDATA%\PyOccult\home`);
-* `pyoccult setup --home <folder>` chooses another folder from now on, for a clone too (files are not moved; setup
-  tells you if the old folder holds data of yours);
-* `PYOCCULT_HOME=<folder>` for a single run.
-
-`pyoccult setup --status`, the GUI's About box and the GUI's start-up line show the folder in use and why.
+**Your data folder** (sites, settings, kernels, catalogs, results): see "Where your data and settings live" below.
 
 ## 4. One-time data setup
 
@@ -389,14 +388,16 @@ pyoccult                 # opens http://127.0.0.1:8080 in your browser (local on
    rotation where SBDB knows them (axes, rotation period, pole, taxonomic type; fetched once per favorite from the
    SBDB API, as the pick tool's bulk data holds only the size), and to edit its note. **CSV** downloads all favorites as a table (`favorites_<date>.csv`): `favorites/favorites.csv` is rewritten with every
    change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
-   in your browser).
+   in your browser; the Results report and the Pick table have the same corner).
 
 Settings changed in the GUI apply to that run only; `pyoccult_config.py` is not changed. Details: "Web interface
 (GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.
 
 ### The core command-line tools
 
-Everything the GUI does is also available on the command line (scripts, automation, a remote machine). The site is
+Everything the GUI does is also available on the command line (scripts, automation, a remote machine). Type them as
+`uv run pyoccult …` with uv, or `.venv/bin/pyoccult …` without an activated environment (see "How to type the
+commands" at the top of Install). The site is
 `default_site` in `sites.py`, or `PYOCCULT_SITE=<name>` for one run; settings come from `pyoccult_config.py`.
 
 | Step | Command | What it does |
@@ -445,6 +446,49 @@ To include the maps' KML links in the published page, also copy the `maps` folde
   ```
 
 
+
+## Where your data and settings live
+
+**One data folder holds all your files**, none of them in git:
+
+| what | files |
+|---|---|
+| your sites and settings | `sites.py`, `pyoccult_config.py` (created from `src/pyoccult/templates/pyoccult_config.py` on first use) |
+| downloaded data | SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`, ~120 MB), Gaia catalogs (`gaia_dr3_g16/` ~4 GB, `gaia_dr3_g18/` ~13 GB), `data/ObsCodes.html` (MPC observatory list) |
+| your results | `picks/` (saved picks), `hits_log.csv` (+ `.runs.jsonl`), `hits_report.html`, `maps/` (KML, previews, globe plots), `favorites/`, `targets.py`, `pick_events.csv` |
+
+**Which folder is the data folder** (first match wins; `pyoccult setup --status`, the GUI's About box and its
+start-up line show the one in use and why):
+
+1. `PYOCCULT_HOME=<folder>`: for a single run (testing, a second setup side by side).
+2. The saved setting, written by `pyoccult setup --home <folder>` or by the first setup of an installed copy.
+3. A clone or unpacked ZIP (the folder with `pyproject.toml`): **the PyOccult folder itself**. This is the usual case
+   with `git clone` / ZIP plus uv or pip.
+4. Otherwise (an installed copy without a setting): `PyOccult` in your home folder.
+
+`pyoccult setup --home <folder>` moves the data folder from now on (also for a clone). Files are not moved: setup
+tells you if the old folder holds data of yours; move or link it yourself (big catalog folders can be linked).
+
+**Per system:**
+
+| | Linux | macOS | Windows |
+|---|---|---|---|
+| default data folder (installed copy) | `~/PyOccult` | `~/PyOccult` (`/Users/<you>/PyOccult`) | `%USERPROFILE%\PyOccult` (`C:\Users\<you>\PyOccult`) |
+| saved setting (path of the data folder) | `~/.config/pyoccult/home` (or `$XDG_CONFIG_HOME/pyoccult/home`) | `~/Library/Application Support/PyOccult/home` | `%APPDATA%\PyOccult\home` |
+| cache (`cache_path` in `pyoccult_config.py`): asteroid orbit files, SBDB data | `/dev/shm` (RAM, emptied on reboot) | the system temp folder (`$TMPDIR`, under `/var/folders/...`) | the temp folder (`%TEMP%`) |
+| Python environment | `.venv/` in the PyOccult folder (uv and pip) | same | same |
+| uv's own downloads (shared by all uv projects; `uv cache dir`, `uv python dir`) | `~/.cache/uv`, `~/.local/share/uv/python` | same as Linux | `%LOCALAPPDATA%\uv\cache`, `%APPDATA%\uv\python` |
+
+On Windows, choose a data folder that is **not synced to OneDrive** (Documents and Desktop often are): the Gaia
+catalog would be uploaded to the cloud. The cache can be set to any folder with `cache_path`; it is refilled when
+needed.
+
+**Settings kept in your browser** (per browser, not in the data folder): the GUI's list heights, the favorites'
+time display (UT / Local / Site) and similar view choices.
+
+**To remove PyOccult:** delete the PyOccult folder (code, `.venv` and, for a clone, your data), the data folder if it
+is elsewhere, and the saved setting file above if it exists. The cache empties itself (RAM or temp folder); uv's
+downloads can be cleared with `uv cache clean`.
 
 ## Site Configuration and Run Setup
 
