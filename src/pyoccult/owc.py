@@ -10,7 +10,7 @@ the report and favorites tables, linked to the OWC event page). Standard library
 """
 from pyoccult.version import __version__, __url__
 from pyoccult import urls as U
-import json, os, tempfile, time, urllib.parse, urllib.request
+import json, os, tempfile, time, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 CACHE = "owc_cache.json"
@@ -30,6 +30,10 @@ def _get(url, timeout=20):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.load(r)
+    except urllib.error.HTTPError as ex:                         # name the request: which one failed, and how
+        raise OSError(f"HTTP {ex.code} {ex.reason} for {url}") from None
+    except urllib.error.URLError as ex:
+        raise OSError(f"{ex.reason} for {url}") from None
     finally:
         _last[0] = time.time()
 
@@ -108,7 +112,7 @@ def check(records, folder=".", progress=None):
         try:
             res = lookup(r)
         except Exception as ex:                                   # network trouble: keep going, report it
-            errors.append(f"{r.get('target_id')}: {str(ex)[:80]}")
+            errors.append(f"{r.get('target_id')} {str(r.get('best_utc'))[:16]}: {str(ex)[:300]}")
             continue
         cache[key(r)] = dict(checked=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"), event=res)
         found += res is not None

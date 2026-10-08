@@ -639,9 +639,12 @@ def index():
             return
         ui.notify(f"Checking {len(uniq)} event(s) in OccultWatcher Cloud (about {2 * len(uniq)} s) ...")
         found, n, errors = await run.io_bound(owc.check, list(uniq.values()), ROOT)
+        for err in errors:                                      # which request failed and how (log and terminal)
+            log.push(f"OWC check failed: {err}")
+            print(f"OWC check failed: {err}")
         ui.notify(f"OccultWatcher Cloud: {found} of {n} event(s) found"
-                  + (f"; {len(errors)} failed (offline?)" if errors else ""),
-                  type="warning" if errors else "positive")
+                  + (f"; {len(errors)} failed: details in the Log at the bottom of the page" if errors else ""),
+                  type="warning" if errors else "positive", multi_line=True)
         if which == "results":
             await build_report()
         else:
