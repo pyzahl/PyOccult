@@ -69,6 +69,12 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `search.online_double_check` after pass 2: one async ADQL job (OR of circles, daemon thread, 120 s timeout) ->
   `online_fields` -> `update_hits_csv` rewrites only this run's rows (csv module, atomic; new columns appended).
   New record fields go at the END of the hit record (the log is appended; mixed headers otherwise).
+- `pyoccult/owc.py` (experimental, hidden: config `owc_lookup = False`, only by editing the config; the user is
+  introducing it to IOTA people step by step, so keep it low-key): OccultWatcher Cloud lookup through the public
+  event pages' interface `URL_OWC_API` (`events/?astNo=&dt=&bf=` then `event/<id>`; no login; `my-events` needs
+  login: not used). Match by Gaia id (`gaia.id`) else time (10 min); 1 s pause, User-Agent PyOccult; on click only
+  (GUI "Check OWC" in Results/Favorites, `run.io_bound`); cache `<data folder>/owc_cache.json`; report `owc_line()`
+  under the asteroid (tags, station count, hover: observer, signed distance km, commitment).
 - `pyoccult/binaries.py`: known asteroid satellites, `data/binaries.json` from Johnston's PDS compilation V3.0
   (fixed-width `binarytable.tab`, layout read from its PDS4 label) + SAT_* columns of the occultations archive's
   `Asteroid_*.psv` (separation in mas). `short()` "+moon"/"+moon?" (report label, Markdown), `text()` (favorites

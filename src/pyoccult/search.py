@@ -25,7 +25,7 @@ import warnings, erfa
 warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
 from pyoccult import config
-from pyoccult.paths import shadow_path, path_sigma3_km, write_shadow_kml
+from pyoccult.paths import shadow_path, path_sigma3_km, write_shadow_kml, site_probability
 from pyoccult import corridor
 from pyoccult import doubles          # close and double stars at an event
 from pyoccult import binaries         # known asteroid satellites
@@ -784,6 +784,11 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
         comps = doubles.companions(LOCAL.cone(record["star_ra"], record["star_dec"], (rad + 3.0) / 3600.0),
                                    row.source_id, record["star_ra"], record["star_dec"], row.phot_g_mean_mag, years, rad)
     record.update(doubles.fields(comps, row.phot_g_mean_mag, m_ast, "local" if LOCAL is not None else "none"))
+    # chance that the shadow covers the site, from the path uncertainty (Horizons 3-sigma RSS, else the default)
+    sigma3_h = path_sigma3_km(target_id, res['best_utc'])
+    sigma3 = sigma3_h or config.default_sigma3_km
+    record.update(path_sigma1_km=sigma3 / 3.0, sigma_source="Horizons" if sigma3_h else "default",
+                  p_site=site_probability(res['min_distance'], size['r_km'], sigma3 / 3.0))
     RUN_RECORDS.append(record)
     print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT")
     pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
@@ -793,7 +798,6 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
 
     t_map = time.time()
     stem = f"{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}"     # file name of KML and preview
-    sigma3 = path_sigma3_km(target_id, res['best_utc']) or config.default_sigma3_km
     if config.write_maps and res['min_distance'] < r_search + config.max_shadow_dist:   # shadow + reach, as logged
         os.makedirs(config.map_dir, exist_ok=True)
         paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3,

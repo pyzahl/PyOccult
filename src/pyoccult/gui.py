@@ -343,6 +343,10 @@ def index():
         with ui.tab_panel(t_res):
             with ui.row().classes("items-center"):
                 ui.button("Rebuild report", on_click=lambda: build_report()).props("outline")
+                if getattr(config, "owc_lookup", False):                  # experimental, set in pyoccult_config.py
+                    ui.button("Check OWC", on_click=lambda: owc_check("results")).props("outline dense").tooltip(
+                        "Look these events up in OccultWatcher Cloud: prediction feeds (tags) and signed-up stations, "
+                        "shown under the asteroid with a link to the OWC event page (one request per second)")
                 ui.link("Open in a new tab", "/out/hits_report.html", new_tab=True)
                 ui.button("CSV", on_click=lambda: hits_csv()).props("outline dense").tooltip(
                     "Download the search results (hits_log.csv: every event with all its columns)")
@@ -362,6 +366,10 @@ def index():
                 ui.button("CSV", on_click=lambda: fav_csv()).props("outline dense").tooltip(
                     "Download all favorites as a table (favorites/favorites.csv, rewritten with every change), "
                     "named favorites_<today>.csv")
+                if getattr(config, "owc_lookup", False):                  # experimental, set in pyoccult_config.py
+                    ui.button("Check OWC", on_click=lambda: owc_check("favorites")).props("outline dense").tooltip(
+                        "Look the favorites up in OccultWatcher Cloud: prediction feeds (tags) and signed-up stations "
+                        "(one request per second)")
             ui.label("Add events with the ☆ button in the Results report (opened from this GUI). Each favorite keeps "
                      "its own copy of map and preview, so later searches do not change it. Click a row for its preview, "
                      "map and note below; check rows for the actions above the table. Drag the table's bottom-right corner to make "
@@ -616,6 +624,29 @@ def index():
     show_site(state["name"])
 
     # ------------------------------------------------ runs
+    async def owc_check(which):
+        """Look the Results or Favorites events up in OccultWatcher Cloud (owc.py), then show the tables again."""
+        from pyoccult import owc
+        if which == "results":
+            path = os.path.join(ROOT, config.hits_output_cvs_file)
+            with open(path, newline="") if os.path.isfile(path) else open(os.devnull) as f:
+                recs = list(csv.DictReader(f))
+        else:
+            recs = [f["record"] for f in favorites.load()]
+        uniq = {owc.key(r): r for r in recs if r.get("target_id") and r.get("best_utc")}
+        if not uniq:
+            ui.notify("No events to check", type="warning")
+            return
+        ui.notify(f"Checking {len(uniq)} event(s) in OccultWatcher Cloud (about {2 * len(uniq)} s) ...")
+        found, n, errors = await run.io_bound(owc.check, list(uniq.values()), ROOT)
+        ui.notify(f"OccultWatcher Cloud: {found} of {n} event(s) found"
+                  + (f"; {len(errors)} failed (offline?)" if errors else ""),
+                  type="warning" if errors else "positive")
+        if which == "results":
+            await build_report()
+        else:
+            load_favs(fav_cur["key"])
+
     async def build_report(rc=0):
         await run_process(PYOCCULT + ["report", config.hits_output_cvs_file], log)
         frame.props(f"src=/out/hits_report.html?t={int(time.time())}")

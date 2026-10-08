@@ -779,7 +779,7 @@ Each run is its own process. The GUI listens on this computer only (127.0.0.1), 
 
 ## Quick start: hits_log.csv to HTML report
 
-`pyoccult/report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, offset from the centre line) and a **Map** button for each event. Standard library only, no install needed.
+`pyoccult/report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, shadow distance from the centre line) plus **Chance** (the probability that the shadow covers your site, from the shadow distance, the shadow radius and the 1-sigma path uncertainty of JPL Horizons; it falls as the shadow distance grows and is a rough guide for far-future events, whose uncertainty is large) and a **Map** button for each event. Standard library only, no install needed.
 The page header shows the site, its equipment, the magnitude and observing limits, the statistics of the run with the
 saved pick its targets came from, and the Earth orientation data it used (from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column. The **Preview** button shows
 the event preview: the star field around the target star at the event date (local Gaia catalog), the camera frame

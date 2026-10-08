@@ -2,7 +2,7 @@
 
 Columns follow the Occult Watcher (OWC) list - asteroid, event time (UT), star magnitude, magnitude
 drop, maximum duration, star altitude with compass direction, Moon distance with phase icon - plus the
-observer's offset from the shadow centre line and a link to the KML ground-track file.
+observer's shadow distance (from the shadow centre line) and a link to the KML ground-track file.
 
 Standard library only. Usage:
 
@@ -294,7 +294,9 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")), calc=num(r.get("calc_s")),
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
                 size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(),
-                drop_blend=num(r.get("mag_drop_blended")), dhint=(r.get("double_hint") or "").strip(), ra=ra, dec=dec, fov=fov,
+                drop_blend=num(r.get("mag_drop_blended")), dhint=(r.get("double_hint") or "").strip(),
+                p_site=num(r.get("p_site")), sigma1=num(r.get("path_sigma1_km")),
+                sigma_src=(r.get("sigma_source") or "").strip(), ra=ra, dec=dec, fov=fov,
                 globe=globe)
 
 
@@ -344,7 +346,11 @@ h1{font-size:1.35rem;margin:0 0 4px}
 .info dt{color:var(--muted)}.info dd{margin:0}
 .wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%;min-width:760px}
-th,td{padding:8px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
+th,td{padding:8px 7px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{white-space:normal;vertical-align:bottom}
+td.tools{white-space:normal;min-width:9.5em} td.ast{white-space:normal;min-width:9em}
+td .sub{white-space:normal} .badge{white-space:nowrap}
+@media (max-width:1180px){.c-narrow{display:none}}   /* favorites on narrow windows: note and date are in the panel */ td.tools .mapbtn{margin:2px 0}
 th{background:var(--head);font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);
 cursor:pointer;user-select:none;position:sticky;top:0}
 th.sorted-asc::after{content:" ▲"}th.sorted-desc::after{content:" ▼"}
@@ -355,6 +361,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .badge{display:inline-block;padding:0 8px;border-radius:99px;font-size:.78rem}
 .in{background:var(--in-bg);color:var(--in-ink)}.near{background:var(--near-bg);color:var(--near-ink)}
 a{color:var(--accent)}
+a.owc{display:inline-block;margin-top:2px;padding:0 6px;border-radius:6px;font-size:.78rem;text-decoration:none;
+ background:color-mix(in srgb,#2563eb 14%,transparent);color:var(--accent)}
 sup.bin{color:#0891b2;font-weight:600;margin-left:3px;cursor:help;white-space:nowrap}
 span.dbl{color:#b26a00;font-weight:600;cursor:help;white-space:nowrap}
 sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
@@ -425,7 +433,7 @@ FAVPAGE_JS = """<style>
 .favbar select{font:inherit;padding:2px 4px}
 th,td{padding:8px 6px} tr.favrow{cursor:pointer} tr.favrow.cur td{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 td.note{max-width:12em;overflow:hidden;text-overflow:ellipsis}
-tr.favrow td:last-child{white-space:normal;min-width:12.5em} tr.favrow td:last-child .mapbtn{margin:2px 0}
+tr.favrow td:last-child{white-space:normal;min-width:9.5em}
 </style><script>
 (function(){
 var boxes=[].slice.call(document.querySelectorAll('.favsel')),all=document.getElementById('favall'),
@@ -582,12 +590,13 @@ def shadow_cell(e):
     if m is None:
         sub = ""
     elif m <= 0:
-        sub = '<span class="sub"><span class="badge in">inside shadow</span></span>'
+        sub = '<span class="sub"><span class="badge in" title="inside the shadow path">inside</span></span>'
     elif m <= NEAR_KM:
-        sub = f'<span class="sub"><span class="badge near">{m:.1f} km outside</span></span>'
+        sub = (f'<span class="sub"><span class="badge near" title="{m:.1f} km outside the shadow path">'
+               f'{m:.1f} km out</span></span>')
     else:
-        sub = f'<span class="sub">{m:.1f} km outside</span>'
-    return f'<td class="num" data-s="{e["miss"]:.3f}">{e["miss"]:.1f} km{sub}</td>'
+        sub = f'<span class="sub" title="{m:.1f} km outside the shadow path">{m:.1f} km out</span>'
+    return f'<td class="num" data-s="{e["miss"]:.3f}" style="min-width:5.5em">{e["miss"]:.1f} km{sub}</td>'
 
 
 def map_cell(e):
@@ -602,7 +611,7 @@ def map_cell(e):
           f'time, seen from the site (Linux, KStars running, report opened from the GUI)">KStars</button> '
           if e.get("ra") is not None and e.get("dec") is not None else "")
     if not e["kml"] and not e.get("preview") and not e.get("globe"):
-        return f"<td>{ks}—</td>" if ks else "<td>—</td>"
+        return f'<td class="tools">{ks}—</td>' if ks else '<td class="tools">—</td>'
     title = f'{e["label"]} · {fmt_time(e["when"])} UT'
     out = ks
     if e.get("pkey"):
@@ -616,7 +625,29 @@ def map_cell(e):
                 f'minute marks and the event parameters">Globe</button> ')
     if e["kml"]:
         out += f'<a href="{e["kml"]}" download title="KML for Google Earth or My Maps">KML</a>'
-    return f"<td>{out}</td>"
+    return f'<td class="tools">{out}</td>'
+
+
+_OWC = {}
+
+
+def owc_line(e):
+    """'<span class=sub><a class=owc ...>OWC IBEROC · 2 stations</a></span>' under the asteroid when the event was
+    looked up in OccultWatcher Cloud (owc.py; cache owc_cache.json in the data folder = the working folder); hover
+    lists the stations, the link opens the OWC event page. Empty otherwise."""
+    from pyoccult import owc
+    try:
+        m = os.path.getmtime(owc.CACHE)
+    except OSError:
+        return ""
+    if _OWC.get("m") != m:
+        _OWC.update(m=m, data=owc.load("."))
+    hit = owc.info(e["tid"], e["utc"], _OWC["data"])
+    if not hit:
+        return ""
+    label, tip, url = hit
+    return (f'<span class="sub"><a class="owc" href="{esc(url)}" target="_blank" rel="noopener" '
+            f'title="{esc(tip)}">{esc(label)}</a></span>')
 
 
 def binary_mark(tid):
@@ -661,19 +692,20 @@ def html_row(e):
         mid = f'<td data-s="{esc(site)}">{esc(site)}</td>'
         calc = ""
         tail = (f'<td data-s="{esc(f["status"])}">{esc(f["status"])}</td>'
-                f'<td data-s="{esc(f["note"])}" class="note" title="{esc(f["note"])}">{esc(f["note"][:40])}'
+                f'<td data-s="{esc(f["note"])}" class="note c-narrow" title="{esc(f["note"])}">{esc(f["note"][:40])}'
                 f'{"…" if len(f["note"]) > 40 else ""}</td>'
-                f'<td data-s="{esc(f["added"])}" title="{esc(f["added"])} UTC">{esc(f["added"][5:16].replace("T", " "))}</td>')
+                f'<td class="c-narrow" data-s="{esc(f["added"])}" title="{esc(f["added"])} UTC">{esc(f["added"][5:16].replace("T", " "))}</td>')
     else:
         lead, mid, tail = "<tr>", "", ""
-        calc = f'<td class="num" data-s="{s(e["calc"])}">{fmt(e["calc"])}</td>'
+        calc = ""                                                # calculation time: in hits_log.csv only
     return (
         lead +
-        f'<td data-s="{esc(e["tid"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
+        f'<td class="ast" data-s="{esc(e["tid"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
         f'target="_blank" rel="noopener">{esc(e["label"])}</a>'
         + binary_mark(e["tid"])
         + (f'<sup class="est" title="Size estimated from H with an assumed albedo: diameter, duration and shadow width '
            f'are uncertain by a factor of about 1.7 (no measured diameter in SBDB)">*</sup>' if size_estimated(e) else '')
+        + owc_line(e)
         + '</td>' + mid +
         f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)"'
         + (f' class="evtime" data-utc="{(e["when"] + timedelta(milliseconds=500)).strftime("%Y-%m-%dT%H:%M:%SZ")}" '
@@ -687,10 +719,27 @@ def html_row(e):
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
         f'<td data-s="{s(moon["sep"], 1) if moon else ""}" title="{moon_tip}">{esc(moon_text(e))}</td>'
-        f"{shadow_cell(e)}" + calc + tail +
+        f"{shadow_cell(e)}" + chance_cell(e) + calc + tail +
         f"{map_cell(e)}"
         "</tr>"
     )
+
+
+def chance_text(e):
+    """'62 %' (chance that the shadow covers the site), '<1 %', or '—' for events logged before it existed."""
+    p = e.get("p_site")
+    if p is None:
+        return "\u2014"
+    return "<1 %" if 0 < p < 0.005 else f"{100 * p:.0f} %"
+
+
+def chance_cell(e):
+    tip = ""
+    if e.get("p_site") is not None and e.get("sigma1") is not None:
+        tip = (f"shadow distance {e['miss']:.1f} km, shadow radius {e['rad']:.1f} km, path uncertainty 1 sigma "
+               f"{e['sigma1']:.1f} km ({e['sigma_src'] or '?'})") if e.get("miss") is not None and e.get("rad") else ""
+    p = e.get("p_site")
+    return f'<td class="num" data-s="{"" if p is None else f"{p:.4f}"}" title="{esc(tip)}">{esc(chance_text(e))}</td>'
 
 
 def info_html(info):
@@ -710,9 +759,11 @@ def to_html(events, meta):
             '<th class="num" data-k title="Maximum duration (centre line), seconds">Max dur (s)</th>'
             '<th data-k title="Star altitude and compass direction at closest approach">Altitude</th>'
             '<th data-k title="Moon distance from the star; shown while the Moon is up">Moon dist</th>'
-            '<th class="num" data-k title="Distance of the observer from the shadow centre line">Offset</th>'
-            + ('<th data-k>Status</th><th data-k>Note</th><th data-k>Added (UT)</th>' if fav else
-               '<th class="num" data-k title="Calculation time for this event (exact solve and metrics), seconds">Calc (s)</th>')
+            '<th class="num" data-k title="Distance of the observer from the shadow centre line">Shadow dist</th>'
+            '<th class="num" data-k title="Chance that the shadow covers your site, from the shadow distance, the shadow '
+            'radius and the 1-sigma path uncertainty">Chance</th>'
+            + ('<th data-k>Status</th><th data-k class="c-narrow">Note</th><th data-k class="c-narrow">Added (UT)</th>'
+               if fav else "")
             + '<th title=""☆ favorites and KStars (when opened from the GUI), Map: shadow path, Preview: star field, '
             'KML: ground track for Google Earth">Tools</th>')
     body = "".join(html_row(e) for e in events)
@@ -747,7 +798,8 @@ def to_html(events, meta):
 <li><b>+moon</b> after an asteroid: it has known satellites (W. R. Johnston's compilation, NASA PDS 2019; "+moon?": only reported in an occultation, not confirmed); hover for their sizes and distances. A satellite casts its own shadow, somewhere within the dotted "satellite zone" lines on the map (its distance from the asteroid plus its radius): observers outside the main path may see a short extra event. Newer discoveries: Johnston's Archive (johnstonsarchive.net).</li>
 <li><b>\u26a0</b> after a drop: a close or double star. The number is the drop with the light of neighbours within a few arcseconds, which stays in the camera image when the star is covered; hover for details (neighbours from the local catalog; with the online check also Gaia's double-star hints and neighbours the catalog leaves out).</li>
 <li><b>*</b> after an asteroid: no measured diameter; its size is estimated from H with an assumed albedo, so diameter, duration and shadow width are uncertain by a factor of about 1.7 (typical for small asteroids, H above ~15).</li>
-<li>Offset is the observer's distance from the shadow centre line in the fundamental plane. "Inside" means within the shadow radius; otherwise it is the gap to the shadow edge. Radius comes from the size lookup (hover the asteroid name).</li>
+<li>Chance: the probability that the shadow covers your site, from the shadow distance, the shadow radius and the path uncertainty (1 sigma: JPL Horizons' 3-sigma position uncertainty / 3, else the default). It assumes the size is right; an uncertain size (* after the asteroid) or a far-future event (large uncertainty) makes it a rough guide. Check again as the date approaches: the orbit, and with it the chance, improves.</li>
+<li>Shadow dist is the observer's distance from the shadow centre line in the fundamental plane. "Inside" means within the shadow radius; otherwise it is the gap to the shadow edge. Radius comes from the size lookup (hover the asteroid name).</li>
 <li>Altitude is the star's altitude at closest approach. The Moon is shown only while above the horizon. Click a column heading to sort.</li>
 <li>Map shows the path on an interactive map (needs internet for the map tiles) and links the closest centre-line point in Google Maps. Google Maps itself cannot load a local KML file: use the KML link with Google Earth, or import it in My Maps (Create a new map, then Import).</li>
 </ul>
@@ -761,8 +813,8 @@ def to_markdown(events, meta):
     out = [f"# {meta['title']}", "",
            f"{len(events)} events{meta['span']} · {meta['observer']} · times in UT · generated {meta['generated']}", ""]
     out += [f"- **{k}:** {v}" for k, v in (meta.get("info") or [])] + ([""] if meta.get("info") else [])
-    out += ["| Asteroid | Event time (UT) | Star mag (G) | Mag drop | Max dur (s) | Altitude | Moon dist | Offset | Calc (s) | Files |",
-            "|---|---|---:|---:|---:|---|---|---:|---:|---|"]
+    out += ["| Asteroid | Event time (UT) | Star mag (G) | Mag drop | Max dur (s) | Altitude | Moon dist | Shadow dist | Chance | Calc (s) | Files |",
+            "|---|---|---:|---:|---:|---|---|---:|---:|---:|---|"]
     for e in events:
         if e["miss"] is None:
             off = "—"
@@ -777,7 +829,7 @@ def to_markdown(events, meta):
         star += f" {binaries.short(e['tid'])}" if binaries.short(e["tid"]) else ""   # known satellites
         dbl = (" \u26a0" + (f" {e['drop_blend']:.2f}" if e.get("drop_blend") is not None else "")) if e.get("dhint") else ""
         out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])}{dbl} | {fmt(e['dur'])} "
-                   f"| {alt_text(e)} | {moon_text(e)} | {off} | {fmt(e['calc'])} | {kml} |")
+                   f"| {alt_text(e)} | {moon_text(e)} | {off} | {chance_text(e)} | {fmt(e['calc'])} | {kml} |")
     if any(size_estimated(e) for e in events):
         out.append("\n\\* size estimated from H with an assumed albedo (no measured diameter): diameter, duration and "
                    "shadow width uncertain by a factor of about 1.7.")

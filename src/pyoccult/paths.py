@@ -96,6 +96,19 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
     return out
 
 
+def site_probability(miss_km, r_km, sigma1_km):
+    """Chance (0-1) that the shadow covers a site miss_km from the predicted centre line. The shadow covers +/- r_km
+    across the track; the path itself is uncertain across the track with a normal error of sigma1_km (1 sigma).
+    Horizons' RSS value is the whole error ellipse, so using it across the track is on the safe side (the chance
+    is rather underestimated far from the path and overestimated near it). Without an uncertainty: 1 or 0."""
+    import math
+    d, r = abs(float(miss_km)), float(r_km)
+    if not sigma1_km or sigma1_km <= 0:
+        return 1.0 if d <= r else 0.0
+    phi = lambda x: 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+    return max(0.0, min(1.0, phi((r - d) / sigma1_km) - phi((-r - d) / sigma1_km)))
+
+
 def path_sigma3_km(target_id, utc_time):
     """3-sigma plane-of-sky position uncertainty (RSS) from Horizons, converted to km at the asteroid.
 

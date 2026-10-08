@@ -43,3 +43,4 @@ release/
 data/ObsCodes.html
 # private reading and notes (not in git)
 private-docs/
+owc_cache.json

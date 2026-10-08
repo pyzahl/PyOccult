@@ -20,6 +20,8 @@ from pyoccult import screen as pyoccult_screen, astrometry as pyoccult_astrometr
 ns = dict(np=np, pd=pd, os=os, time=time, json=json, datetime=datetime.datetime, screen=pyoccult_screen, astrometry=pyoccult_astrometry, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
 from pyoccult import doubles as pyoccult_doubles
 ns.update(doubles=pyoccult_doubles, RUN_RECORDS=[], LOCAL=None)       # close/double star check (no local catalog here)
+from pyoccult.paths import site_probability
+ns.update(site_probability=site_probability)                         # chance at the site (pure function)
 ns['spice'] = types.SimpleNamespace(et2utc=lambda et, f, p: "ET:%r" % float(et))
 def star_test(loc, utc, span, ra, dec, tid, r, reach):
     calls['star_test'] += 1

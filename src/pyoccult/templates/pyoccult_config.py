@@ -25,6 +25,8 @@ search_mode = "corridor"   # "corridor": stars along each path from the local Ga
 star_parallax = True       # astrometric corrections of the star direction (ABOUT.md Part 6): the star seen from the
 light_deflection = True    # Earth (Gaia parallax), and the light bending by Sun, Jupiter, Saturn (star minus asteroid)
 companion_radius_arcsec = 4.0   # close and double stars: neighbours within this blend into the star image (drop is smaller)
+owc_lookup = False         # experimental: "Check OWC" buttons (GUI Results, Favorites) look the events up in OccultWatcher
+                           # Cloud (feeds, signed-up stations); set True here to try it (no GUI switch)
 gaia_online_check = True   # after a search: check the event stars in the Gaia archive (doubles, neighbours the local
                            # catalog leaves out); one query per run, skipped when offline
 min_mag_drop = 0.1         # mag; events with a smaller drop are not logged (also sets the Gaia magnitude cap per asteroid)

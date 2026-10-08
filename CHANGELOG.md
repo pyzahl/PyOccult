@@ -49,6 +49,16 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
   4.2 asteroid satellites; open items for close and double stars (Part 6).
 
 ### Added
+- Experimental, off by default: **Check OWC** buttons in the GUI's Results and Favorites tabs (`owc_lookup = True` in
+  `pyoccult_config.py`; no GUI switch). They look the events up in OccultWatcher Cloud through the interface of its
+  public event pages (`pyoccult/owc.py`; one request per second, PyOccult named as the client, only on click) and
+  show the prediction feeds and signed-up stations under the asteroid, e.g. "OWC IBEROC · 2 stations", linked
+  to the OWC event page (stations with distance and commitment on hover). Matched by the star's Gaia DR3 id, else
+  by time; results cached in `owc_cache.json` in the data folder.
+- Results and Favorites tables: a **Chance** column, the probability that the shadow covers your site, from the
+  offset, the shadow radius and the 1-sigma path uncertainty (JPL Horizons' 3-sigma position uncertainty / 3, else
+  `default_sigma3_km`), like Occult's "Rank" but for your site; sortable, details on hover. New hit-log columns
+  `path_sigma1_km`, `sigma_source`, `p_site` (events logged before show "—").
 - **Asteroid satellites** (`pyoccult/binaries.py`, `data/binaries.json`: 325 systems from W. R. Johnston's Binary
   Minor Planets Compilation V3.0, NASA PDS 2019, doi:10.26033/bb68-pw96, plus satellites seen in occultations):
   "+moon" / "+2 moons" ("+moon?": only reported in an occultation) after the asteroid in the Results and Favorites
@@ -110,6 +120,11 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- Results and Favorites tables were wider than the page (the right side looked cut off; its scroll bar was only at
+  the table's end): tool buttons and column headings may wrap, the asteroid name and offset too, tighter cell
+  padding, the calculation-time column dropped (it stays in `hits_log.csv`), and on windows narrower than about
+  1180 px the favorites' Note and Added columns are hidden (both are in the detail panel). Both tables fit a
+  1280 px window.
 - GUI: the Favorites table's height (drag the corner) was sometimes restored as a sliver after a restart: it was saved
   on every size change, including the box's minimum height while the tab was laid out. Now it is saved only after
   you drag, as a share of the window height, and restored only between 25 and 92 % of the window (else the

@@ -148,4 +148,13 @@ root = ET.parse('/tmp/graze.kml').getroot()
 ns = {'k': 'http://www.opengis.net/kml/2.2'}
 print("\nKML (grazing case): linestrings", len(root.findall('.//k:LineString', ns)),
       "placemarks", len(root.findall('.//k:Placemark', ns)))
+# chance that the shadow covers a site (site_probability)
+P = load_module().site_probability
+assert P(0, 5, 0) == 1.0 and P(6, 5, 0) == 0.0                     # no uncertainty: inside or not
+assert abs(P(0, 5, 5) - 0.6827) < 1e-3                              # centre, radius = 1 sigma: +/- 1 sigma
+assert abs(P(5, 5, 1e-6) - 0.5) < 1e-3                              # exactly on the edge, tiny error: half
+assert P(0, 5, 2) > P(3, 5, 2) > P(8, 5, 2) > P(20, 5, 2) > 0      # falls off with the offset
+assert P(-3, 5, 2) == P(3, 5, 2)                                    # symmetric
+assert P(20, 1, 3) < 1e-6 and 0 <= P(1e9, 1, 1) <= 1
+print("site probability: ok")
 print("ALL TESTS PASSED")
