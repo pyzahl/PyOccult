@@ -971,7 +971,7 @@ if __name__ == "__main__":
         if size is None:
             print(f"No size data for {t}, skipping")
             continue
-        print(f"Estimated/known target {t} size data: {size}")
+        print(f"Estimated/known target {t} size: {size['r_max_km']:.1f} km (H={size.get('H')}, G={size.get('G')})")
         fetch_target_orbit(t, epochs)                              # once per target
         plans[t] = (size, corridor.plan_corridor(t, et0, et1, size, mag_min, config.max_shadow_dist,
                                                  min_drop=getattr(config, "min_mag_drop", 0.1),
