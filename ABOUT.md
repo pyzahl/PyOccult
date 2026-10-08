@@ -584,6 +584,16 @@ maps and the report do not care what the occulting body is.
 **Target names.** Asteroids are plain numbers, and NAIF moon ids collide with them (Io is 501, so is asteroid (501)).
 Major bodies would be given by name in `targets`, e.g. `["218001", "Moon", "Io", "Titan"]`; SPICE resolves the names.
 
+**User side (plan of 2026-10-08).** A GUI tab **Planets & Moons** after Pick, choosing targets in groups (no pick
+needed: only a few dozen bodies): Moon · Mars system · Jupiter system (planet + Galilean moons) · Saturn system
+(planet + major moons) · Uranus · Neptune + Triton · Pluto + Charon. A group's satellite kernel is downloaded the
+first time it is chosen. The targets go into the same list, with a readable type prefix that cannot collide with
+asteroid numbers: `L:Moon`, `P:Jupiter`, `M:Io`, `M:Titan` (not a letter plus a NAIF number). They run as their
+own search (own limits: bright stars, glare, long windows); only the target preparation differs (no Horizons SPK,
+no SBDB size: radii from the kernels, brightness from a table). The hit log marks the target type, so the report
+can show planet events with or apart from asteroid events. Order: Moon first, then the Jupiter system, then the
+rest.
+
 **Suggested order.**
 1. The Moon as an optional target: about half a day; no new data; many events to cross-check against Occult.
 2. Planets and major moons by name: optional kernel downloads in setup, ellipsoid limbs, a brightness table; a day or
@@ -591,3 +601,47 @@ Major bodies would be given by name in `targets`, e.g. `["218001", "Moon", "Io",
 
 The pick tool would not need to change: there are only a handful of major bodies, so they would simply be listed as
 targets.
+
+**Implementation notes (2026-10-08, from a review of the current search).** The search loop itself works unchanged
+for major bodies: corridor scan, solver (`besselian_offsets`, `star_test`), local Gaia catalog, star corrections,
+visibility (`observable`), Moon info, maps, globe and report only ask SPICE for the target's position (`spkpos` with
+`IO`, `MOON`, `599`, ... once the kernel is loaded). What a "target kind" check (asteroid / planet / moon / Moon,
+from the `L:`/`P:`/`M:` prefix) has to change, most important first:
+
+1. **Brightness, drop, star limit.** `corridor.limiting_star_mag` caps the star magnitude from the asteroid's H and G
+   and the minimum drop, and `event_metrics` computes the drop from star + target light. Against Jupiter (mag -2)
+   or the Moon (-12) every drop is ~0, so these filters would reject every event. Planets and the Moon: no drop
+   filter and no H/G cap, a plain star limit instead (later: glare, i.e. how bright the star must be at a given
+   distance from the limb). Major moons: a brightness table (V or G at opposition, phase law) in place of SBDB H/G;
+   the drop formula then works as for asteroids.
+2. **Contact times.** We log the moment of closest approach, which is enough for asteroids (seconds). For the
+   Moon and planets, disappearance (D) and reappearance (R) are minutes to an hour apart, and those are what
+   observers need: solve |offset(t)| = radius on both sides of the closest approach (same distance function,
+   e.g. `brentq` on [t_ca - T, t_ca] and [t_ca, t_ca + T]); log `d_utc`, `r_utc`, and show them in the report.
+   Bright or dark limb at D and R (Moon: position angle vs the terminator) is a useful extra.
+3. **Light deflection.** `astrometry.corrected_star_dir` deflects by the Sun, Jupiter and Saturn as star minus
+   target (`deflect(..., unit(ast - body), ...)`). With the target in that body's own system (Jupiter itself or a
+   Galilean moon) the target-minus-body vector is ~0 or tiny: skip the target's own planet for the planet itself,
+   and check the formula's validity for its moons (close to the planet the deflection of the star is real, mas).
+4. **Target preparation** (`fetch_target_orbit`, `get_asteroid_size`, `get_asteroid_name` in `search.py`): no
+   Horizons SPK and no SBDB. Load the group's satellite kernel (downloaded the first time, like the Gaia catalog;
+   names and sizes to verify at NAIF), radius from the PCK (`bodvrd RADII`: mean for a circle, or the ellipsoid),
+   name from a table.
+5. **Path uncertainty.** `paths.path_sigma3_km` asks Horizons for the small-body RSS uncertainty, default
+   `default_sigma3_km` (10 km). Planets and major moons are known to well below a km (Moon: metres): use a
+   per-kind value, else the sigma lines and the Chance column are wrong.
+6. **Shape.** The shadow is a circle of one radius. Fine for the Moon and the major moons; Jupiter and Saturn are
+   flattened (6-10 %): first version with the mean radius and a note, later the limb ellipse (SPICE `edlimb`)
+   projected on the fundamental plane. Rings and atmospheres (gradual drops, central flashes) are not modelled.
+7. **Report and lookups.** The asteroid cell links to JPL SBDB and adds "+moon", the earlier-occultations line, the
+   close-star check and OWC, all keyed by asteroid number: skip them for major bodies (or link to a suitable page,
+   e.g. NASA/JPL's body page), and show the kind (e.g. a "planet" / "moon" badge). `observable`'s Sun limit stays;
+   the Moon also needs a daylight/bright-limb filter.
+8. **Preview image** (`preview.render_svg` via `search.write_preview`): it draws the target as a point with its
+   track. For planets and the Moon draw the disk at its angular size (radius / distance) with the phase (lit side
+   from the Sun direction), the planet's major moons at their positions in the field (from the same kernel), and
+   optionally a glare halo; for a moon target also its planet if it is in or near the field. The field size must
+   grow with the disk (the Moon is 30').
+
+Hit log: a `target_kind` column (asteroid, planet, moon, moon_earth) so the report can list planet events with or
+apart from asteroid events. The OWC check, the pick tool and the saved picks stay asteroid-only.
