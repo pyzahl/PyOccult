@@ -44,7 +44,7 @@ class R:
     def __enter__(s): return s
     def __exit__(s, *a): pass
     def read(s): return json.dumps(s.b).encode()
-def urlopen(url, timeout):
+def urlopen(url, timeout, context=None):                   # as urllib.request.urlopen (net.py passes context)
     calls.append(url); return R(dict(fields=F, data=data))
 _j = json
 P.urllib.request.urlopen = urlopen

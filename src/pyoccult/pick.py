@@ -17,6 +17,7 @@ Defaults come from pyoccult_config.py (site, window ct/days, reach, altitude lim
 Needs the kernels and the local Gaia catalog with its bright-star index: pyoccult setup
 """
 from pyoccult.version import __version__
+from pyoccult import net                      # https with certifi's certificate authorities
 from pyoccult import urls as U
 import argparse, datetime as dt, json, math, os, sys, tempfile, time, urllib.parse, urllib.request
 from concurrent.futures import ProcessPoolExecutor
@@ -47,7 +48,7 @@ def fetch_sbdb(hmax, cache, max_age_s=None):
     if hmax is not None:
         q["sb-cdata"] = json.dumps({"AND": [f"H|LT|{hmax}"]})
     print(f"Downloading SBDB ({'all numbered' if hmax is None else f'H < {hmax}'}, full precision) ...", file=sys.stderr)
-    with urllib.request.urlopen(SBDB_URL + "?" + urllib.parse.urlencode(q), timeout=1200) as r:
+    with net.urlopen(SBDB_URL + "?" + urllib.parse.urlencode(q), timeout=1200) as r:
         blob = json.load(r)
     blob["hmax"], blob["fetched"], blob["full_prec"] = want, time.time(), True
     if cache:

@@ -9,6 +9,7 @@ agent, and run only when the user clicks the button. Results are kept in <data f
 the report and favorites tables, linked to the OWC event page). Standard library only.
 """
 from pyoccult.version import __version__, __url__
+from pyoccult import net                      # https with certifi's certificate authorities
 from pyoccult import urls as U
 import json, os, tempfile, time, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timezone
@@ -28,7 +29,7 @@ def _get(url, timeout=20):
         time.sleep(wait)
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with net.urlopen(req, timeout=timeout) as r:
             return json.load(r)
     except urllib.error.HTTPError as ex:                         # name the request: which one failed, and how
         raise OSError(f"HTTP {ex.code} {ex.reason} for {url}") from None

@@ -120,6 +120,11 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- Web lookups with Python's standard library (OWC check, place/elevation/IP lookups and the MPC list, the full SBDB
+  record for favorites, the pick's SBDB download) failed on Python installations without certificate authorities
+  (often macOS: "CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate"), while the browser worked. They
+  now use certifi's list (installed with requests) via `pyoccult/net.py`. OWC check failures name the request and
+  the error in the GUI log.
 - Results and Favorites tables were wider than the page (the right side looked cut off; its scroll bar was only at
   the table's end): tool buttons and column headings may wrap, the asteroid name and offset too, tighter cell
   padding, the calculation-time column dropped (it stays in `hits_log.csv`), and on windows narrower than about

@@ -6,13 +6,14 @@ All results are approximate: IP positions are city level (10-100 km off, wrong b
 centre. Use an exact position (GPS, map) for observing.
 """
 from pyoccult.version import __version__
+from pyoccult import net                      # https with certifi's certificate authorities
 from pyoccult import urls as U
 import json, urllib.parse, urllib.request
 
 
 def get_json(url, timeout=10):
     req = urllib.request.Request(url, headers={"User-Agent": "PyOccult"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with net.urlopen(req, timeout=timeout) as r:
         return json.load(r)
 
 
@@ -56,7 +57,7 @@ def mpc_observatories(folder="data", url=MPC_OBSCODES_URL):
     if not os.path.isfile(path):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "PyOccult"})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with net.urlopen(req, timeout=30) as r:
                 data = r.read()
             os.makedirs(folder, exist_ok=True)
             fd, tmp = tempfile.mkstemp(dir=folder, suffix=".tmp")

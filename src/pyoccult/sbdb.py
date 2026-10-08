@@ -11,6 +11,7 @@ size rules always apply. Entries older than sbdb_max_age_days (config, default 3
 Standard library only (the pick tool must not need SPICE/astropy).
 """
 from pyoccult.version import __version__
+from pyoccult import net                      # https with certifi's certificate authorities
 import json, os, tempfile, time
 
 FILE = "PyOccult_sbdb_phys.json"
@@ -85,7 +86,7 @@ def get_full(number, cache_path=None, timeout=15):
         return e
     try:
         url = U.URL_JPL_SBDB_API + "?" + urllib.parse.urlencode({"sstr": n, "phys-par": 1})
-        with urllib.request.urlopen(url, timeout=timeout) as r:
+        with net.urlopen(url, timeout=timeout) as r:
             js = json.load(r)
     except (OSError, ValueError):
         return e

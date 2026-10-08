@@ -150,6 +150,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   lines and `null` for missing values.
 - Gaia archive (windows mode only): never use synchronous `Gaia.launch_job`; it silently truncates at 2000 rows. Use
   `launch_job_async`. `Gaia.ROW_LIMIT = -1` does not lift the sync cap.
+- Standard-library web requests go through `pyoccult.net.urlopen` (SSL context with certifi's CA list): some Pythons
+  (macOS) have no CAs for urllib -> CERTIFICATE_VERIFY_FAILED, while requests (own certifi) works. Never call
+  `urllib.request.urlopen` directly; test stand-ins must accept `context=`.
 - Every download/web address lives in `pyoccult/urls.py` (`URL_*` names; no side effects, so setup/geo/kernels/report
   can import it before a sites.py exists). Never hard-code an http(s) address elsewhere; exceptions: XML namespaces
   (SVG, KML) and `pyoccult.version.__url__`. Tests that exec code excerpts must put `U` (pyoccult.urls) in their ns.
