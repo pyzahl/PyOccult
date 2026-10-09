@@ -52,7 +52,7 @@ def limiting_star_mag(H, G, ast_from_sun_au, ast_from_earth_au, mag_limit, min_d
     FAINTEST asteroid magnitude over the run (the largest allowed star magnitude) plus `safety` (H-G is good to
     ~0.3 mag). Returns (cap, m_ast_faintest). With no H the cap is just mag_limit.
     """
-    if H is None or not np.isfinite(H):
+    if H is None or not np.isfinite(H) or not min_drop or min_drop <= 0:    # no H, or no drop limit: no cap
         return float(mag_limit), float("nan")
     G = 0.15 if G is None or not np.isfinite(G) else G
     s = np.asarray(ast_from_sun_au, float)

@@ -68,6 +68,8 @@ def run(ref, settings):
     config.targets = [str(t) for t in ref.target_id]
     config.targets_source = "list"
     config.hits_output_cvs_file = OUT
+    config.results_db = "owc_check.db"                  # its own results database: never mixed with your results
+    config.results_new_series = True
     if os.path.isfile(OUT):
         os.remove(OUT)
     runpy.run_module("pyoccult.search", run_name="__main__", alter_sys=True)

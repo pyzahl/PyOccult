@@ -25,6 +25,7 @@ search_mode = "corridor"   # "corridor": stars along each path from the local Ga
 star_parallax = True       # astrometric corrections of the star direction (ABOUT.md Part 6): the star seen from the
 light_deflection = True    # Earth (Gaia parallax), and the light bending by Sun, Jupiter, Saturn (star minus asteroid)
 companion_radius_arcsec = 4.0   # close and double stars: neighbours within this blend into the star image (drop is smaller)
+planet_star_limit = 10.0   # planets as targets (P:Jupiter, bodies.py): faintest star searched (the planet's glare)
 owc_lookup = False         # experimental: "Check OWC" buttons (GUI Results, Favorites) look the events up in OccultWatcher
                            # Cloud (feeds, signed-up stations); set True here to try it (no GUI switch)
 gaia_online_check = True   # after a search: check the event stars in the Gaia archive (doubles, neighbours the local
@@ -90,7 +91,9 @@ pick_hmax = 17.0         # asteroids with H below this (pyoccult pick --all: eve
 
 ### CONFIG OUTPUT
 
-hits_output_cvs_file = 'hits_log.csv'
+hits_output_cvs_file = 'hits_log.csv'        # export of the current results (the database below holds them)
+results_db = "pyoccult.db"     # results database in the data folder: runs, events, favorites (db.py)
+results_new_series = False     # True: this run starts a fresh results list (the GUI's "Start a fresh results list")
 
 write_maps = True
 map_dir = "maps"

@@ -1,6 +1,6 @@
 from pyoccult.version import __version__
 from pyoccult import urls as U
-import sys, base64, functools, os, re, time
+import sys, base64, functools, math, os, re, time
 T_START = time.time()                    # run statistics: start-up time is measured from here
 from datetime import datetime
 import numpy as np
@@ -28,6 +28,8 @@ from pyoccult import config
 from pyoccult.paths import shadow_path, path_sigma3_km, write_shadow_kml, site_probability
 from pyoccult import corridor
 from pyoccult import doubles          # close and double stars at an event
+from pyoccult import db               # results database
+from pyoccult import bodies           # planets and moons as targets (P:Jupiter, M:Io, ...)
 from pyoccult import binaries         # known asteroid satellites
 from pyoccult import astrometry
 from pyoccult import sbdb as sbdb_cache
@@ -264,7 +266,9 @@ def list_spk_contents(kernel_path):
 #+20000000
 def get_asteroid_name(spk_id):
     """Full name ("218001 (2001 XQ72)") from the SBDB size cache (fetched and cached if missing); the number if SBDB
-    cannot be reached. Accepts the asteroid number or its SPK id (20000000 + number)."""
+    cannot be reached. Accepts the asteroid number or its SPK id (20000000 + number); a major body: its name."""
+    if bodies.is_body(spk_id):
+        return bodies.name(spk_id)
     n = int(spk_id)
     n = n - 20000000 if n >= 20000000 else n
     phys = sbdb_phys(n)
@@ -467,6 +471,30 @@ def besselian_offsets(et, star_vector, observer_geo, asteroid_target):
 def get_besselian_miss_distance(*args):
     return np.hypot(*besselian_offsets(*args))
 
+def contact_times(et_ca, miss_km, r_km, speed_kms, star_dir, obs_geo, target):
+    """(et_D, et_R): disappearance and reappearance at the site, where the distance from the shadow axis equals r_km,
+    on both sides of the closest approach et_ca; None if the site is outside the shadow. For major bodies, whose
+    events last minutes to hours (asteroids: the closest approach is enough)."""
+    from scipy.optimize import brentq
+    if not (miss_km < r_km) or not speed_kms or speed_kms <= 0:
+        return None
+    f = lambda et: get_besselian_miss_distance(et, star_dir, obs_geo, target) - r_km
+    half = math.sqrt(r_km ** 2 - miss_km ** 2) / speed_kms
+    out = []
+    for sign in (-1, 1):
+        step = max(2.0 * half, 60.0)
+        far = et_ca + sign * step
+        for _ in range(8):                                        # widen until outside the shadow
+            if f(far) > 0:
+                break
+            far += sign * step
+        else:
+            return None
+        a, b = (far, et_ca) if sign < 0 else (et_ca, far)
+        out.append(brentq(f, a, b, xtol=1e-3))
+    return tuple(out)
+
+
 def event_metrics(et, star_dir, obs_geo, target, r_km, m_star, m_ast, dt=1.0):
     dx0, dy0 = besselian_offsets(et - dt, star_dir, obs_geo, target)
     dx1, dy1 = besselian_offsets(et + dt, star_dir, obs_geo, target)
@@ -652,16 +680,48 @@ def target_test(loc, event_time_utc, time_span, target_id, size, mag_lim=20.0, m
 
 RUN = dict(candidates=0, gated=0, solves=0, hits=0, maps_s=0.0, calc_s=0.0)      # run statistics (see run_summary)
 RUN_RECORDS = []         # this run's hits (for the online double-star check after the search)
+DB, RUN_ID = None, None  # results database (db.py) and this run's id, set by the driver
 LOCAL = None             # the local Gaia catalog (set by the driver), for the event previews
 
 
 def write_preview(record, target_id, stem):
     """Event preview SVG (preview.py): stars of the local catalog around the target star at the event date,
-    camera frame, asteroid track +/- 1 h. Written to <map_dir>/<stem>.svg next to the KML."""
+    camera frame, asteroid track +/- 1 h; a planet or moon as a disk with its system's bodies, zoomed to them.
+    Written to <map_dir>/<stem>.svg next to the KML."""
     from pyoccult import preview
     fov = preview.camera_fov_arcmin(config.camera_focal_mm, config.camera_sensor_mm)
     field = max(config.preview_field_factor * max(fov), 10.0)
     et = record["best_et"]
+    disks, sub, name, zoom = None, None, None, None
+    if bodies.is_body(target_id):                        # the planet or moon as a disk, with its system's bodies
+        b, disks, name = bodies.parse(target_id), [], bodies.name(target_id)
+        for t in [t for t in bodies.GROUPS.get(b["group"], [target_id]) if t in bodies.LOADED]:
+            try:                                         # bodies of this run (their kernels are loaded)
+                v = np.asarray(spice.spkpos(bodies.parse(t)["alias"], et, 'J2000', 'CN', '399')[0])
+                r_km = float(np.asarray(spice.bodvrd(str(bodies.parse(t)["naif"]), "RADII", 3)[1]).max())
+            except Exception:
+                continue
+            _, a_, d_ = spice.recrad(v)
+            disks.append(dict(ra=np.degrees(a_), dec=np.degrees(d_), r_arcsec=np.degrees(r_km / np.linalg.norm(v)) * 3600,
+                              label=bodies.name(t), main=(bodies.parse(t)["naif"] == b["naif"])))
+        # zoom: the system's bodies near the target (within 15'), at least 8 disk diameters, 2' minimum
+        u0 = np.array([math.cos(math.radians(record["star_dec"])) * math.cos(math.radians(record["star_ra"])),
+                       math.cos(math.radians(record["star_dec"])) * math.sin(math.radians(record["star_ra"])),
+                       math.sin(math.radians(record["star_dec"]))])
+        seps = []
+        for dk in disks:
+            u = np.array([math.cos(math.radians(dk["dec"])) * math.cos(math.radians(dk["ra"])),
+                          math.cos(math.radians(dk["dec"])) * math.sin(math.radians(dk["ra"])), math.sin(math.radians(dk["dec"]))])
+            sep = math.degrees(math.acos(float(np.clip(u @ u0, -1, 1)))) * 60 + dk["r_arcsec"] / 60
+            if sep <= 15.0:
+                seps.append(sep)
+        main_r = max([dk["r_arcsec"] for dk in disks if dk["main"]] or [1.0]) / 60
+        zoom = float(max(2.4 * max(seps or [0.0]), 16 * main_r, 2.0))
+        field = zoom
+        dur = record.get("duration_s") or 0.0
+        sub = (f"Gaia DR3 {record['star']} \u00b7 G {record['mag']:.2f} \u00b7 "
+               + (f"D {record['d_utc'][11:21]} \u00b7 R {record['r_utc'][11:21]} UT \u00b7 {dur / 60:.1f} min"
+                  if record.get("d_utc") else f"passes {record['min_distance'] - record['r_km']:.0f} km outside the limb"))
     stars = LOCAL.cone(record["star_ra"], record["star_dec"], field / 60 * 0.75, config.preview_mag_limit)
     ra, de = corridor.propagate_linear(stars, 2000.0 + et / (365.25 * 86400) - corridor.GAIA_EPOCH_YEAR)
     def radec(t):
@@ -670,15 +730,16 @@ def write_preview(record, target_id, stem):
     # track span: about a quarter of the field, between 30 min and 12 h each side
     (a0, d0), (a1, d1) = radec(et - 600.0), radec(et + 600.0)
     rate = np.hypot((a1 - a0) * np.cos(np.radians(d0)), d1 - d0) * 60 / 20.0            # arcmin per minute
-    span = int(np.clip(field / 4 / max(rate, 1e-9), 30, 720))
+    span = int(np.clip(field / 4 / max(rate, 1e-9), 30 if zoom is None else 2, 720))
     track = [(m, *radec(et + 60.0 * m)) for m in np.linspace(-span, span, 13)]
     svg = preview.render_svg(dict(ra=ra, dec=de, g=stars.phot_g_mean_mag.to_numpy()),
                              dict(ra=record["star_ra"], dec=record["star_dec"], g=record["mag"]), track, fov,
                              config.preview_field_factor,
                              title=f"{record['target_name']}  {record['best_utc'][:19].replace('T', ' ')} UT",
-                             subtitle=f"Gaia DR3 {record['star']} \u00b7 G {record['mag']:.2f} \u00b7 drop "
+                             subtitle=sub or (f"Gaia DR3 {record['star']} \u00b7 G {record['mag']:.2f} \u00b7 drop "
                                       f"{record['mag_drop']:.2f} mag \u00b7 max {record['max_duration_s']:.2f} s \u00b7 "
-                                      f"miss {record['min_distance']:.1f} km")
+                                      f"miss {record['min_distance']:.1f} km"), disks=disks, body_name=name,
+                             field_arcmin=zoom)
     os.makedirs(config.map_dir, exist_ok=True)
     with open(f"{config.map_dir}/{stem}.svg", "w", encoding="utf-8") as f:
         f.write(svg)
@@ -728,7 +789,8 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
         u0 = np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
         u1, corr = astrometry.corrected_star_dir(spice, u0, float(getattr(row, "parallax", np.nan)), et_guess, target_id,
                                                  parallax=getattr(config, "star_parallax", True),
-                                                 deflection=getattr(config, "light_deflection", True))
+                                                 deflection=getattr(config, "light_deflection", True),
+                                                 bodies=bodies.deflectors(target_id))
         ra, dec = np.arctan2(u1[1], u1[0]) % (2*np.pi), np.arcsin(np.clip(u1[2], -1.0, 1.0))
     res = star_test(loc, spice.et2utc(et_guess, "ISOC", 3), bracket_s, ra, dec, target_id, r_search, config.max_shadow_dist)
     if res is None:
@@ -785,19 +847,31 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
                                    row.source_id, record["star_ra"], record["star_dec"], row.phot_g_mean_mag, years, rad)
     record.update(doubles.fields(comps, row.phot_g_mean_mag, m_ast, "local" if LOCAL is not None else "none"))
     # chance that the shadow covers the site, from the path uncertainty (Horizons 3-sigma RSS, else the default)
-    sigma3_h = path_sigma3_km(target_id, res['best_utc'])
+    if bodies.is_body(target_id):                        # planet or moon: no Horizons RSS; rough per-body value
+        sigma3_h, src = bodies.sigma3_km(target_id), "ephemeris estimate"
+    else:
+        sigma3_h, src = path_sigma3_km(target_id, res['best_utc']), "Horizons"
     sigma3 = sigma3_h or config.default_sigma3_km
-    record.update(path_sigma1_km=sigma3 / 3.0, sigma_source="Horizons" if sigma3_h else "default",
+    record.update(path_sigma1_km=sigma3 / 3.0, sigma_source=src if sigma3_h else "default",
                   p_site=site_probability(res['min_distance'], size['r_km'], sigma3 / 3.0))
+    contacts = []
+    record["kind"] = bodies.kind(target_id)
+    if bodies.is_body(target_id):                        # disappearance and reappearance at the site
+        ct = contact_times(res['best_et'], res['min_distance'], size['r_km'], met['speed_kms'], star_dir, obs_geo,
+                           target_id)
+        record.update(d_utc=spice.et2utc(ct[0], "ISOC", 2) if ct else "", r_utc=spice.et2utc(ct[1], "ISOC", 2) if ct else "",
+                      duration_s=(ct[1] - ct[0]) if ct else 0.0)
+        if ct:
+            contacts = [("D", record["d_utc"], ct[0], None), ("R", record["r_utc"], ct[1], None)]
     RUN_RECORDS.append(record)
     print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT")
-    pd.DataFrame([record]).to_csv(config.hits_output_cvs_file, mode='a', index=False,
-                                  header=not os.path.isfile(config.hits_output_cvs_file))
+    db.add_event(DB, RUN_ID, record, kind=record["kind"], contacts=contacts)   # hits_log.csv: exported after the run
     RUN["hits"] += 1
     RUN["calc_s"] += record["calc_s"]
 
     t_map = time.time()
-    stem = f"{target_id}_{res['best_utc'][:16].replace(':','').replace('-','')}"     # file name of KML and preview
+    from pyoccult.report import file_id                  # P:Jupiter -> P-Jupiter (no ':' in file names)
+    stem = f"{file_id(target_id)}_{res['best_utc'][:16].replace(':','').replace('-','')}"     # KML and preview
     if config.write_maps and res['min_distance'] < r_search + config.max_shadow_dist:   # shadow + reach, as logged
         os.makedirs(config.map_dir, exist_ok=True)
         paths = shadow_path(target_id, star_dir, res['best_et'], size['r_km'], sigma3,
@@ -848,9 +922,10 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
     print(f"  per asteroid {s['per_asteroid_s']:.2f} s (search {s['search_per_asteroid_s']:.2f} s); search time per "
           f"exact solve {s['per_solve_s'] * 1000:.0f} ms (with star lookup and scan); calculation per hit "
           f"{s['calc_per_hit_s'] * 1000:.0f} ms")
-    stem = os.path.splitext(config.hits_output_cvs_file)[0]
-    with open(stem + ".runs.jsonl", "a") as f:
-        f.write(json.dumps(s) + "\n")
+    db.finish_run(DB, RUN_ID, s)                         # results database; then the exports of the current series
+    n = db.export(DB, config.hits_output_cvs_file, lst=getattr(config, "results_list", "main"))
+    print(f"  results: {getattr(config, 'results_db', db.DEFAULT)}, current series {n} event(s) -> "
+          f"{config.hits_output_cvs_file}")
     return s
 
 
@@ -865,7 +940,7 @@ def online_double_check(records):
     if archive is None:
         return
     upd = doubles.online_fields(records, rad, archive)
-    n = doubles.update_hits_csv(config.hits_output_cvs_file, records, upd)
+    n = db.update_events(DB, records, upd, lst=getattr(config, "results_list", "main"))
     flagged = sum(1 for u in upd if u["double_hint"])
     print(f"* Gaia online check: {n} event(s) updated, {flagged} with a close or double star note")
 
@@ -921,6 +996,12 @@ def resolve_targets():
 
 if __name__ == "__main__":
     t_main = time.time()
+    DB = db.connect(getattr(config, "results_db", db.DEFAULT))       # results database (db.py)
+    if db.import_log(DB, config.hits_output_cvs_file):               # an older hit log, once
+        print(f"* imported {config.hits_output_cvs_file} into {getattr(config, 'results_db', db.DEFAULT)}")
+    RUN_ID, _ = db.start_run(DB, getattr(config, "search_mode", "corridor"),
+                             new_series=bool(getattr(config, "results_new_series", False)),
+                             lst=getattr(config, "results_list", "main"))
     mag_min = config.MAG_MIN
     TARGETS_FROM = resolve_targets()
     obs_loc = EarthLocation(lat=config.LAT*u.deg, lon=config.LON*u.deg, height=config.ELE*u.m)
@@ -935,6 +1016,9 @@ if __name__ == "__main__":
     if getattr(config, "search_mode", "corridor") == "windows":    # old path: ~200 Gaia cones per asteroid
         t_w = time.time()
         for t in config.targets:
+            if bodies.is_body(t):
+                print(f"{t}: planets and moons need the corridor search mode, skipping")
+                continue
             size = get_asteroid_size(t)
             if size is None:
                 print(f"No size data for {t}, skipping")
@@ -967,13 +1051,25 @@ if __name__ == "__main__":
     t_p1 = time.time()
     plans = {}
     for t in config.targets:
-        size = get_asteroid_size(t)
-        if size is None:
-            print(f"No size data for {t}, skipping")
-            continue
-        print(f"Estimated/known target {t} size: {size['r_max_km']:.1f} km (H={size.get('H')}, G={size.get('G')})")
-        fetch_target_orbit(t, epochs)                              # once per target
-        plans[t] = (size, corridor.plan_corridor(t, et0, et1, size, mag_min, config.max_shadow_dist,
+        mag_lim = mag_min
+        if bodies.is_body(t):                                      # planet or moon: kernel from Horizons, radii
+            try:
+                bodies.ensure_kernel(spice, t, et0, et1, config.cache_path)
+            except Exception as ex:
+                print(f"{t}: no ephemeris ({str(ex)[:160]}), skipping")
+                continue
+            size = bodies.size(spice, t)
+            if size["kind"] == "planet":                           # no drop filter; bright stars only (glare)
+                mag_lim = min(mag_min, float(getattr(config, "planet_star_limit", 10.0)))
+            print(f"Major body {t}: radius {size['r_km']:.0f} km, stars G <= {mag_lim:g}")
+        else:
+            size = get_asteroid_size(t)
+            if size is None:
+                print(f"No size data for {t}, skipping")
+                continue
+            print(f"Estimated/known target {t} size: {size['r_max_km']:.1f} km (H={size.get('H')}, G={size.get('G')})")
+            fetch_target_orbit(t, epochs)                          # once per target
+        plans[t] = (size, corridor.plan_corridor(t, et0, et1, size, mag_lim, config.max_shadow_dist,
                                                  min_drop=getattr(config, "min_mag_drop", 0.1),
                                                  step_s=getattr(config, "corridor_step_s", 600.0)))
 

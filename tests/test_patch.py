@@ -22,6 +22,10 @@ from pyoccult import doubles as pyoccult_doubles
 ns.update(doubles=pyoccult_doubles, RUN_RECORDS=[], LOCAL=None)       # close/double star check (no local catalog here)
 from pyoccult.paths import site_probability
 ns.update(site_probability=site_probability)                         # chance at the site (pure function)
+from pyoccult import db as pyoccult_db                                  # results database in a temporary folder
+_con = pyoccult_db.connect(os.path.join(os.path.dirname(out_csv), "test.db"))
+from pyoccult import bodies as pyoccult_bodies
+ns.update(db=pyoccult_db, bodies=pyoccult_bodies)             # asteroid targets here: bodies.* answers 'not a body'
 ns['spice'] = types.SimpleNamespace(et2utc=lambda et, f, p: "ET:%r" % float(et))
 def star_test(loc, utc, span, ra, dec, tid, r, reach):
     calls['star_test'] += 1
@@ -36,6 +40,7 @@ ns.update(star_test=star_test,
           besselian_offsets=lambda et, sd, geo, t: (1.0, 2.0), get_asteroid_name=lambda t: "Test",
           path_sigma3_km=lambda t, utc: None)
 exec(funcs, ns)
+ns.update(DB=_con, RUN_ID=pyoccult_db.start_run(_con, "corridor")[0])   # after the excerpt (it resets them)
 # propagation stand-in (astropy is not installed in this sandbox): same output columns as propagate_exact
 def fake_prop(df, utc):
     out = df.copy(); out["ra_20261003"], out["dec_20261003"] = out["ra"], out["dec"]; calls['propagate'] += 1; return out
@@ -48,6 +53,7 @@ class _ET(list): pass
 ns['_et'] = [float(sub.et_guess.iloc[0])]
 size = dict(r_km=10.0, r_min_km=5.0, r_max_km=15.0, source="test", H=12.0, G=0.15)
 n = ns['target_test_corridor'](Loc, plan, 'X', size, stars_cands=(stars, sub))
+pyoccult_db.export(_con, out_csv)                                      # as the run summary does after a run
 log = pd.read_csv(out_csv)
 print("candidates", len(sub), "gate calls", calls['gate'], "solver calls", calls['star_test'], "propagations", calls['propagate'], "logged", n, "csv rows", len(log))
 assert calls['gate'] == len(sub) and calls['propagate'] == calls['gate'] - (sub.et_guess.astype(int) % 5 == 0).sum()

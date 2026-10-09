@@ -1,0 +1,231 @@
+"""db.py - PyOccult's results database: one SQLite file in the data folder (config `results_db`, default
+pyoccult.db). Standard library only (sqlite3).
+
+Tables
+  runs       one row per search run: series, start time, mode, summary (the run summary as JSON, see search.py)
+  events     one row per logged event: run, series, kind ('asteroid'; later 'planet', 'moon', 'eclipse', ...), target,
+             event time, star, and the full record as JSON (the same fields as a hit-log row)
+  contacts   contact times of an event (D/R for the Moon and planets, C1-C4 for eclipses; not used by asteroids yet)
+  favorites  the favorites list (one row per favorite, the entry as JSON; map/preview copies stay files)
+  meta       schema version, current series
+
+Results *lists* keep different searches apart (config `results_list`): "main" (the asteroid search, exported as
+hits_log.csv) and "bodies" (planets and moons, the Planets & Moons tab, exported as bodies_log.csv). Each list has
+its own current series; series numbers are unique across lists.
+A *series* is what the old hits_log.csv was: the events since the last fresh start ("Start a fresh results list" in
+the GUI, config `results_new_series`). Older series stay in the database. After each run the current series is
+written out as hits_log.csv and hits_log.runs.jsonl (exports with consistent columns, for the report, the CSV
+download and other tools). An existing hits_log.csv / runs.jsonl / favorites.json is imported once.
+"""
+from pyoccult.version import __version__
+import csv, json, math, os, sqlite3, tempfile, time
+
+SCHEMA = 1
+DEFAULT = "pyoccult.db"
+
+
+def _json(obj):
+    return json.dumps(obj, default=lambda o: o.item() if hasattr(o, "item") else str(o))
+
+
+def connect(path=DEFAULT):
+    """Open (and create) the database. Several processes may use it (GUI and a run): WAL mode, 30 s busy wait."""
+    con = sqlite3.connect(path, timeout=30)
+    con.row_factory = sqlite3.Row
+    con.execute("PRAGMA journal_mode=WAL")
+    con.executescript("""
+        CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, series INTEGER, started TEXT, mode TEXT, summary TEXT);
+        CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, run_id INTEGER, series INTEGER, kind TEXT,
+            target_id TEXT, best_utc TEXT, best_et REAL, star TEXT, record TEXT);
+        CREATE INDEX IF NOT EXISTS events_series ON events (series);
+        CREATE INDEX IF NOT EXISTS events_key ON events (target_id, best_utc);
+        CREATE TABLE IF NOT EXISTS contacts (event_id INTEGER, label TEXT, utc TEXT, et REAL, data TEXT);
+        CREATE TABLE IF NOT EXISTS favorites (key TEXT PRIMARY KEY, pos INTEGER, entry TEXT);
+    """)
+    con.execute("INSERT OR IGNORE INTO meta VALUES ('schema', ?)", (str(SCHEMA),))
+    con.execute("INSERT OR IGNORE INTO meta VALUES ('series', '1')")
+    if "list" not in [r[1] for r in con.execute("PRAGMA table_info(runs)")]:     # schema 1 without lists
+        con.execute("ALTER TABLE runs ADD COLUMN list TEXT DEFAULT 'main'")
+    con.commit()
+    return con
+
+
+def _key(lst):
+    return "series" if lst in (None, "", "main") else f"series:{lst}"
+
+
+def _next_series(con):
+    used = con.execute("SELECT MAX(CAST(value AS INTEGER)) FROM meta WHERE key LIKE 'series%'").fetchone()[0]
+    return max(int(used or 0), int(con.execute("SELECT COALESCE(MAX(series), 0) FROM runs").fetchone()[0])) + 1
+
+
+def current_series(con, lst="main"):
+    """The current series of a results list (a new list gets its own series number)."""
+    r = con.execute("SELECT value FROM meta WHERE key=?", (_key(lst),)).fetchone()
+    if r is None:
+        con.execute("INSERT INTO meta VALUES (?, ?)", (_key(lst), str(_next_series(con))))
+        con.commit()
+        return current_series(con, lst)
+    return int(r[0])
+
+
+def start_run(con, mode, new_series=False, lst="main"):
+    """A new run of a results list (in a new series if new_series). Returns (run_id, series)."""
+    series = current_series(con, lst)
+    if new_series and con.execute("SELECT 1 FROM runs WHERE series=?", (series,)).fetchone():
+        series = _next_series(con)                                # (an unused current series is simply reused)
+        con.execute("UPDATE meta SET value=? WHERE key=?", (str(series), _key(lst)))
+    cur = con.execute("INSERT INTO runs (series, started, mode, summary, list) VALUES (?, ?, ?, NULL, ?)",
+                      (series, time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()), mode, lst or "main"))
+    con.commit()
+    return cur.lastrowid, series
+
+
+def finish_run(con, run_id, summary):
+    con.execute("UPDATE runs SET summary=? WHERE id=?", (_json(summary), run_id))
+    con.commit()
+
+
+def add_event(con, run_id, record, kind="asteroid", contacts=()):
+    """Log one event (record: the hit-log fields). contacts: [(label, utc, et, data dict)]. Returns its id."""
+    series = con.execute("SELECT series FROM runs WHERE id=?", (run_id,)).fetchone()[0]
+    cur = con.execute("INSERT INTO events (run_id, series, kind, target_id, best_utc, best_et, star, record) "
+                      "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                      (run_id, series, kind, str(record.get("target_id", "")), str(record.get("best_utc", "")),
+                       float(record.get("best_et") or 0.0), str(record.get("star", "")), _json(record)))
+    for label, utc, et, data in contacts:
+        con.execute("INSERT INTO contacts VALUES (?, ?, ?, ?, ?)", (cur.lastrowid, label, utc, et, _json(data or {})))
+    con.commit()
+    return cur.lastrowid
+
+
+def update_events(con, records, updates, lst="main"):
+    """Merge updates (one dict per record) into this series' events of these records (same target and time).
+    Returns the number of events updated."""
+    series, n = current_series(con, lst), 0
+    for r, u in zip(records, updates):
+        for row in con.execute("SELECT id, record FROM events WHERE series=? AND target_id=? AND best_utc=?",
+                               (series, str(r["target_id"]), str(r["best_utc"]))).fetchall():
+            rec = json.loads(row["record"])
+            rec.update(u)
+            con.execute("UPDATE events SET record=? WHERE id=?", (_json(rec), row["id"]))
+            n += 1
+    con.commit()
+    return n
+
+
+def events(con, series=None, kind=None, lst="main"):
+    """The records (dicts, logging order) of a series (default: the list's current one), optionally of one kind."""
+    series = current_series(con, lst) if series is None else series
+    q, args = "SELECT record FROM events WHERE series=?", [series]
+    if kind:
+        q, args = q + " AND kind=?", args + [kind]
+    return [json.loads(r["record"]) for r in con.execute(q + " ORDER BY id", args)]
+
+
+def runs(con, series=None, lst="main"):
+    """The run summaries (dicts) of a series, oldest first (runs without a summary are left out)."""
+    series = current_series(con, lst) if series is None else series
+    return [json.loads(r["summary"]) for r in con.execute(
+        "SELECT summary FROM runs WHERE series=? AND summary IS NOT NULL ORDER BY id", (series,))]
+
+
+def last_run(con):
+    r = con.execute("SELECT summary FROM runs WHERE summary IS NOT NULL ORDER BY id DESC LIMIT 1").fetchone()
+    return json.loads(r["summary"]) if r else None
+
+
+def find_event(con, target_id, best_utc_prefix):
+    """The newest record of an asteroid whose event time starts with best_utc_prefix (e.g. to the minute), or None."""
+    r = con.execute("SELECT record FROM events WHERE target_id=? AND best_utc LIKE ? ORDER BY id DESC LIMIT 1",
+                    (str(target_id).strip(), str(best_utc_prefix).strip() + "%")).fetchone()
+    return json.loads(r["record"]) if r else None
+
+
+def find_event_run(con, target_id, best_utc_prefix):
+    """(record, run summary) of the newest event of a target (any list) whose time starts with best_utc_prefix, or
+    (None, None)."""
+    r = con.execute("SELECT e.record, r.summary FROM events e JOIN runs r ON r.id = e.run_id WHERE e.target_id=? "
+                    "AND e.best_utc LIKE ? ORDER BY e.id DESC LIMIT 1",
+                    (str(target_id).strip(), str(best_utc_prefix).strip() + "%")).fetchone()
+    if not r:
+        return None, None
+    return json.loads(r["record"]), (json.loads(r["summary"]) if r["summary"] else None)
+
+
+def _cell(v):
+    """A record value as the hit log writes it ('' for None/NaN)."""
+    if v is None or (isinstance(v, float) and not math.isfinite(v)):
+        return ""
+    return str(v)
+
+
+def _atomic(path, write):
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), suffix=".tmp")
+    with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+        write(f)
+    os.replace(tmp, path)
+
+
+def export(con, csv_path, series=None, lst="main"):
+    """Write a series (default: current) as csv_path (all events, columns in first-seen order) and its run summaries
+    as <stem>.runs.jsonl. No events: the CSV is removed (as an empty hit log was before), the summaries are written."""
+    series = current_series(con, lst) if series is None else series
+    recs = events(con, series)
+    cols = []
+    for r in recs:
+        cols += [k for k in r if k not in cols]
+    if recs:
+        _atomic(csv_path, lambda f: (csv.writer(f).writerow(cols),
+                                     csv.writer(f).writerows([[_cell(r.get(k)) for k in cols] for r in recs])))
+    elif os.path.isfile(csv_path):
+        os.remove(csv_path)
+    _atomic(os.path.splitext(csv_path)[0] + ".runs.jsonl",
+            lambda f: f.writelines(_json(s) + "\n" for s in runs(con, series)))
+    return len(recs)
+
+
+def import_log(con, csv_path):
+    """Import an existing hit log (and its runs.jsonl) as the current series, once (only into an empty database).
+    Returns the number of events imported."""
+    if con.execute("SELECT 1 FROM events LIMIT 1").fetchone() or not os.path.isfile(csv_path):
+        return 0
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    summaries = []
+    jl = os.path.splitext(csv_path)[0] + ".runs.jsonl"
+    if os.path.isfile(jl):
+        with open(jl, encoding="utf-8") as f:
+            summaries = [json.loads(ln) for ln in f if ln.strip()]
+    run_id, series = start_run(con, "imported")
+    for s in summaries[:-1]:                                      # earlier runs: summaries only
+        con.execute("INSERT INTO runs (series, started, mode, summary) VALUES (?, ?, ?, ?)",
+                    (series, s.get("run_utc", ""), "imported", _json(s)))
+    finish_run(con, run_id, summaries[-1] if summaries else {"note": f"imported from {os.path.basename(csv_path)}"})
+    for r in rows:
+        add_event(con, run_id, {k: v for k, v in r.items() if k is not None})
+    return len(rows)
+
+
+# ---------------------------------------------------------------- favorites
+def favorites_load(con):
+    return [json.loads(r["entry"]) for r in con.execute("SELECT entry FROM favorites ORDER BY pos")]
+
+
+def favorites_save(con, items):
+    con.execute("DELETE FROM favorites")
+    con.executemany("INSERT INTO favorites VALUES (?, ?, ?)", [(e["key"], i, _json(e)) for i, e in enumerate(items)])
+    con.commit()
+
+
+def favorites_import(con, json_path):
+    """Import favorites.json once (only into an empty favorites table); the file is kept as favorites.json.migrated.
+    Returns the number imported."""
+    if con.execute("SELECT 1 FROM favorites LIMIT 1").fetchone() or not os.path.isfile(json_path):
+        return 0
+    with open(json_path, encoding="utf-8") as f:
+        items = json.load(f)
+    favorites_save(con, items)
+    os.replace(json_path, json_path + ".migrated")
+    return len(items)

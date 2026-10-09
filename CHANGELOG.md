@@ -6,6 +6,15 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Changed
+- **Results database** (`pyoccult/db.py`): searches and favorites are stored in `pyoccult.db` in the data folder
+  (SQLite, part of Python): every run with its summary, every event, and the favorites. "Start a fresh hits_log.csv"
+  became **Start a fresh results list**: a new list (series) begins, the older ones stay in the database instead of
+  being deleted. `hits_log.csv` and `hits_log.runs.jsonl` are still written after each search, as exports of the
+  current list with consistent columns (the report, the CSV button and other tools read them). An existing
+  `hits_log.csv` and `favorites/favorites.json` are imported once (the latter kept as `favorites.json.migrated`).
+  Prepares event kinds with several contact times (planets, moons, eclipses).
+
 ## [0.13.0] "New Horizons" - 2026-10-07
 
 A standard Python package now (`pyproject.toml`, code in `src/pyoccult/`, one `pyoccult` command; install with
@@ -49,6 +58,29 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
   4.2 asteroid satellites; open items for close and double stars (Part 6).
 
 ### Added
+- All planet systems: Mars, Jupiter, Saturn, Uranus, Neptune and Pluto with their moons
+  (`src/pyoccult/data/satellites.json`: 458 moons from JPL Horizons, 91 with size and brightness to search; built
+  with `python -m pyoccult.bodies build`). The GUI tab lists per system the planet and its larger moons, plus one
+  box for the smaller moons, which behave like asteroids. Pluto follows the asteroid rules; the planets Mars to
+  Neptune the planet rule. Missing sizes or brightness are estimated like for asteroids (marked \*).
+- GUI tab **Planets & Moons** (after Pick): tick the bodies of a group (Jupiter system first), window, the planets'
+  star limit and the moons' minimum drop, Run; the results right in the tab as their own list (`bodies_log.csv`,
+  results list "bodies" in the database, apart from the asteroid search) with a report layout for major bodies:
+  D, closest approach and R at the site, duration, star, sky, shadow distance, chance, tools. The preview shows the
+  planet as a disk at its size with its moons, zoomed to the system. File and favorite names use `P-Jupiter`
+  (no ':' for Windows).
+- Optional offline ephemeris for planets and moons: `pyoccult setup --planet-kernels` (setup also asks on a
+  first-time setup) downloads NAIF's satellite kernel (Jupiter: `jup365.bsp`, 1.1 GB), used instead of Horizons
+  when it covers the search window.
+- **Planets and moons as targets** (`pyoccult/bodies.py`), first the Jupiter system: give `P:Jupiter`, `M:Io`,
+  `M:Europa`, `M:Ganymede`, `M:Callisto` in the target list (the prefix keeps them apart from asteroid numbers).
+  Their positions come from JPL Horizons as a small SPICE kernel per search window (cached; the same ephemeris as
+  NAIF's 1 GB satellite kernel, reproduced to ~1 m), radii from the planet constants. Events of a planet or moon
+  get **disappearance and reappearance times** at your site (`d_utc`, `r_utc`; also in the database as contacts),
+  a planet has no drop filter but its own star limit (`planet_star_limit`, glare), and the light deflection leaves
+  out the target's own planet. The report shows their name with a "planet"/"moon" badge. Verified: Jupiter's D and
+  R put the star exactly one Jupiter radius from its centre in independent geometry. A GUI tab and a results page
+  for them follow.
 - Experimental, off by default: **Check OWC** buttons in the GUI's Results and Favorites tabs (`owc_lookup = True` in
   `pyoccult_config.py`; no GUI switch). They look the events up in OccultWatcher Cloud through the interface of its
   public event pages (`pyoccult/owc.py`; one request per second, PyOccult named as the client, only on click) and
@@ -120,6 +152,7 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
   an MPC observatory is picked), shown in the report header and kept in the run summary.
 
 ### Fixed
+- A minimum drop of 0 (no drop limit) stopped the search with a math error in the star limit; it now means "no cap".
 - Web lookups with Python's standard library (OWC check, place/elevation/IP lookups and the MPC list, the full SBDB
   record for favorites, the pick's SBDB download) failed on Python installations without certificate authorities
   (often macOS: "CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate"), while the browser worked. They

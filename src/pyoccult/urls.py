@@ -12,6 +12,7 @@ address (version.__url__).
 URL_NAIF_LSK = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls"                 # leap seconds
 URL_NAIF_DE440 = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp"         # planets
 URL_NAIF_PCK = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc"                # body constants
+URL_NAIF_SATELLITES = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/"  # + jup365.bsp (optional)
 URL_NAIF_EARTH_PCK = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/earth_latest_high_prec.bpc"  # Earth orientation
 
 # --- Gaia DR3 bulk files at ESA (gaia_local.py build)

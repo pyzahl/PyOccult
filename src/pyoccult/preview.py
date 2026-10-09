@@ -34,14 +34,18 @@ def _esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", subtitle="", min_field_arcmin=10.0):
+def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", subtitle="", min_field_arcmin=10.0,
+               disks=None, body_name=None, field_arcmin=None):
     """SVG text of the preview.
     stars: dict of arrays ra, dec (deg, at the event date), g (Gaia G)
     target: dict ra, dec, g (the occulted star)
     track: list of (minutes from the event, ra, dec) of the asteroid; must include 0
-    fov_arcmin: (width, height) of the camera field."""
+    fov_arcmin: (width, height) of the camera field.
+    disks: planets and moons to draw at their angular size, [dict(ra, dec, r_arcsec, label, main)] (main: the
+    occulting body); body_name: the occulting body's name for the legend (a planet or moon) instead of "asteroid";
+    field_arcmin: the field size instead of the camera-based one (planets and moons: zoomed to their system)."""
     fw, fh = fov_arcmin
-    field = max(field_factor * max(fw, fh), min_field_arcmin)          # square finder field, arcmin
+    field = field_arcmin or max(field_factor * max(fw, fh), min_field_arcmin)   # square finder field, arcmin
     scale = SIZE / field                                               # px per arcmin
     cx = cy = SIZE / 2
     px = lambda xi: cx - xi * scale                                    # east left
@@ -99,8 +103,25 @@ def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", sub
         out.append(f'<path d="M{ax:.1f},{ay - 5:.1f} L{ax + 5:.1f},{ay:.1f} L{ax:.1f},{ay + 5:.1f} L{ax - 5:.1f},{ay:.1f} Z" '
                    f'fill="none" stroke="#f59e0b" stroke-width="1.5"><title>asteroid at the event</title></path>')
         out.append(f'<g font-size="11" fill="#f59e0b"><path d="M16,{SIZE - 52} h22" stroke="#f59e0b" stroke-width="1.5" '
-                   f'stroke-dasharray="3 3"/><text x="44" y="{SIZE - 48}">asteroid track {t[0]:+.0f} to {t[-1]:+.0f} min, '
+                   f'stroke-dasharray="3 3"/><text x="44" y="{SIZE - 48}">{_esc(body_name or "asteroid")} track '
+                   f'{t[0]:+.0f} to {t[-1]:+.0f} min, '
                    f'◇ at the event</text></g>')
+    # planets and moons at their angular size (the occulting body brighter), labelled
+    placed = []                                                         # label positions (no overlaps)
+    for dk in disks or []:
+        dxi, deta = _gnomonic([dk["ra"]], [dk["dec"]], target["ra"], target["dec"])
+        x, y, rr = px(dxi[0]), py(deta[0]), max(dk["r_arcsec"] / 60.0 * scale, 2.0)
+        if -rr <= x <= SIZE + rr and -rr <= y <= SIZE + rr:
+            fill = "#fde68a" if dk.get("main") else "#cbd5e1"
+            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{rr:.1f}" fill="{fill}" fill-opacity="0.35" stroke="{fill}" '
+                       f'stroke-width="1.2"><title>{_esc(dk["label"])}: radius {dk["r_arcsec"]:.1f}″</title></circle>')
+            left = x + rr + 4 + 7 * len(dk["label"]) > SIZE - 4             # near the right edge: label on the left
+            lx, ly = (x - rr - 4, y - rr - 2) if left else (x + rr + 4, y - rr - 2)
+            while any(abs(ly - py_) < 12 and abs(lx - px_) < 60 for px_, py_ in placed):
+                ly += 12
+            placed.append((lx, ly))
+            out.append(f'<text x="{lx:.1f}" y="{ly:.1f}" fill="{fill}" font-size="11"'
+                       + (' text-anchor="end"' if left else '') + f'>{_esc(dk["label"])}</text>')
     # target star
     r = 11
     out.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="#f43f5e" stroke-width="1.8"/>')

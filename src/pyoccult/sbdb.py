@@ -81,6 +81,8 @@ def get_full(number, cache_path=None, timeout=15):
     import urllib.parse, urllib.request
     from pyoccult import urls as U
     n = str(number).strip()
+    if not n.isdigit():                                           # a planet or moon (bodies.py): not in SBDB
+        return None
     e, fresh = get(n, cache_path)
     if e and fresh and e.get("source") == "sbdb.api":
         return e

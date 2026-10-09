@@ -141,31 +141,3 @@ def online_fields(records, radius_arcsec, archive):
                            radius_arcsec)
         out.append(fields(comps, float(r["mag"]), r.get("m_ast"), "gaia online", flags))
     return out
-
-
-def update_hits_csv(path, records, updates):
-    """Set the fields in updates (one dict per record) in the rows of path that hold these records (same target and
-    time); other rows and values stay as written. Atomic. Returns the number of rows updated."""
-    with open(path, newline="") as f:
-        rows = list(csv.reader(f))
-    if not rows:
-        return 0
-    head = rows[0]
-    for k in (k for u in updates for k in u):
-        if k not in head:
-            head.append(k)
-    col = {k: i for i, k in enumerate(head)}
-    key = {(str(r["target_id"]), str(r["best_utc"])): u for r, u in zip(records, updates)}
-    n = 0
-    for row in rows[1:]:
-        row += [""] * (len(head) - len(row))
-        u = key.get((row[col["target_id"]], row[col["best_utc"]]))
-        if u:
-            for k, v in u.items():
-                row[col[k]] = "" if v is None or (isinstance(v, float) and not np.isfinite(v)) else str(v)
-            n += 1
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)), suffix=".tmp")
-    with os.fdopen(fd, "w", newline="") as f:
-        csv.writer(f).writerows(rows)
-    os.replace(tmp, path)
-    return n

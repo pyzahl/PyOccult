@@ -30,6 +30,7 @@ Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spice
 - [Local Gaia catalog (required)](#local-gaia-catalog-required)
 - [Quick start: choose targets (pick tool)](#quick-start-choose-targets-pick-tool)
 - [Web interface (GUI)](#web-interface-gui)
+- [Planets and moons](#planets-and-moons)
 - [Quick start: hits_log.csv to HTML report](#quick-start-hits_logcsv-to-html-report)
 - [GUI Step by Step in Screenshots](#gui-step-by-step-in-screenshots)
 - [Contributing](#contributing)
@@ -455,7 +456,7 @@ To include the maps' KML links in the published page, also copy the `maps` folde
 |---|---|
 | your sites and settings | `sites.py`, `pyoccult_config.py` (created from `src/pyoccult/templates/pyoccult_config.py` on first use) |
 | downloaded data | SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`, ~120 MB), Gaia catalogs (`gaia_dr3_g16/` ~4 GB, `gaia_dr3_g18/` ~13 GB), `data/ObsCodes.html` (MPC observatory list) |
-| your results | `picks/` (saved picks), `hits_log.csv` (+ `.runs.jsonl`), `hits_report.html`, `maps/` (KML, previews, globe plots), `favorites/`, `targets.py`, `pick_events.csv` |
+| your results | `pyoccult.db` (the results database: every search run and its events, kept per "results list", and the favorites), `hits_log.csv` (+ `.runs.jsonl`: the current results list, exported from the database after each search), `hits_report.html`, `maps/` (KML, previews, globe plots), `favorites/` (map and preview copies of the favorites), `picks/` (saved picks), `targets.py`, `pick_events.csv` |
 
 **Which folder is the data folder** (first match wins; `pyoccult setup --status`, the GUI's About box and its
 start-up line show the one in use and why):
@@ -776,6 +777,37 @@ pyoccult --port 8090 --no-browser
 Settings chosen in the GUI apply to that run only (via `pyoccult/runner.py`); `pyoccult_config.py` is not changed.
 Each run is its own process. The GUI listens on this computer only (127.0.0.1), because it can start programs.
 
+
+## Planets and moons
+
+The GUI tab **Planets & Moons** (after Pick) searches occultations by the planets Mars to Neptune, the dwarf
+planet Pluto and their moons: per system the planet and its larger moons (radius 150 km or more) to tick, and one
+box for its smaller moons; choose the window and run. No pick is needed (only a few bodies). The results are their own
+list (`bodies_log.csv`, `bodies_report.html`), apart from the asteroid search, and the report lists for each event
+the **disappearance (D)**, the closest approach and the **reappearance (R)** at your site, the duration, the star,
+its altitude, the Moon, the shadow distance and the chance, with map, preview (the planet as a disk with its
+moons), globe and KML. On the command line, give the bodies in the target list with a prefix that keeps them apart
+from asteroid numbers: `P:Jupiter`, `M:Io`, `M:Titan`, `M:Himalia`, `P:Pluto`, `M:S2003_J2`, ... (`python -m
+pyoccult.bodies` lists them).
+
+* The satellite table (`src/pyoccult/data/satellites.json`, 458 moons) comes from JPL Horizons: radius from the
+  angular diameter, brightness (H, phase removed with an H-G law, G 0.5; within ~0.2 mag of published values for
+  the major moons, Phobos ~1 mag). Where Horizons gives only one of them, the other is estimated like for
+  asteroids (marked \* in the tables). 91 moons can be searched; the rest (mostly tiny, recently found moons of
+  magnitude 22-25) have neither. The small moons behave like asteroids (faint, narrow paths), but their orbits are
+  less certain (rough 3-sigma 50-200 km for the sigma lines and the chance).
+
+* Positions: from JPL Horizons with each search (a small kernel per window, cached), the same ephemeris as NAIF's
+  satellite kernels. For offline use, `pyoccult setup --planet-kernels` downloads NAIF's kernel once (Jupiter:
+  `jup365.bsp`, 1.1 GB; setup also asks on a first-time setup); PyOccult then uses it.
+* Brightness: a planet's light swamps any star, so planets have no drop limit, only their own star limit
+  (`planet_star_limit`, default G 10, for the glare); moons (Jupiter's are about mag 5) need bright stars for a
+  measurable drop (`min_mag_drop`).
+* Planets Mars to Neptune use the planet rule; Pluto (point-like, mag ~14.5) follows the asteroid rules (drop
+  limit). Saturn's rings and the planets' atmospheres are not modelled (the shadow is the planet's disk).
+* Offline kernels (`--planet-kernels`): Jupiter `jup365.bsp`, Saturn `sat441.bsp`, Neptune `nep097.bsp`, Pluto
+  `plu060.bsp`, Mars `mar099.bsp`; Uranus only via Horizons (NAIF splits it per moon, up to 2 GB each).
+* Coming: Earth's Moon; later solar eclipses (contacts C1-C4).
 
 ## Quick start: hits_log.csv to HTML report
 

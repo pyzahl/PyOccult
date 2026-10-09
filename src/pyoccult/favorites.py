@@ -1,6 +1,7 @@
 """favorites.py - a hand-picked list of events from any search and any site, kept with everything known.
 
-    favorites/favorites.json                    the list (one entry per event, newest first)
+    pyoccult.db (data folder), table favorites  the list (one entry per event, newest first; db.py; an older
+                                                favorites/favorites.json is imported once and kept as .migrated)
     favorites/favorites.csv                     the same as a flat table (rewritten with every change; for sharing)
     favorites/<target>_<YYYYMMDDTHHMM>/          the event's own copies of its KML ground track and preview SVG
 
@@ -22,27 +23,40 @@ STATUSES = ("planned", "observed", "cancelled", "clouded")
 
 def key_of(target_id, best_utc):
     """<target>_<YYYYMMDDTHHMM>, the same stem as the files in maps/."""
-    return f"{str(target_id).strip()}_{str(best_utc).strip()[:16].replace(':', '').replace('-', '')}"
+    from pyoccult.report import file_id                          # P:Jupiter -> P-Jupiter (a folder name)
+    return f"{file_id(target_id)}_{str(best_utc).strip()[:16].replace(':', '').replace('-', '')}"
 
 
 def _path(folder):
     return os.path.join(folder, "favorites.json")
 
 
+def _db(folder):
+    """The results database next to the favorites folder (the data folder's pyoccult.db); imports an older
+    favorites.json once."""
+    from pyoccult import db
+    con = db.connect(os.path.join(os.path.dirname(os.path.abspath(folder)), db.DEFAULT))
+    db.favorites_import(con, _path(folder))
+    return con
+
+
 def load(folder=DIR):
+    from pyoccult import db
+    con = _db(folder)
     try:
-        with open(_path(folder), encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return []
+        return db.favorites_load(con)
+    finally:
+        con.close()
 
 
 def _save(items, folder):
+    from pyoccult import db
     os.makedirs(folder, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=folder, suffix=".tmp")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(items, f, indent=1)
-    os.replace(tmp, _path(folder))
+    con = _db(folder)
+    try:
+        db.favorites_save(con, items)
+    finally:
+        con.close()
     write_csv(items, folder)
 
 

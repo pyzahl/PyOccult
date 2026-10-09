@@ -63,11 +63,40 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - `pyoccult/gui.py`: NiceGUI web interface (127.0.0.1 only); runs scripts as subprocesses via `pyoccult/runner.py`
   (JSON config overrides per run). `pyoccult/geo.py`: IP/place/elevation lookups (setup + GUI). `pyoccult/preview.py`:
   event preview SVG per hit (`maps/<target>_<stamp>.svg`), shown by the report's Preview button.
+- `pyoccult/bodies.py` (2026-10-08): planets/moons as targets, prefix + name (`P:Jupiter`, `M:Io`; `L:Moon` later),
+  REGISTRY (NAIF id, centre = system barycentre, kind, V(1,0), phase coeff, rough sigma3), GROUPS ("jupiter").
+  `ensure_kernel`: Horizons VECTORS (CENTER 500@<bary>, 20 min, ICRF) -> SPK type 13 via `spkw13` in cache_path
+  (~1 m vs Horizons; Horizons = jup365 ephemeris, so no 1 GB NAIF download), furnsh + `boddef(alias)` so all SPICE
+  calls take "M:IO". search.py: corridor loop branch (no SBDB/Horizons SPK; size from PCK radii; planets H=None ->
+  no drop cap, star limit `planet_star_limit`; moons H=V10, G=0.3), deflection without own system
+  (`bodies.deflectors`), sigma from REGISTRY, `contact_times` D/R (brentq on |offset|=r; logged d_utc/r_utc,
+  duration_s; db contacts), record `kind`. Windows mode skips bodies. Verified 2026-10-08: Jupiter events, D/R at
+  exactly the radius by independent topocentric geometry (0.1 km). Report: name + kind badge (no SBDB link).
+  Stage 3: results lists in db (`results_list` "main"/"bodies", series per list via meta 'series:<list>', numbers
+  unique); GUI tab "Planets & Moons" runs search with results_list=bodies, hits_output_cvs_file=bodies_log.csv,
+  report `--layout bodies` (`html_row_body`: D/closest/R); favorites ★ finds events in the db (any list,
+  `db.find_event_run`). File/folder names: `report.file_id` (P:Jupiter -> P-Jupiter). Preview: `disks=` (system
+  bodies at angular size) and `field_arcmin` zoom. Optional NAIF kernel (`NAIF_KERNELS`, `naif_kernel`,
+  `download_naif`; setup `--planet-kernels`): used if it covers the window (spkcov), else Horizons.
+  All systems (2026-10-08): REGISTRY = PLANETS (Mars..Neptune kind planet, Pluto kind dwarf = H rule) + moons from
+  `data/satellites.json` (`python -m pyoccult.bodies build`: Horizons 'MB' list + one OBSERVER query per moon,
+  APmag/Ang-diam/r/delta; `phase_correct` with H-G G=MOON_G=0.5 via SPICE phase angle; `fill_estimates`
+  radius<->H with albedo, flagged -> D_est/'*'). 458 moons, 91 usable. GROUPS per system (planet + usable moons by
+  size), `featured()` = planet + radius >= 150 km vs smaller. `LOADED` = targets with kernels (previews).
+  Brightness vs literature: ~0.2 mag (Phobos ~1 mag). Saturn rings not modelled.
+- `pyoccult/db.py` (2026-10-08): results database `<data folder>/pyoccult.db` (config `results_db`; sqlite3, WAL,
+  30 s busy timeout: GUI and run processes share it). Tables runs (summary JSON), events (kind, target, best_utc,
+  record JSON; `series`), contacts (D/R, C1-C4 later), favorites (entry JSON), meta (schema, current series). A
+  series = what hits_log.csv was: GUI "Start a fresh results list" / config `results_new_series` starts a new one.
+  search.py: `db.start_run` at start (after a one-time `import_log` of an old hits_log.csv + runs.jsonl),
+  `db.add_event` per hit, `db.finish_run` + `db.export` in run_summary: hits_log.csv and hits_log.runs.jsonl are
+  EXPORTS of the current series (report, CSV button, OWC check and favorites read them). favorites.py load/_save use
+  the db next to the favorites folder (favorites.json imported once -> .migrated). owc_check uses owc_check.db.
 - `pyoccult/doubles.py`: close/double stars per event. Local: `companions()` from `LOCAL.cone` (radius
   `companion_radius_arcsec`, <= 5 mag fainter, proper motion to the event date), `blended_drop`, `fields()` (blend_*,
   mag_drop_blended, double_hint only if the drop changes >= 0.1 mag or Gaia flags). Online (`gaia_online_check`):
   `search.online_double_check` after pass 2: one async ADQL job (OR of circles, daemon thread, 120 s timeout) ->
-  `online_fields` -> `update_hits_csv` rewrites only this run's rows (csv module, atomic; new columns appended).
+  `online_fields` -> `db.update_events` (this run's events in the results database).
   New record fields go at the END of the hit record (the log is appended; mixed headers otherwise).
 - `pyoccult/owc.py` (experimental, hidden: config `owc_lookup = False`, only by editing the config; the user is
   introducing it to IOTA people step by step, so keep it low-key): OccultWatcher Cloud lookup through the public

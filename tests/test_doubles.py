@@ -43,15 +43,4 @@ on = D.online_fields([rec], 4.0, archive)[0]
 assert on["double_check"] == "gaia online" and on["gaia_nss"] == 1 and on["gaia_multi_peak"] == 12
 assert "non-single star" in on["double_hint"] and "two peaks in 12 %" in on["double_hint"], on["double_hint"]
 
-# hit log: only this run's rows change, new columns are added, other values stay as written
-p = os.path.join(tempfile.mkdtemp(), "hits_log.csv")
-with open(p, "w", newline="") as fh:
-    w = csv.writer(fh)
-    w.writerow(["target_id", "best_utc", "mag", "double_hint"])
-    w.writerow(["5", "2026-10-08T22:10:05.939", "10.0000001", "old"])
-    w.writerow(["7", "2026-10-09T01:00:00.000", "12.5", ""])
-assert D.update_hits_csv(p, [rec], [on]) == 1
-rows = list(csv.DictReader(open(p)))
-assert rows[0]["mag"] == "10.0000001" and rows[0]["gaia_nss"] == "1" and "non-single" in rows[0]["double_hint"]
-assert rows[1]["target_id"] == "7" and rows[1]["double_hint"] == "" and rows[1]["gaia_nss"] == ""
 print("DOUBLE STAR TESTS PASSED")

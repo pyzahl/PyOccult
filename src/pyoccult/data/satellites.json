@@ -1,0 +1,2795 @@
+{
+"meta": {
+"source": "JPL Horizons (major-body list; observer table: APmag, Ang-diam, r, delta); h is H of the H-G law (G 0.5, phase removed); missing size or brightness estimated (radius_est, h_est)",
+"date": "2026-10-15",
+"satellites": 458,
+"usable": 91
+},
+"satellites": [
+{
+"naif": 401,
+"name": "Phobos",
+"radius_km": 13.0,
+"h": 10.8
+},
+{
+"naif": 402,
+"name": "Deimos",
+"radius_km": 7.8,
+"h": 11.89
+},
+{
+"naif": 501,
+"name": "Io",
+"radius_km": 1829.4,
+"h": -1.71
+},
+{
+"naif": 502,
+"name": "Europa",
+"radius_km": 1562.6,
+"h": -1.6
+},
+{
+"naif": 503,
+"name": "Ganymede",
+"radius_km": 2631.2,
+"h": -2.22
+},
+{
+"naif": 504,
+"name": "Callisto",
+"radius_km": 2410.3,
+"h": -0.93
+},
+{
+"naif": 505,
+"name": "Amalthea",
+"radius_km": 125.0,
+"h": 7.03
+},
+{
+"naif": 506,
+"name": "Himalia",
+"radius_km": 85.0,
+"h": 7.77
+},
+{
+"naif": 507,
+"name": "Elara",
+"radius_km": 40.0,
+"h": 9.63
+},
+{
+"naif": 508,
+"name": "Pasiphae",
+"radius_km": 18.0,
+"h": 9.96
+},
+{
+"naif": 509,
+"name": "Sinope",
+"radius_km": 14.0,
+"h": 11.23
+},
+{
+"naif": 510,
+"name": "Lysithea",
+"radius_km": 12.0,
+"h": 11.33
+},
+{
+"naif": 511,
+"name": "Carme",
+"radius_km": 15.0,
+"h": 10.93
+},
+{
+"naif": 512,
+"name": "Ananke",
+"radius_km": 10.0,
+"h": 11.83
+},
+{
+"naif": 513,
+"name": "Leda",
+"radius_km": 5.0,
+"h": 13.13
+},
+{
+"naif": 514,
+"name": "Thebe",
+"radius_km": 58.0,
+"h": 8.63
+},
+{
+"naif": 515,
+"name": "Adrastea",
+"radius_km": 10.0,
+"h": 12.03
+},
+{
+"naif": 516,
+"name": "Metis",
+"radius_km": 30.0,
+"h": 10.43
+},
+{
+"naif": 517,
+"name": "Callirrhoe",
+"radius_km": 5.09,
+"h": 13.83,
+"radius_est": true
+},
+{
+"naif": 518,
+"name": "Themisto",
+"radius_km": 4.65,
+"h": 14.03,
+"radius_est": true
+},
+{
+"naif": 519,
+"name": "Megaclite",
+"radius_km": 3.52,
+"h": 14.63,
+"radius_est": true
+},
+{
+"naif": 520,
+"name": "Taygete",
+"radius_km": 2.93,
+"h": 15.03,
+"radius_est": true
+},
+{
+"naif": 521,
+"name": "Chaldene",
+"radius_km": 2.55,
+"h": 15.33,
+"radius_est": true
+},
+{
+"naif": 522,
+"name": "Harpalyke",
+"radius_km": 3.21,
+"h": 14.83,
+"radius_est": true
+},
+{
+"naif": 523,
+"name": "Kalyke",
+"radius_km": 3.07,
+"h": 14.93,
+"radius_est": true
+},
+{
+"naif": 524,
+"name": "Iocaste",
+"radius_km": 4.44,
+"h": 14.13,
+"radius_est": true
+},
+{
+"naif": 525,
+"name": "Erinome",
+"radius_km": 2.22,
+"h": 15.63,
+"radius_est": true
+},
+{
+"naif": 526,
+"name": "Isonoe",
+"radius_km": 2.33,
+"h": 15.53,
+"radius_est": true
+},
+{
+"naif": 527,
+"name": "Praxidike",
+"radius_km": 3.52,
+"h": 14.63,
+"radius_est": true
+},
+{
+"naif": 528,
+"name": "Autonoe",
+"radius_km": 2.93,
+"h": 15.03,
+"radius_est": true
+},
+{
+"naif": 529,
+"name": "Thyone",
+"radius_km": 2.55,
+"h": 15.33,
+"radius_est": true
+},
+{
+"naif": 530,
+"name": "Hermippe",
+"radius_km": 2.8,
+"h": 15.13,
+"radius_est": true
+},
+{
+"naif": 531,
+"name": "Aitne",
+"radius_km": 2.12,
+"h": 15.73,
+"radius_est": true
+},
+{
+"naif": 532,
+"name": "Eurydome",
+"radius_km": 2.12,
+"h": 15.73,
+"radius_est": true
+},
+{
+"naif": 533,
+"name": "Euanthe",
+"radius_km": 2.03,
+"h": 15.83,
+"radius_est": true
+},
+{
+"naif": 534,
+"name": "Euporie",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 535,
+"name": "Orthosie",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 536,
+"name": "Sponde",
+"radius_km": 1.85,
+"h": 16.03,
+"radius_est": true
+},
+{
+"naif": 537,
+"name": "Kale",
+"radius_km": 1.85,
+"h": 16.03,
+"radius_est": true
+},
+{
+"naif": 538,
+"name": "Pasithee",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 539,
+"name": "Hegemone",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 540,
+"name": "Mneme",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 541,
+"name": "Aoede",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 542,
+"name": "Thelxinoe",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 543,
+"name": "Arche",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 544,
+"name": "Kallichore",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 545,
+"name": "Helike",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 546,
+"name": "Carpo",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 547,
+"name": "Eukelade",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 548,
+"name": "Cyllene",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 549,
+"name": "Kore",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 550,
+"name": "Herse",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 551,
+"name": "S2010_J1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 552,
+"name": "S2010_J2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 553,
+"name": "Dia",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 554,
+"name": "S2016_J1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 555,
+"name": "S2003_J18",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 556,
+"name": "S2011_J2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 557,
+"name": "Eirene",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 558,
+"name": "Philophrosyne",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 559,
+"name": "S2017_J1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 560,
+"name": "Eupheme",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 561,
+"name": "S2003_J19",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 562,
+"name": "Valetudo",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 563,
+"name": "S2017_J2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 564,
+"name": "S2017_J3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 565,
+"name": "Pandia",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 566,
+"name": "S2017_J5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 567,
+"name": "S2017_J6",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 568,
+"name": "S2017_J7",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 569,
+"name": "S2017_J8",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 570,
+"name": "S2017_J9",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 571,
+"name": "Ersa",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 572,
+"name": "S2011_J1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55501,
+"name": "S2003_J2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55502,
+"name": "S2003_J4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55503,
+"name": "S2003_J9",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55504,
+"name": "S2003_J10",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55505,
+"name": "S2003_J12",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55506,
+"name": "S2003_J16",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55507,
+"name": "S2003_J23",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55508,
+"name": "S2003_J24",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55509,
+"name": "S2011_J3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55510,
+"name": "S2018_J2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55511,
+"name": "S2018_J3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55512,
+"name": "S2021_J1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55513,
+"name": "S2021_J2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55514,
+"name": "S2021_J3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55515,
+"name": "S2021_J4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55516,
+"name": "S2021_J5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55517,
+"name": "S2021_J6",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55518,
+"name": "S2016_J3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55519,
+"name": "S2016_J4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55520,
+"name": "S2018_J4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55521,
+"name": "S2022_J1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55522,
+"name": "S2022_J2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55523,
+"name": "S2022_J3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55525,
+"name": "S2017_J10",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55526,
+"name": "S2017_J11",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55527,
+"name": "S2011_J4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55528,
+"name": "S2018_J5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55529,
+"name": "S2024_J1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55530,
+"name": "S2011_J5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55531,
+"name": "S2010_J3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55532,
+"name": "S2010_J4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55533,
+"name": "S2010_J5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55534,
+"name": "S2010_J6",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55535,
+"name": "S2011_J6",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55536,
+"name": "S2017_J12",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55537,
+"name": "S2017_J13",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55538,
+"name": "S2017_J14",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55539,
+"name": "S2017_J15",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55540,
+"name": "S2017_J16",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55541,
+"name": "S2017_J17",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55542,
+"name": "S2017_J18",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55543,
+"name": "S2021_J7",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 55544,
+"name": "S2021_J8",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 601,
+"name": "Mimas",
+"radius_km": 207.8,
+"h": 3.2
+},
+{
+"naif": 602,
+"name": "Enceladus",
+"radius_km": 256.6,
+"h": 2.0
+},
+{
+"naif": 603,
+"name": "Tethys",
+"radius_km": 538.4,
+"h": 0.5
+},
+{
+"naif": 604,
+"name": "Dione",
+"radius_km": 563.4,
+"h": 0.7
+},
+{
+"naif": 605,
+"name": "Rhea",
+"radius_km": 765.0,
+"h": -0.0
+},
+{
+"naif": 606,
+"name": "Titan",
+"radius_km": 2575.15,
+"h": -1.38
+},
+{
+"naif": 607,
+"name": "Hyperion",
+"radius_km": 180.1,
+"h": 4.53
+},
+{
+"naif": 608,
+"name": "Iapetus",
+"radius_km": 745.7,
+"h": 1.4
+},
+{
+"naif": 609,
+"name": "Phoebe",
+"radius_km": 109.4,
+"h": 6.79
+},
+{
+"naif": 610,
+"name": "Janus",
+"radius_km": 101.7,
+"h": 4.3
+},
+{
+"naif": 611,
+"name": "Epimetheus",
+"radius_km": 64.9,
+"h": 5.3
+},
+{
+"naif": 612,
+"name": "Helene",
+"radius_km": 22.5,
+"h": 8.3
+},
+{
+"naif": 613,
+"name": "Telesto",
+"radius_km": 16.3,
+"h": 8.8
+},
+{
+"naif": 614,
+"name": "Calypso",
+"radius_km": 15.3,
+"h": 9.0
+},
+{
+"naif": 615,
+"name": "Atlas",
+"radius_km": 20.5,
+"h": 8.3
+},
+{
+"naif": 616,
+"name": "Prometheus",
+"radius_km": 68.2,
+"h": 6.3
+},
+{
+"naif": 617,
+"name": "Pandora",
+"radius_km": 52.2,
+"h": 6.3
+},
+{
+"naif": 618,
+"name": "Pan",
+"radius_km": 17.2,
+"h": 8.69,
+"h_est": true
+},
+{
+"naif": 619,
+"name": "Ymir",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 620,
+"name": "Paaliaq",
+"radius_km": 11.3,
+"h": 12.1,
+"radius_est": true
+},
+{
+"naif": 621,
+"name": "Tarvos",
+"radius_km": 7.13,
+"h": 13.1,
+"radius_est": true
+},
+{
+"naif": 622,
+"name": "Ijiraq",
+"radius_km": 5.93,
+"h": 13.5,
+"radius_est": true
+},
+{
+"naif": 623,
+"name": "Suttungr",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 624,
+"name": "Kiviuq",
+"radius_km": 7.46,
+"h": 13.0,
+"radius_est": true
+},
+{
+"naif": 625,
+"name": "Mundilfari",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 626,
+"name": "Albiorix",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 627,
+"name": "Skathi",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 628,
+"name": "Erriapus",
+"radius_km": 4.93,
+"h": 13.9,
+"radius_est": true
+},
+{
+"naif": 629,
+"name": "Siarnaq",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 630,
+"name": "Thrymr",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 631,
+"name": "Narvi",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 632,
+"name": "Methone",
+"radius_km": 1.94,
+"h": 13.43,
+"h_est": true
+},
+{
+"naif": 633,
+"name": "Pallene",
+"radius_km": 2.88,
+"h": 12.57,
+"h_est": true
+},
+{
+"naif": 634,
+"name": "Polydeuces",
+"radius_km": 1.5,
+"h": 13.98,
+"h_est": true
+},
+{
+"naif": 635,
+"name": "Daphnis",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 636,
+"name": "Aegir",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 637,
+"name": "Bebhionn",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 638,
+"name": "Bergelmir",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 639,
+"name": "Bestla",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 640,
+"name": "Farbauti",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 641,
+"name": "Fenrir",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 642,
+"name": "Fornjot",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 643,
+"name": "Hati",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 644,
+"name": "Hyrrokkin",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 645,
+"name": "Kari",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 646,
+"name": "Loge",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 647,
+"name": "Skoll",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 648,
+"name": "Surtur",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 649,
+"name": "Anthe",
+"radius_km": 0.5,
+"h": 16.37,
+"h_est": true
+},
+{
+"naif": 650,
+"name": "Jarnsaxa",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 651,
+"name": "Greip",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 652,
+"name": "Tarqeq",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 653,
+"name": "Aegaeon",
+"radius_km": 0.7,
+"h": 15.64,
+"h_est": true
+},
+{
+"naif": 654,
+"name": "Gridr",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 655,
+"name": "Angrboda",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 656,
+"name": "Skrymir",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 657,
+"name": "Gerd",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 658,
+"name": "S2004_S26",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 659,
+"name": "Eggther",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 660,
+"name": "S2004_S29",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 661,
+"name": "Beli",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 662,
+"name": "Gunnlod",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 663,
+"name": "Thiazzi",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 664,
+"name": "S2004_S34",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 665,
+"name": "Alvaldi",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 666,
+"name": "Geirrod",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65067,
+"name": "S2004_S31",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65070,
+"name": "S2004_S24",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65077,
+"name": "S2004_S28",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65079,
+"name": "S2004_S21",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65081,
+"name": "S2004_S36",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65082,
+"name": "S2004_S37",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65084,
+"name": "S2004_S39",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65085,
+"name": "S2004_S7",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65086,
+"name": "S2004_S12",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65087,
+"name": "S2004_S13",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65088,
+"name": "S2004_S17",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65089,
+"name": "S2006_S1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65090,
+"name": "S2006_S3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65091,
+"name": "S2007_S2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65092,
+"name": "S2007_S3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65093,
+"name": "S2019_S1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65094,
+"name": "S2019_S2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65095,
+"name": "S2019_S3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65096,
+"name": "S2020_S1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65097,
+"name": "S2020_S2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65098,
+"name": "S2004_S40",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65100,
+"name": "S2006_S9",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65101,
+"name": "S2007_S5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65102,
+"name": "S2020_S3",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65103,
+"name": "S2019_S4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65104,
+"name": "S2004_S41",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65105,
+"name": "S2020_S4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65106,
+"name": "S2020_S5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65107,
+"name": "S2007_S6",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65108,
+"name": "S2004_S42",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65109,
+"name": "S2006_S10",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65110,
+"name": "S2019_S5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65111,
+"name": "S2004_S43",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65112,
+"name": "S2004_S44",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65113,
+"name": "S2004_S45",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65114,
+"name": "S2006_S11",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65115,
+"name": "S2006_S12",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65116,
+"name": "S2019_S6",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65117,
+"name": "S2006_S13",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65118,
+"name": "S2019_S7",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65119,
+"name": "S2019_S8",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65120,
+"name": "S2019_S9",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65121,
+"name": "S2004_S46",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65122,
+"name": "S2019_S10",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65123,
+"name": "S2004_S47",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65124,
+"name": "S2019_S11",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65125,
+"name": "S2006_S14",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65126,
+"name": "S2019_S12",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65127,
+"name": "S2020_S6",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65128,
+"name": "S2019_S13",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65129,
+"name": "S2005_S4",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65130,
+"name": "S2007_S7",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65131,
+"name": "S2007_S8",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65132,
+"name": "S2020_S7",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65133,
+"name": "S2019_S14",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65134,
+"name": "S2019_S15",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65135,
+"name": "S2005_S5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65136,
+"name": "S2006_S15",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65137,
+"name": "S2006_S16",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65138,
+"name": "S2006_S17",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65139,
+"name": "S2004_S48",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65140,
+"name": "S2020_S8",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65141,
+"name": "S2004_S49",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65142,
+"name": "S2004_S50",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65143,
+"name": "S2006_S18",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65144,
+"name": "S2019_S16",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65145,
+"name": "S2019_S17",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65146,
+"name": "S2019_S18",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65147,
+"name": "S2019_S19",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65148,
+"name": "S2019_S20",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65149,
+"name": "S2006_S19",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65150,
+"name": "S2004_S51",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65151,
+"name": "S2020_S9",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65152,
+"name": "S2004_S52",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65153,
+"name": "S2007_S9",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65154,
+"name": "S2004_S53",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65155,
+"name": "S2020_S10",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65156,
+"name": "S2019_S21",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65157,
+"name": "S2006_S20",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65158,
+"name": "S2004_S54",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65159,
+"name": "S2004_S55",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65160,
+"name": "S2004_S56",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65161,
+"name": "S2004_S57",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65162,
+"name": "S2004_S58",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65163,
+"name": "S2004_S59",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65164,
+"name": "S2004_S60",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65165,
+"name": "S2004_S61",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65166,
+"name": "S2005_S06",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65167,
+"name": "S2005_S07",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65168,
+"name": "S2006_S21",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65169,
+"name": "S2006_S22",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65170,
+"name": "S2006_S23",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65171,
+"name": "S2006_S24",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65172,
+"name": "S2006_S25",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65173,
+"name": "S2006_S26",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65174,
+"name": "S2006_S27",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65175,
+"name": "S2006_S28",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65176,
+"name": "S2006_S29",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65177,
+"name": "S2007_S10",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65178,
+"name": "S2007_S11",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65179,
+"name": "S2019_S22",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65180,
+"name": "S2019_S23",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65181,
+"name": "S2019_S24",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65182,
+"name": "S2019_S25",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65183,
+"name": "S2019_S26",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65184,
+"name": "S2019_S27",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65185,
+"name": "S2019_S28",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65186,
+"name": "S2019_S29",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65187,
+"name": "S2019_S30",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65188,
+"name": "S2019_S31",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65189,
+"name": "S2019_S32",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65190,
+"name": "S2019_S33",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65191,
+"name": "S2019_S34",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65192,
+"name": "S2019_S35",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65193,
+"name": "S2019_S36",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65194,
+"name": "S2019_S37",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65195,
+"name": "S2019_S38",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65196,
+"name": "S2019_S39",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65197,
+"name": "S2019_S40",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65198,
+"name": "S2019_S41",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65199,
+"name": "S2019_S42",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65200,
+"name": "S2019_S43",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65201,
+"name": "S2019_S44",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65202,
+"name": "S2020_S11",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65203,
+"name": "S2020_S12",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65204,
+"name": "S2020_S13",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65205,
+"name": "S2020_S14",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65206,
+"name": "S2020_S15",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65207,
+"name": "S2020_S16",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65208,
+"name": "S2020_S17",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65209,
+"name": "S2020_S18",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65210,
+"name": "S2020_S19",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65211,
+"name": "S2020_S20",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65212,
+"name": "S2020_S21",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65213,
+"name": "S2020_S22",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65214,
+"name": "S2020_S23",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65215,
+"name": "S2020_S24",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65216,
+"name": "S2020_S25",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65217,
+"name": "S2020_S26",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65218,
+"name": "S2020_S27",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65219,
+"name": "S2020_S28",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65220,
+"name": "S2020_S29",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65221,
+"name": "S2020_S30",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65222,
+"name": "S2020_S31",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65223,
+"name": "S2020_S32",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65224,
+"name": "S2020_S33",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65225,
+"name": "S2020_S34",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65226,
+"name": "S2020_S35",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65227,
+"name": "S2020_S36",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65228,
+"name": "S2020_S37",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65229,
+"name": "S2020_S38",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65230,
+"name": "S2020_S39",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65231,
+"name": "S2020_S40",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65232,
+"name": "S2020_S41",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65233,
+"name": "S2020_S42",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65234,
+"name": "S2020_S43",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65235,
+"name": "S2020_S44",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65236,
+"name": "S2023_S01",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65237,
+"name": "S2023_S02",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65238,
+"name": "S2023_S03",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65239,
+"name": "S2023_S04",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65240,
+"name": "S2023_S05",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65241,
+"name": "S2023_S06",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65242,
+"name": "S2023_S07",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65243,
+"name": "S2023_S08",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65244,
+"name": "S2023_S09",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65245,
+"name": "S2023_S10",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65246,
+"name": "S2023_S11",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65247,
+"name": "S2023_S12",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65248,
+"name": "S2023_S13",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65249,
+"name": "S2023_S14",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65250,
+"name": "S2023_S15",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65251,
+"name": "S2023_S16",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65252,
+"name": "S2023_S17",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65253,
+"name": "S2023_S18",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65254,
+"name": "S2023_S19",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65255,
+"name": "S2023_S20",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65256,
+"name": "S2023_S21",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65257,
+"name": "S2023_S22",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65258,
+"name": "S2023_S23",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65259,
+"name": "S2023_S24",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65260,
+"name": "S2023_S25",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65261,
+"name": "S2023_S26",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65262,
+"name": "S2023_S27",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65263,
+"name": "S2023_S28",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65264,
+"name": "S2023_S29",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65265,
+"name": "S2023_S30",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65266,
+"name": "S2023_S31",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65267,
+"name": "S2023_S32",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65268,
+"name": "S2023_S33",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65269,
+"name": "S2023_S34",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65270,
+"name": "S2023_S35",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65271,
+"name": "S2023_S36",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65272,
+"name": "S2023_S37",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65273,
+"name": "S2023_S38",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65274,
+"name": "S2023_S39",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65275,
+"name": "S2023_S40",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65276,
+"name": "S2023_S41",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65277,
+"name": "S2023_S42",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65278,
+"name": "S2023_S43",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65279,
+"name": "S2023_S44",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65280,
+"name": "S2023_S45",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65281,
+"name": "S2023_S46",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65282,
+"name": "S2023_S47",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65283,
+"name": "S2023_S48",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65284,
+"name": "S2023_S49",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65285,
+"name": "S2023_S50",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65286,
+"name": "S2020_S45",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65287,
+"name": "S2020_S46",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65288,
+"name": "S2020_S47",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65289,
+"name": "S2020_S48",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65290,
+"name": "S2023_S51",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65291,
+"name": "S2023_S52",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65292,
+"name": "S2023_S53",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65293,
+"name": "S2023_S54",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65294,
+"name": "S2023_S55",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65295,
+"name": "S2023_S56",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65296,
+"name": "S2023_S57",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65297,
+"name": "S2020_S49",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65298,
+"name": "S2023_S58",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65299,
+"name": "S2023_S59",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65300,
+"name": "S2023_S60",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65301,
+"name": "S2023_S61",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65302,
+"name": "S2023_S62",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65303,
+"name": "S2023_S63",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 65304,
+"name": "S2009_S2",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 701,
+"name": "Ariel",
+"radius_km": 581.1,
+"h": 1.31
+},
+{
+"naif": 702,
+"name": "Umbriel",
+"radius_km": 584.7,
+"h": 1.96
+},
+{
+"naif": 703,
+"name": "Titania",
+"radius_km": 788.9,
+"h": 0.88
+},
+{
+"naif": 704,
+"name": "Oberon",
+"radius_km": 761.4,
+"h": 1.09
+},
+{
+"naif": 705,
+"name": "Miranda",
+"radius_km": 240.4,
+"h": 3.46
+},
+{
+"naif": 706,
+"name": "Cordelia",
+"radius_km": 13.0,
+"h": 11.43,
+"h_est": true
+},
+{
+"naif": 707,
+"name": "Ophelia",
+"radius_km": 15.0,
+"h": 11.12,
+"h_est": true
+},
+{
+"naif": 708,
+"name": "Bianca",
+"radius_km": 21.0,
+"h": 10.39,
+"h_est": true
+},
+{
+"naif": 709,
+"name": "Cressida",
+"radius_km": 31.0,
+"h": 9.36
+},
+{
+"naif": 710,
+"name": "Desdemona",
+"radius_km": 27.0,
+"h": 9.66
+},
+{
+"naif": 711,
+"name": "Juliet",
+"radius_km": 42.0,
+"h": 8.66
+},
+{
+"naif": 712,
+"name": "Portia",
+"radius_km": 54.0,
+"h": 8.16
+},
+{
+"naif": 713,
+"name": "Rosalind",
+"radius_km": 27.0,
+"h": 9.66
+},
+{
+"naif": 714,
+"name": "Belinda",
+"radius_km": 33.0,
+"h": 9.26
+},
+{
+"naif": 715,
+"name": "Puck",
+"radius_km": 77.0,
+"h": 7.36
+},
+{
+"naif": 716,
+"name": "Caliban",
+"radius_km": 36.39,
+"h": 9.56,
+"radius_est": true
+},
+{
+"naif": 717,
+"name": "Sycorax",
+"radius_km": 72.61,
+"h": 8.06,
+"radius_est": true
+},
+{
+"naif": 718,
+"name": "Prospero",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 719,
+"name": "Setebos",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 720,
+"name": "Stephano",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 721,
+"name": "Trinculo",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 722,
+"name": "Francisco",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 723,
+"name": "Margaret",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 724,
+"name": "Ferdinand",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 725,
+"name": "Perdita",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 726,
+"name": "Mab",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 727,
+"name": "Cupid",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 75051,
+"name": "2023U1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 801,
+"name": "Triton",
+"radius_km": 1352.6,
+"h": -1.31
+},
+{
+"naif": 802,
+"name": "Nereid",
+"radius_km": 170.0,
+"h": 3.93
+},
+{
+"naif": 803,
+"name": "Naiad",
+"radius_km": 29.0,
+"h": 9.69,
+"h_est": true
+},
+{
+"naif": 804,
+"name": "Thalassa",
+"radius_km": 40.0,
+"h": 8.99,
+"h_est": true
+},
+{
+"naif": 805,
+"name": "Despina",
+"radius_km": 74.0,
+"h": 7.83
+},
+{
+"naif": 806,
+"name": "Galatea",
+"radius_km": 79.0,
+"h": 7.53
+},
+{
+"naif": 807,
+"name": "Larissa",
+"radius_km": 96.0,
+"h": 7.23
+},
+{
+"naif": 808,
+"name": "Proteus",
+"radius_km": 218.0,
+"h": 5.53
+},
+{
+"naif": 809,
+"name": "Halimede",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 810,
+"name": "Psamathe",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 811,
+"name": "Sao",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 812,
+"name": "Laomedeia",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 813,
+"name": "Neso",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 814,
+"name": "Hippocamp",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 85051,
+"name": "S2002_N5",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 85052,
+"name": "S2021_N1",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 901,
+"name": "Charon",
+"radius_km": 606.0,
+"h": 0.78
+},
+{
+"naif": 902,
+"name": "Nix",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 903,
+"name": "Hydra",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 904,
+"name": "Kerberos",
+"radius_km": null,
+"h": null
+},
+{
+"naif": 905,
+"name": "Styx",
+"radius_km": null,
+"h": null
+}
+]
+}

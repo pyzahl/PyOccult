@@ -204,11 +204,17 @@ def compass(az):
 
 # ---------------------------------------------------------------- building events
 
+def file_id(target_id):
+    """The target as part of a file or folder name: 'P:Jupiter' -> 'P-Jupiter' (':' is not allowed on Windows);
+    asteroid numbers unchanged."""
+    return str(target_id).strip().replace(":", "-")
+
+
 def find_kml(kml_dir, target_id, when, ext="kml"):
     """<kml_dir>/<target>_<YYYYMMDDTHHMM>*.<ext>: the KML ground track, or with ext="svg" the event preview."""
     if not kml_dir or not os.path.isdir(kml_dir):
         return None
-    stamp = when.strftime("%Y%m%dT%H%M")
+    stamp, target_id = when.strftime("%Y%m%dT%H%M"), file_id(target_id)
     found = sorted(glob.glob(os.path.join(glob.escape(kml_dir), f"{glob.escape(str(target_id))}_{stamp}*.{ext}")))
     if ext == "globe":                                           # the Occult-style plot <stem>_globe.svg
         found = sorted(glob.glob(os.path.join(glob.escape(kml_dir), f"{glob.escape(str(target_id))}_{stamp}*_globe.svg")))
@@ -287,7 +293,11 @@ def build_event(r, lat, lon, kml_dir, out_dir):
     miss, margin = num(r.get("min_distance")), num(r.get("margin_km"))
     if margin is None and miss is not None and rad is not None:
         margin = miss - rad
-    return dict(when=when, label=asteroid_label(tid, r.get("target_name")), tid=tid,
+    body = ":" in tid                                            # a planet or moon (bodies.py: P:Jupiter, M:Io)
+    label = (r.get("target_name") or tid.split(":", 1)[1]).strip() if body else asteroid_label(tid, r.get("target_name"))
+    return dict(when=when, label=label, tid=tid, body=body, kind=(r.get("kind") or ("asteroid" if not body else "")).strip(),
+                d_utc=(r.get("d_utc") or "").strip(), r_utc=(r.get("r_utc") or "").strip(),
+                contact_dur=num(r.get("duration_s")) if (r.get("d_utc") or "").strip() else None,
                 star=r.get("star", "").strip(), mag=mag, drop=drop, dur=dur, alt=alt,
                 compass=compass(az) if az is not None else "", az=az, moon=moon,
                 miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs, preview=preview,
@@ -363,6 +373,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 a{color:var(--accent)}
 a.owc{display:inline-block;margin-top:2px;padding:0 6px;border-radius:6px;font-size:.78rem;text-decoration:none;
  background:color-mix(in srgb,#2563eb 14%,transparent);color:var(--accent)}
+.badge.kind{background:color-mix(in srgb,#7c3aed 14%,transparent);color:#6d28d9;font-size:.72rem}
 sup.bin{color:#0891b2;font-weight:600;margin-left:3px;cursor:help;white-space:nowrap}
 span.dbl{color:#b26a00;font-weight:600;cursor:help;white-space:nowrap}
 sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
@@ -602,7 +613,7 @@ def shadow_cell(e):
 def map_cell(e):
     fav = ("" if e.get("fav") else
            f'<button class="mapbtn favbtn" type="button" hidden data-tid="{esc(e["tid"])}" data-utc="{esc(e["utc"])}" '
-           f'data-key="{esc(e["tid"])}_{e["when"]:%Y%m%dT%H%M}" aria-label="Favorite">☆</button> ')
+           f'data-key="{esc(file_id(e["tid"]))}_{e["when"]:%Y%m%dT%H%M}" aria-label="Favorite">☆</button> ')
     site = e.get("site") or {}                                   # favorites: each row has its own site
     ks_site = (f'data-lat="{site["lat"]}" data-lon="{site["lon"]}" data-ele="{site.get("ele") or 0}" '
                if site.get("lat") is not None and site.get("lon") is not None else "")
@@ -667,6 +678,39 @@ def double_mark(e):
     return f' <span class="dbl" title="{esc(e["dhint"])}">\u26a0{val}</span>'
 
 
+def contact_text(utc):
+    """'2026-10-11T02:19:37.48' -> '02:19:37.5'; '' -> '—'."""
+    if not utc:
+        return "\u2014"
+    t = parse_utc(utc)
+    return f"{t:%H:%M:}{t.second + t.microsecond / 1e6:04.1f}"
+
+
+def html_row_body(e):
+    """A row of the planets & moons layout: D, closest approach and R at the site, duration, star, sky, chance."""
+    s = lambda v, nd=3: "" if v is None else f"{v:.{nd}f}"
+    moon = e["moon"]
+    moon_tip = esc(f"Moon {moon['alt']:.0f}\u00b0 above horizon, {moon['illum']:.0f}% lit") if moon and moon["illum"] is not None else ""
+    alt_tip = esc(f"azimuth {e['az']:.0f}\u00b0" if e["az"] is not None else "")
+    dur = e.get("contact_dur")
+    dur_txt = "\u2014" if not dur else (f"{dur / 60:.1f} min" if dur >= 120 else f"{dur:.1f} s")
+    tip = esc(f"Gaia DR3 {e['star']} \u00b7 radius {e['rad']:.0f} km ({e['size_src']})" if e["rad"] else "")
+    d_ts = parse_utc(e["d_utc"]).timestamp() if e.get("d_utc") else ""
+    return (
+        f'<tr><td class="ast" data-s="{esc(e["tid"])}" title="{tip}">{esc(e["label"])} '
+        f'<span class="badge kind">{esc(e["kind"] or "body")}</span></td>'
+        f'<td data-s="{d_ts}" title="{esc(e.get("d_utc") or "outside the shadow: no contact")} UTC">'
+        f'{esc(e["when"].strftime("%Y-%b-%d"))} {contact_text(e.get("d_utc"))}</td>'
+        f'<td data-s="{e["when"].timestamp():.3f}" title="{esc(e["utc"])} UTC (closest approach to the observer)">'
+        f'{esc(contact_text(e["utc"]))}</td>'
+        f'<td title="{esc(e.get("r_utc") or "")} UTC">{contact_text(e.get("r_utc"))}</td>'
+        f'<td class="num" data-s="{s(dur)}">{dur_txt}</td>'
+        f'<td class="num" data-s="{s(e["mag"])}">{fmt(e["mag"])}</td>'
+        f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
+        f'<td data-s="{s(moon["sep"], 1) if moon else ""}" title="{moon_tip}">{esc(moon_text(e))}</td>'
+        f"{shadow_cell(e)}" + chance_cell(e) + f"{map_cell(e)}</tr>")
+
+
 def html_row(e):
     size = f"D≈{2 * e['rad']:.1f} km" if e["rad"] is not None else ""
     tip_ast = esc(f"Gaia DR3 {e['star']} · {size} ({e['size_src']})")
@@ -700,8 +744,9 @@ def html_row(e):
         calc = ""                                                # calculation time: in hits_log.csv only
     return (
         lead +
-        f'<td class="ast" data-s="{esc(e["tid"])}" title="{tip_ast}"><a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" '
-        f'target="_blank" rel="noopener">{esc(e["label"])}</a>'
+        f'<td class="ast" data-s="{esc(e["tid"])}" title="{tip_ast}">' + (
+            f'{esc(e["label"])} <span class="badge kind">{esc(e["kind"] or "body")}</span>' if e.get("body") else
+            f'<a href="{JPL_SBDB}{urllib.parse.quote(str(e["tid"]))}" target="_blank" rel="noopener">{esc(e["label"])}</a>')
         + binary_mark(e["tid"])
         + (f'<sup class="est" title="Size estimated from H with an assumed albedo: diameter, duration and shadow width '
            f'are uncertain by a factor of about 1.7 (no measured diameter in SBDB)">*</sup>' if size_estimated(e) else '')
@@ -766,7 +811,21 @@ def to_html(events, meta):
                if fav else "")
             + '<th title=""☆ favorites and KStars (when opened from the GUI), Map: shadow path, Preview: star field, '
             'KML: ground track for Google Earth">Tools</th>')
-    body = "".join(html_row(e) for e in events)
+    if meta.get("layout") == "bodies":                           # planets & moons: contact times
+        head = ('<th data-k>Body</th>'
+                f'<th class="{on("date").strip()}" data-k title="Date and disappearance (D) at the site, UT">D (UT)</th>'
+                '<th data-k title="Closest approach of the star to the centre, UT">Closest (UT)</th>'
+                '<th data-k title="Reappearance (R) at the site, UT">R (UT)</th>'
+                '<th class="num" data-k title="From D to R at the site">Duration</th>'
+                f'<th class="num{on("mag")}" data-k title="Gaia G magnitude of the star">Star mag</th>'
+                '<th data-k title="Star altitude and compass direction at closest approach">Altitude</th>'
+                '<th data-k title="Moon distance from the star; shown while the Moon is up">Moon dist</th>'
+                '<th class="num" data-k title="Distance of the observer from the shadow centre line">Shadow dist</th>'
+                '<th class="num" data-k title="Chance that the shadow covers your site">Chance</th>'
+                '<th>Tools</th>')
+        body = "".join(html_row_body(e) for e in events)
+    else:
+        body = "".join(html_row(e) for e in events)
     table = (f'<div class="wrap"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
              if events else '<div class="wrap"><div class="empty">No events match.</div></div>')
     if fav:
@@ -859,7 +918,9 @@ def main(argv=None):
     ap.add_argument("--min-drop", type=float, help="only events with at least this magnitude drop")
     ap.add_argument("--sort", choices=("mag", "date"), default="mag",
                     help="row order: mag = brightest star first (default), date = by event time")
-    ap.add_argument("--title", default="PyOccult asteroid occultation events")
+    ap.add_argument("--title", help="page title (default: by layout)")
+    ap.add_argument("--layout", choices=["auto", "asteroids", "bodies"], default="auto",
+                    help="table layout: asteroids, or planets & moons with contact times (auto: bodies if all are)")
     ap.add_argument("--no-embed", action="store_true", help="do not embed the KML paths and map viewer in the HTML page")
     ap.add_argument("--tile-url", default=U.URL_OSM_TILES,
                     help="tile URL template for the embedded map (default: OpenStreetMap, fine for light personal use)")
@@ -919,7 +980,11 @@ def main(argv=None):
     if run and run.get("site"):                                  # the run's site wins over the current config
         lat, lon = run["site"]["lat"], run["site"]["lon"]
         observer = f"site {run['site']['name']}"
-    meta = dict(title=a.title, span=span, sort=a.sort, info=header_info(run, lat, lon), observer=observer, generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
+    layout = a.layout if a.layout != "auto" else ("bodies" if events and all(e.get("body") for e in events)
+                                                     else "asteroids")
+    a.title = a.title or ("PyOccult planet and moon occultations" if layout == "bodies"
+                          else "PyOccult asteroid occultation events")
+    meta = dict(title=a.title, layout=layout, span=span, sort=a.sort, info=header_info(run, lat, lon), observer=observer, generated=datetime.now().strftime("%Y-%m-%d %H:%M"),
                 paths=paths, tiles=a.tile_url, obs=[lat, lon] if lat is not None and lon is not None else None,
                 site=dict(lat=lat, lon=lon, ele=(run or {}).get("site", {}).get("ele", 0.0))
                 if lat is not None and lon is not None else None)

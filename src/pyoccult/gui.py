@@ -200,7 +200,9 @@ def index():
             ui.link(__url__, __url__, new_tab=True).classes("text-sm")
             ui.button("Close", on_click=lambda: about.close()).props("flat")
     with ui.tabs().classes("w-full") as tabs:
-        t_site, t_pick, t_search, t_res = ui.tab("Site"), ui.tab("Pick"), ui.tab("Search"), ui.tab("Results")
+        t_site, t_pick = ui.tab("Site"), ui.tab("Pick")
+        t_bod = ui.tab("Planets & Moons")
+        t_search, t_res = ui.tab("Search"), ui.tab("Results")
         t_fav = ui.tab("Favorites")
     log_card = None
 
@@ -279,7 +281,9 @@ def index():
             s_targets = ui.textarea("Targets (asteroid numbers, comma or space separated)",
                                     value=", ".join(config.targets)).classes("w-full")
             with ui.row():
-                s_fresh = ui.checkbox("Start a fresh hits_log.csv", value=True)
+                s_fresh = ui.checkbox("Start a fresh results list", value=True).tooltip(
+                    "On: the Results tab shows only this search (a new series in the results database; older "
+                    "results stay in pyoccult.db). Off: add this search's events to the current list")
                 s_maps = ui.checkbox("KML maps", value=bool(config.write_maps))
                 s_prev = ui.checkbox("Previews", value=bool(getattr(config, "write_previews", True)))
             with ui.row().classes("items-center"):
@@ -338,6 +342,51 @@ def index():
             with resizable_box("pick", 55, scroll=True):                # drag the corner to resize (remembered)
                 p_table = ui.table(columns=cols, rows=[], row_key="key", pagination=0).classes("w-full").props(
                     "flat dense")
+
+        # ------------------------------------------------ planets & moons (bodies.py)
+        with ui.tab_panel(t_bod):
+            site_note_b = ui.label().classes("text-sm text-slate-600")
+            from pyoccult import bodies as bodies_mod
+            b_checks, b_small = {}, {}
+            with ui.row().classes("items-start gap-6"):
+                for grp in bodies_mod.GROUPS:
+                    major, small = bodies_mod.featured(grp)
+                    with ui.column().classes("gap-0"):
+                        ui.label(f"{grp.capitalize()} system").classes("font-semibold")
+                        for t in major:
+                            kind = bodies_mod.kind(t)
+                            b_checks[t] = ui.checkbox(f"{bodies_mod.name(t)}" + (f" ({kind})" if kind != "moon" else ""),
+                                                      value=(grp == "jupiter")).props("dense")
+                        if small:
+                            b_small[grp] = ui.checkbox(f"smaller moons ({len(small)})", value=False).props(
+                                "dense").tooltip(", ".join(bodies_mod.name(t) for t in small[:40])
+                                                 + (" ..." if len(small) > 40 else "")
+                                                 + ": like small asteroids (faint, narrow paths, less certain orbits)")
+                with ui.column().classes("gap-0"):
+                    ui.label("Coming").classes("font-semibold text-slate-400")
+                    ui.label("Earth's Moon").classes("text-sm text-slate-400")
+            with ui.row().classes("items-end gap-4"):
+                b_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date").classes("w-36")
+                b_days = ui.number("Days", value=30, min=1, step=1).classes("w-28")
+                b_plim = ui.number("Planet: star G limit", value=float(getattr(config, "planet_star_limit", 10.0)),
+                                   step=0.5).classes("w-36").tooltip(
+                    "Planets: no drop limit (a planet's light swamps it), only stars this bright or brighter (glare)")
+                b_drop = ui.number("Moons: min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1),
+                                   step=0.05).classes("w-36").tooltip(
+                    "Moons are bright (about mag 5 for Jupiter's): only bright stars give a measurable drop")
+                b_fresh = ui.checkbox("Start a fresh list", value=True)
+            with ui.row():
+                ui.button("Run", on_click=lambda: run_bodies()).props("color=primary")
+                ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
+                ui.button("Rebuild report", on_click=lambda: build_bodies_report()).props("outline")
+                ui.link("Open in a new tab", "/out/bodies_report.html", new_tab=True).classes("self-center")
+                ui.button("CSV", on_click=lambda: bodies_csv()).props("outline dense").tooltip(
+                    "Download these events (bodies_log.csv) with disappearance and reappearance times")
+            ui.label("Disappearance (D) and reappearance (R) at your site, from JPL Horizons positions (a small "
+                     "kernel per window). The results are their own list (bodies_log.csv), apart from the asteroid "
+                     "search.").classes("text-xs text-slate-500")
+            with resizable_box("bodies", 60):
+                b_frame = ui.element("iframe").style("width: 100%; height: 100%; border: 0; display: block")
 
         # ------------------------------------------------ results
         with ui.tab_panel(t_res):
@@ -443,7 +492,7 @@ def index():
             load_pick()
         except NameError:                         # first call, while the page is built: load_pick() runs later
             pass
-        for note in (site_note_s, site_note_p):
+        for note in (site_note_s, site_note_p, site_note_b):
             note.text = (f"Runs use site {name} ({s['lat']:.4f}, {s['lon']:.4f}, {s.get('aperture_cm', 25):g} cm); "
                          f"change it at the top right.")
         marker.move(s["lat"], s["lon"])
@@ -633,7 +682,7 @@ def index():
                 recs = list(csv.DictReader(f))
         else:
             recs = [f["record"] for f in favorites.load()]
-        uniq = {owc.key(r): r for r in recs if r.get("target_id") and r.get("best_utc")}
+        uniq = {owc.key(r): r for r in recs if str(r.get("target_id", "")).strip().isdigit() and r.get("best_utc")}
         if not uniq:
             ui.notify("No events to check", type="warning")
             return
@@ -649,6 +698,45 @@ def index():
             await build_report()
         else:
             load_favs(fav_cur["key"])
+
+    async def run_bodies():
+        """Planets & Moons tab: search the ticked bodies (their own results list), then show their report."""
+        if not catalog_ok():
+            return
+        targets = [t for t, c in b_checks.items() if c.value]
+        for grp, c in b_small.items():                  # a system's smaller moons, all at once
+            if c.value:
+                targets += bodies_mod.featured(grp)[1]
+        if not targets:
+            ui.notify("Tick at least one body", type="warning")
+            return
+        ensure_saved()
+        over = dict(ct=f"{b_start.value}T00:00:00", days=int(b_days.value), targets=targets, targets_source="list",
+                    results_list="bodies", hits_output_cvs_file="bodies_log.csv",
+                    results_new_series=bool(b_fresh.value), planet_star_limit=float(b_plim.value),
+                    min_mag_drop=float(b_drop.value), gaia_online_check=False)
+
+        async def done(rc):
+            if rc == 0:
+                await build_bodies_report()
+        await run_process(PYOCCULT + ["run", "search", json.dumps(over)], log,
+                          env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
+
+    async def build_bodies_report(rc=0):
+        if not os.path.isfile(os.path.join(ROOT, "bodies_log.csv")) and not os.path.isfile(
+                os.path.join(ROOT, "bodies_log.runs.jsonl")):
+            ui.notify("No planet or moon search yet", type="warning")
+            return
+        await run_process(PYOCCULT + ["report", "bodies_log.csv", "-o", "bodies_report.html", "--layout", "bodies"],
+                          log)
+        b_frame.props(f"src=/out/bodies_report.html?t={int(time.time())}")
+
+    def bodies_csv():
+        path = os.path.join(ROOT, "bodies_log.csv")
+        if not os.path.isfile(path):
+            ui.notify("No planet or moon events yet", type="warning")
+            return
+        ui.download(path, f"bodies_{today_utc()}.csv")
 
     async def build_report(rc=0):
         await run_process(PYOCCULT + ["report", config.hits_output_cvs_file], log)
@@ -672,8 +760,7 @@ def index():
                     gaia_online_check=bool(s_dbl.value))
         if not s_use_file.value:
             over["targets"] = [t for t in s_targets.value.replace(",", " ").split() if t]
-        if s_fresh.value and os.path.isfile(config.hits_output_cvs_file):
-            os.remove(config.hits_output_cvs_file)
+        over["results_new_series"] = bool(s_fresh.value)          # db.py: a fresh results list = a new series
 
         async def done(rc):
             if rc == 0:
@@ -1000,13 +1087,19 @@ def main():
 
     @app.get("/api/favorites/add")
     def favorites_add(tid: str, utc: str):
-        from pyoccult import config as cfg, report
-        rec = favorites.find_record(cfg.hits_output_cvs_file, tid, utc)
+        from pyoccult import config as cfg, report, db
+        con = db.connect(os.path.join(ROOT, getattr(cfg, "results_db", db.DEFAULT)))
+        try:                                                # any results list (asteroids, planets & moons)
+            rec, run = db.find_event_run(con, tid, utc[:16])
+        finally:
+            con.close()
+        if rec is None:                                     # an older log without the database
+            rec, run = favorites.find_record(cfg.hits_output_cvs_file, tid, utc), report.read_last_run(cfg.hits_output_cvs_file)
         if rec is None:
-            return {"ok": False, "msg": f"event {tid} {utc[:19]} not found in {cfg.hits_output_cvs_file}"}
+            return {"ok": False, "msg": f"event {tid} {utc[:19]} not found in the results"}
         from pyoccult import sbdb
-        ok, msg = favorites.add(rec, report.read_last_run(cfg.hits_output_cvs_file), cfg.map_dir,
-                                sbdb=sbdb.get_full(tid, cfg.cache_path))
+        rec = {k: db._cell(v) for k, v in rec.items()}       # as a hit-log row ('' for none/NaN, as the export)
+        ok, msg = favorites.add(rec, run, cfg.map_dir, sbdb=sbdb.get_full(tid, cfg.cache_path))
         if ok:
             favorites.backfill_timezones(geo.timezone)          # the new favorite's site time zone (once per site)
         favorites.write_page()
@@ -1023,6 +1116,8 @@ def main():
         ok, msg = kstars.show(ra, dec, utc, fov, lat, lon, ele, set_location=KSTARS_OPT["set_location"])
         return {"ok": ok, "msg": msg}
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
+                        strict=False, max_cache_age=0)
+    app.add_static_file(local_file=os.path.join(ROOT, "bodies_report.html"), url_path="/out/bodies_report.html",
                         strict=False, max_cache_age=0)
     ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(PKG, "pyoccult_logo.svg"),
            show=not a.no_browser, reload=False, reconnect_timeout=60)   # a busy browser keeps its page

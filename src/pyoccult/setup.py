@@ -198,6 +198,20 @@ from pyoccult import gaia_local as gaia
 from pyoccult.kernels import KERNELS, download_kernels
 
 
+def planet_kernels(download, ask):
+    """Optional: NAIF's satellite kernels for planets and moons (offline; else Horizons per search)."""
+    from pyoccult import bodies
+    for group, (fname, size) in bodies.NAIF_KERNELS.items():
+        if bodies.naif_kernel(group):
+            continue
+        if not download and ask:
+            k = input(f"4. planets and moons ({group} system): their positions come from JPL Horizons with each search "
+                      f"(online, small).\n   Download NAIF's {fname} ({size}) for offline use instead? [y/N]: ")
+            download = k.strip().lower().startswith("y")
+        if download:
+            bodies.download_naif(group)
+
+
 def show_status(d=None):
     print(f"  data folder                  {home.describe()}")
     with open("sites.py") as f:
@@ -213,6 +227,9 @@ def show_status(d=None):
               " replace it with your exact position (GPS, map) before observing.")
     for k in KERNELS:
         print(f"  {k:28s} {'ok' if os.path.isfile(k) else 'missing'}")
+    from pyoccult import bodies
+    for group, (fname, size) in bodies.NAIF_KERNELS.items():
+        print(f"  {fname:28s} {'ok (planets and moons offline)' if bodies.naif_kernel(group) else 'not downloaded: planets and moons via JPL Horizons (optional: --planet-kernels, ' + size + ')'}")
     d = d or getattr(config, "gaia_local_dir", None)
     if not d:
         print("  local Gaia catalog            gaia_local_dir not set in pyoccult_config.py")
@@ -318,6 +335,9 @@ def main():
     ap.add_argument("--source", choices=["auto", "zenodo", "esa"], default="auto",
                     help="catalog from Zenodo (ready-made, G <= 16 or 18) or built from ESA's files; auto asks")
     ap.add_argument("--keep-archive", action="store_true", help="keep the downloaded Zenodo .tar.xz")
+    ap.add_argument("--planet-kernels", action="store_true",
+                    help="download NAIF's satellite kernels for planets and moons (Jupiter: jup365.bsp, 1.1 GB) for "
+                         "offline use; otherwise their positions come from JPL Horizons per search")
     ap.add_argument("--home", metavar="FOLDER", help="use FOLDER as the data folder from now on (saved as a setting; "
                                                      "files are not moved)")
     a = ap.parse_args()
@@ -328,7 +348,7 @@ def main():
     if not download_kernels(config.earth_pck_max_age):
         sys.exit("kernel download failed (see above); rerun setup when the address is reachable, or copy the kernel "
                  "files (*.tls, *.bsp, *.tpc, *.bpc) from another computer into this folder")
-    d = None
+    d, new_install = None, False
     if not a.no_gaia:
         d, gmax = catalog_target(a.gmax, a.dir)
         st = gaia.status(d)
@@ -356,6 +376,7 @@ def main():
             print(f"   deleted {d}")
             st = gaia.status(d)
         src = None
+        new_install = SITES_CREATED or not st["complete"]           # first-time setup: ask the optional questions
         try:
             if st["complete"]:
                 print("   complete")
@@ -373,6 +394,7 @@ def main():
         if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 16.0)):
             print(f"\n   To search with this catalog, set in pyoccult_config.py:\n"
                   f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")
+    planet_kernels(a.planet_kernels, ask=sys.stdin.isatty() and new_install)
     print()
     show_status(d)
     if not a.no_gaia:

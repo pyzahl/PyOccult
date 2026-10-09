@@ -602,6 +602,13 @@ rest.
 The pick tool would not need to change: there are only a handful of major bodies, so they would simply be listed as
 targets.
 
+**Status (2026-10-08): started with the Jupiter system** (`pyoccult/bodies.py`). Items 1-5 below are done for
+planets and moons (brightness rule, D/R contact times, deflection, target preparation, per-body uncertainty);
+6-8 (limb ellipse, report page, preview disk) and the other planets and the Moon are next. One change to the plan:
+no satellite kernel download. JPL Horizons gives the planet and its moons relative to the system barycentre with
+the same ephemeris (jup365), and PyOccult writes them into a small type 13 kernel per search window (~1 m, a few
+kB per body and day) instead of the 1.1 GB file.
+
 **Implementation notes (2026-10-08, from a review of the current search).** The search loop itself works unchanged
 for major bodies: corridor scan, solver (`besselian_offsets`, `star_test`), local Gaia catalog, star corrections,
 visibility (`observable`), Moon info, maps, globe and report only ask SPICE for the target's position (`spkpos` with
