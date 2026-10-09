@@ -4,7 +4,7 @@
 Python Occultation Searcher by PyZahl (C) 2026, version 0.14.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
-[CHANGELOG.md](CHANGELOG.md).
+[CHANGELOG.md](CHANGELOG.md). How the predictions were verified: [VERIFICATION.md](VERIFICATION.md).
 
 Experimental occultation search tool for asteroids, planets and their moons, built with Python, Astropy, SpiceyPy and
 NiceGUI: a local web interface to plan and run all tasks for easy event exploration. New here? Start with the
@@ -97,8 +97,9 @@ everything: `pyoccult` (the web interface) or `pyoccult <command>`, e.g. `pyoccu
 | `pyoccult/owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
 | supporting modules | `pyoccult/corridor.py` (star corridor), `pyoccult/screen.py` + `pyoccult/orbits.py` (pick tool engine), `pyoccult/preview.py` (event preview image), `pyoccult/globe.py` (whole-Earth plot), `pyoccult/doubles.py` (close and double stars), `pyoccult/binaries.py` (asteroid satellites), `pyoccult/occultations.py` (earlier occultations), `pyoccult/sbdb.py` (asteroid size cache), `pyoccult/cameras.py` (sensor list), `pyoccult/kernels.py` (kernel download), `pyoccult/geo.py` (place and IP lookup), `pyoccult/runner.py` (runs with per-run settings) |
 
-See `ABOUT.md` for the computations, data sources and open points:
-https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
+See [ABOUT.md](ABOUT.md) for the computations, data sources and open points, and
+[VERIFICATION.md](VERIFICATION.md) for how the predictions were checked against OccultWatcher Cloud and Occult
+(same stars, times within a few seconds) and the differences found.
 
 # Quick start
 
@@ -983,7 +984,7 @@ To cite PyOccult, use [CITATION.cff](CITATION.cff) (GitHub: "Cite this repositor
 
 Parts of the code and documentation were developed with the help of Claude (Anthropic), an AI model, using
 Claude Code. All results were reviewed and validated by the author, among others against Occult Watcher Cloud
-(see ABOUT.md, Part 5: Validation). Commits made with this help carry a
+(see [VERIFICATION.md](VERIFICATION.md)). Commits made with this help carry a
 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` line.
 
 Thanks to the IOTA community and the authors of Occult and Occult Watcher Cloud, on whose work and reference

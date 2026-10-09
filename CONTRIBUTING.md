@@ -64,7 +64,7 @@ Good practice:
 
 - Work on your branch, one topic per session or branch.
 - Ask it to run the tests (below) and, for anything that changes predictions, to compare with a known result
-  (`pyoccult/owc_check.py`, see ABOUT.md Part 5).
+  (`pyoccult/owc_check.py`, see VERIFICATION.md).
 - Keep `CLAUDE.md` current: when a change adds a file, a convention or a known limitation, update the matching
   section (Files, Conventions that matter, Status, Ideas not built yet) in the same branch. It is the memory for the
   next developer and the next session.

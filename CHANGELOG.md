@@ -6,6 +6,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+- **VERIFICATION.md**: all checks in one place (OWC search results, Occult's star positions, internal and geometric
+  checks, what the differences mean), moved out of ABOUT.md Part 5 (now a summary with a link), with a new OWC set
+  (Oct 8-11 2026, 50 events: 44 match; two events on Gaia 2-parameter stars the local catalog leaves out, one small
+  asteroid's orbit, three drops by the asteroid's brightness).
+
 ## [0.14.0] "New Horizons" - 2026-10-08
 
 **Planets and moons** join the asteroids as occulting bodies: Mars to Neptune, Pluto and 91 of their moons, in
