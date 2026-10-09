@@ -1,6 +1,7 @@
 """stellarium.py - point a running Stellarium at an event through its Remote Control plugin (HTTP, default port
-8090; enable the plugin in Stellarium: Configuration > Plugins > Remote Control, "Load at startup", and start the
-server, without a password). Sets the observer site (optional), the event time with the clock stopped, the view on
+8090). Stellarium setup, once: Configuration (F2) > Plugins > Remote Control: "Load at startup", restart; then
+its "configure": "Server enabled" and "Enable automatically on startup", port 8090 (default), no authentication,
+"Save settings". Sets the observer site (optional), the event time with the clock stopped, the view on
 the target star (J2000 direction) and the field of view. Any system; never raises.
 
 Used by gui.py (/api/stellarium/show), which the report's Stellarium buttons call when the GUI serves the report.

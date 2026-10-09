@@ -775,11 +775,13 @@ pyoccult --port 8090 --no-browser
   both standard on Linux desktops). Elsewhere (macOS, Windows, KStars not running, the report opened as a file) the
   button does not appear.
   A **Stellarium** button (any system) does the same in Stellarium: the event time with the clock stopped, the
-  view on the star and the field; with the checkbox above (now "KStars/Stellarium: ...") also the site. It needs
-  Stellarium's **Remote Control** plugin (Configuration > Plugins > Remote Control: "Load at startup", restart,
-  then in its settings enable the server without a password, port 8090). The button is always shown when the GUI
-  serves the report; a click tries and says if Stellarium did not answer. Also `pyoccult stellarium <ra> <dec>
-  <utc> [fov]`.
+  view on the star and the field; with the checkbox "KStars/Stellarium: set its location to the event site" also
+  the site. The button is always shown when the GUI serves the report; a click tries and says if Stellarium did
+  not answer. Also `pyoccult stellarium <ra> <dec> <utc> [fov]`.
+  **Stellarium setup (once):** the pointing uses Stellarium's **Remote Control** plugin.
+  1. Configuration (F2) > Plugins > **Remote Control**: tick **Load at startup**, then restart Stellarium.
+  2. Same place, **configure**: tick **Server enabled** and **Enable automatically on startup**. Port **8090** is
+     the default (PyOccult uses it); leave "Access requires authentication" off. **Save settings**.
 * **Log**: the live output of the running job, with **Stop**.
 
 Settings chosen in the GUI apply to that run only (via `pyoccult/runner.py`); `pyoccult_config.py` is not changed.
