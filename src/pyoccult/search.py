@@ -1041,6 +1041,12 @@ if __name__ == "__main__":
     local = gaia_local.LocalGaia(config.gaia_local_dir)         # raises if the catalog is incomplete
     LOCAL = local
     print(f"Using local Gaia catalog {config.gaia_local_dir} (G <= {local.gmax})")
+    if mag_min > local.gmax:                                      # (a GUI or config limit beyond the catalog)
+        print(f"Star limit G {mag_min:g} is fainter than the catalog: using G {local.gmax:g}")
+        mag_min = local.gmax
+    if float(getattr(config, "gaia_local_gmax", local.gmax)) < local.gmax - 1e-9 and abs(mag_min - config.gaia_local_gmax) < 1e-9:
+        print(f"Note: gaia_local_gmax = {config.gaia_local_gmax:g} in pyoccult_config.py caps the star limit at "
+              f"G {mag_min:g}, the catalog goes to G {local.gmax:g} (set gaia_local_gmax = {local.gmax:g} to use it)")
 
     et0 = spice.str2et(t0.strftime("%Y-%m-%dT%H:%M:%S"))
     et1 = et0 + config.days * 86400.0
@@ -1062,8 +1068,6 @@ if __name__ == "__main__":
                 print(f"{t}: no ephemeris ({str(ex)[:160]}), skipping")
                 continue
             size = bodies.size(spice, t)
-            if size["kind"] == "planet":                           # no drop filter; bright stars only (glare)
-                mag_lim = min(mag_min, float(getattr(config, "planet_star_limit", 10.0)))
             print(f"Major body {t}: radius {size['r_km']:.0f} km, stars G <= {mag_lim:g}")
         else:
             size = get_asteroid_size(t)

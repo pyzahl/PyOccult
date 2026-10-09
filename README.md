@@ -83,6 +83,7 @@ everything: `pyoccult` (the web interface) or `pyoccult <command>`, e.g. `pyoccu
 | `pyoccult/picks.py` | the saved picks: which one a search uses, `list`, `import` |
 | `pyoccult/urls.py` | every download and web address PyOccult uses (NAIF, ESA Gaia, Zenodo, JPL, MPC, Open-Meteo, maps), each with its own name: change them there only |
 | `pyoccult/kstars.py` | points a running KStars at an event (Linux, D-Bus); used by the report's KStars button in the GUI |
+| `pyoccult/stellarium.py` | points a running Stellarium at an event (Remote Control plugin, HTTP); the report's Stellarium button |
 | `pyoccult/favorites.py` | the favorites list (`favorites/`, private): events starred in the report, with copies of map and preview; `list` |
 | `pyoccult/setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pyoccult/gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult/setup.py` and the search) |
@@ -377,7 +378,8 @@ pyoccult                 # opens http://127.0.0.1:8080 in your browser (local on
 4. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
    a **Preview** (star field and camera frame), a **Globe** (the whole Earth seen from the star with the path and
    minute marks, and the event parameters as on Occult's plot) and the **KML** for Google Earth for each event; on Linux with KStars
-   running also a **KStars** button that points KStars at the event, and a **☆** button that adds the event to
+   running also a **KStars** button that points KStars at the event, a **Stellarium** button (Remote Control
+   plugin), and a **☆** button that adds the event to
    your favorites.
 5. **Favorites**: the events you starred, from any search and any site, each with its own copy of map and preview
    (later searches do not change them). The table is the Results table (same columns, sorting and tools: KStars,
@@ -772,6 +774,12 @@ pyoccult --port 8090 --no-browser
   computed for the right UT. It uses KStars' D-Bus interface (`gdbus` or `dbus-send`,
   both standard on Linux desktops). Elsewhere (macOS, Windows, KStars not running, the report opened as a file) the
   button does not appear.
+  A **Stellarium** button (any system) does the same in Stellarium: the event time with the clock stopped, the
+  view on the star and the field; with the checkbox above (now "KStars/Stellarium: ...") also the site. It needs
+  Stellarium's **Remote Control** plugin (Configuration > Plugins > Remote Control: "Load at startup", restart,
+  then in its settings enable the server without a password, port 8090). The button is always shown when the GUI
+  serves the report; a click tries and says if Stellarium did not answer. Also `pyoccult stellarium <ra> <dec>
+  <utc> [fov]`.
 * **Log**: the live output of the running job, with **Stop**.
 
 Settings chosen in the GUI apply to that run only (via `pyoccult/runner.py`); `pyoccult_config.py` is not changed.
@@ -800,9 +808,9 @@ pyoccult.bodies` lists them).
 * Positions: from JPL Horizons with each search (a small kernel per window, cached), the same ephemeris as NAIF's
   satellite kernels. For offline use, `pyoccult setup --planet-kernels` downloads NAIF's kernel once (Jupiter:
   `jup365.bsp`, 1.1 GB; setup also asks on a first-time setup); PyOccult then uses it.
-* Brightness: a planet's light swamps any star, so planets have no drop limit, only their own star limit
-  (`planet_star_limit`, default G 10, for the glare); moons (Jupiter's are about mag 5) need bright stars for a
-  measurable drop (`min_mag_drop`).
+* Brightness: a star covered by a planet disappears, so planets have no drop limit, only the run's star limit
+  (**Star G limit** in the tab; how faint you can see a star next to the planet's glare is up to you); moons
+  (Jupiter's are about mag 5) need bright stars for a measurable drop (`min_mag_drop`).
 * Planets Mars to Neptune use the planet rule; Pluto (point-like, mag ~14.5) follows the asteroid rules (drop
   limit). Saturn's rings and the planets' atmospheres are not modelled (the shadow is the planet's disk).
 * Offline kernels (`--planet-kernels`): Jupiter `jup365.bsp`, Saturn `sat441.bsp`, Neptune `nep097.bsp`, Pluto

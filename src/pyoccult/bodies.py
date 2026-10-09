@@ -13,7 +13,7 @@ search, maps and previews work with it unchanged.
 
 Size: radii from the planet constants kernel (pck00010). Brightness: V(1,0) and a phase coefficient
 (V = V10 + 5 log10(r delta) + beta * phase), used as H with G for the moons (the drop works as for asteroids); a
-planet has no H: no drop filter, its own star limit (config `planet_star_limit`, glare). Path uncertainty: rough
+planet has no H: no drop filter, the run's star limit (MAG_MIN). Path uncertainty: rough
 3-sigma values per body (SIGMA3_KM), since Horizons gives none for them.
 """
 from pyoccult.version import __version__
@@ -235,7 +235,7 @@ def ensure_kernel(spice, target, et0, et1, cache_dir, folder="."):
 def size(spice, target):
     """The size dict of the search (as get_asteroid_size gives for asteroids): radius from the planet constants
     kernel (else the satellite table), H and G for moons and Pluto (Horizons' brightness as H, H-G law with G = MOON_G),
-    none for the planets (no drop filter: a planet's light swamps it; planet_star_limit instead)."""
+    none for the planets (no drop filter: a planet's light swamps it; the run's star limit only)."""
     b = parse(target)
     try:
         radii = np.asarray(spice.bodvrd(str(b["naif"]), "RADII", 3)[1], float)

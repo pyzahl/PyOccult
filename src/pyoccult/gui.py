@@ -273,6 +273,9 @@ def index():
             with ui.row().classes("items-end gap-4"):
                 s_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date")
                 s_days = ui.number("Days", value=config.days, min=1, step=1)
+                s_mag = ui.number("Star G limit", step=0.1, min=6, max=21).classes("w-28").tooltip(
+                    "Faintest star (Gaia G) searched. Default: from the site's telescope (aperture, detection frames, longest "
+                    "exposure, MagAdjust; Site tab), capped at the catalog's limit; change it for one run")
                 s_drop = ui.number("Min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1), step=0.05)
             s_use_file = ui.switch("Targets from the saved pick of this site (Pick tab)", value=True).tooltip(
                 "Uses the newest saved pick of the selected site whose window covers the search window; "
@@ -368,9 +371,10 @@ def index():
             with ui.row().classes("items-end gap-4"):
                 b_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date").classes("w-36")
                 b_days = ui.number("Days", value=30, min=1, step=1).classes("w-28")
-                b_plim = ui.number("Planet: star G limit", value=float(getattr(config, "planet_star_limit", 10.0)),
-                                   step=0.5).classes("w-36").tooltip(
-                    "Planets: no drop limit (a planet's light swamps it), only stars this bright or brighter (glare)")
+                b_mag = ui.number("Star G limit", step=0.1, min=6, max=21).classes("w-28").tooltip(
+                    "Faintest star (Gaia G) searched. Default: from the site's telescope (aperture, detection frames, longest "
+                    "exposure, MagAdjust; Site tab), capped at the catalog's limit; change it for one run. "
+                    "Planets have no drop limit (any star they cover disappears); moons also need the min. drop")
                 b_drop = ui.number("Moons: min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1),
                                    step=0.05).classes("w-36").tooltip(
                     "Moons are bright (about mag 5 for Jupiter's): only bright stars give a measurable drop")
@@ -399,10 +403,10 @@ def index():
                 ui.link("Open in a new tab", "/out/hits_report.html", new_tab=True)
                 ui.button("CSV", on_click=lambda: hits_csv()).props("outline dense").tooltip(
                     "Download the search results (hits_log.csv: every event with all its columns)")
-                ui.checkbox("KStars: set its location to the event site", value=KSTARS_OPT["set_location"],
+                ui.checkbox("KStars/Stellarium: set its location to the event site", value=KSTARS_OPT["set_location"],
                             on_change=lambda e: KSTARS_OPT.update(set_location=bool(e.value))).tooltip(
-                    "The report's KStars buttons (Linux, KStars running). Off: KStars keeps its location; "
-                    "you are told if that is far from the site.")
+                    "The report's KStars buttons (Linux, KStars running) and Stellarium buttons (Remote Control "
+                    "plugin). Off: they keep their location (KStars tells you if that is far from the site).")
             with resizable_box("results", 75):                            # drag the corner to resize (remembered)
                 frame = ui.element("iframe").style("width: 100%; height: 100%; border: 0; display: block")
 
@@ -520,7 +524,7 @@ def index():
         s = collect()
         unsaved.text = "" if saved_site(state["name"]) == effective(s, state["name"]) else "unsaved changes"
         w, h = fov(s)
-        p_mag.value = pick_mag_default(s)
+        p_mag.value = s_mag.value = b_mag.value = pick_mag_default(s)
         derived.text = (f"Stars searched to G {mag_limit(s):.1f} · camera field {w:.1f}′ × {h:.1f}′ "
                         f"(focal {s.get('focal_mm') or 100 * s.get('aperture_cm', 25):.0f} mm)")
 
@@ -669,7 +673,9 @@ def index():
         unsaved.text = ""
 
     sel.on_value_change(lambda e: show_site(e.value) if e.value in sites else None)   # None while options change
-    cat_sel.on_value_change(lambda e: setattr(p_mag, "value", pick_mag_default(collect())))   # catalog limit
+    def catalog_limit(*_):                                        # the catalog's limit caps the star limits
+        p_mag.value = s_mag.value = b_mag.value = pick_mag_default(collect())
+    cat_sel.on_value_change(catalog_limit)
     show_site(state["name"])
 
     # ------------------------------------------------ runs
@@ -713,8 +719,9 @@ def index():
         ensure_saved()
         over = dict(ct=f"{b_start.value}T00:00:00", days=int(b_days.value), targets=targets, targets_source="list",
                     results_list="bodies", hits_output_cvs_file="bodies_log.csv",
-                    results_new_series=bool(b_fresh.value), planet_star_limit=float(b_plim.value),
-                    min_mag_drop=float(b_drop.value), gaia_online_check=False)
+                    results_new_series=bool(b_fresh.value),
+                    min_mag_drop=float(b_drop.value), gaia_online_check=False,
+                    **({"MAG_MIN": float(b_mag.value)} if b_mag.value else {}))
 
         async def done(rc):
             if rc == 0:
@@ -755,6 +762,7 @@ def index():
             return
         ensure_saved()
         over = dict(ct=f"{s_start.value}T00:00:00", days=int(s_days.value), min_mag_drop=float(s_drop.value),
+                    **({"MAG_MIN": float(s_mag.value)} if s_mag.value else {}),
                     write_maps=bool(s_maps.value), write_previews=bool(s_prev.value),
                     star_parallax=bool(s_plx.value), light_deflection=bool(s_defl.value),
                     gaia_online_check=bool(s_dbl.value))
@@ -1054,6 +1062,7 @@ def main():
     app.add_static_files("/out/maps", os.path.join(ROOT, config.map_dir), max_cache_age=0)
     app.add_static_file(local_file=os.path.join(PKG, "pyoccult_logo.svg"), url_path="/pyoccult_logo.svg")
     from pyoccult import kstars                                      # report's KStars buttons (Linux; hidden elsewhere)
+    from pyoccult import stellarium                                  # report's Stellarium buttons (any system)
     os.makedirs(os.path.join(ROOT, favorites.DIR), exist_ok=True)
     from pyoccult import sbdb                                        # full SBDB data (shape, rotation) for older favorites
     favorites.backfill_phys(lambda t: sbdb.get_full(t, config.cache_path))
@@ -1114,6 +1123,12 @@ def main():
     def kstars_show(ra: float, dec: float, utc: str, fov: float = 2.0, lat: float = None, lon: float = None,
                     ele: float = 0.0):
         ok, msg = kstars.show(ra, dec, utc, fov, lat, lon, ele, set_location=KSTARS_OPT["set_location"])
+        return {"ok": ok, "msg": msg}
+
+    @app.get("/api/stellarium/show")
+    def stellarium_show(ra: float, dec: float, utc: str, fov: float = 2.0, lat: float = None, lon: float = None,
+                        ele: float = 0.0):
+        ok, msg = stellarium.show(ra, dec, utc, fov, lat, lon, ele, set_location=KSTARS_OPT["set_location"])
         return {"ok": ok, "msg": msg}
     app.add_static_file(local_file=os.path.join(ROOT, "hits_report.html"), url_path="/out/hits_report.html",
                         strict=False, max_cache_age=0)

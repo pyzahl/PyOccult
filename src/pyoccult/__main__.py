@@ -10,6 +10,7 @@
     pyoccult picks list|import       saved picks
     pyoccult favorites ...           favorites list (page, CSV)
     pyoccult kstars ...              point KStars (Linux)
+    pyoccult stellarium ...          point Stellarium (Remote Control plugin)
     pyoccult run <command> '<json>'  a search or pick with settings overridden for this run (used by the GUI)
 
 `pyoccult <command> --help` shows a command's options. Also: python -m pyoccult <command> ...
@@ -21,7 +22,7 @@ import importlib, os, runpy, sys
 
 COMMANDS = {"gui": "gui", "setup": "setup", "pick": "pick", "search": "search", "report": "report",
             "owc-check": "owc_check", "gaia": "gaia_local", "picks": "picks", "favorites": "favorites",
-            "kstars": "kstars", "run": "runner"}
+            "kstars": "kstars", "stellarium": "stellarium", "run": "runner"}
 SCRIPTS = {"search"}            # not import-safe (sets up SPICE at import): executed as a script
 
 

@@ -58,3 +58,6 @@ URL_OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"               #
 URL_LEAFLET_CSS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
 URL_LEAFLET_JS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
 URL_GOOGLE_MAPS_SEARCH = "https://www.google.com/maps/search/?api=1&query="    # + "lat,lon"
+
+# --- planetarium programs on this computer
+URL_STELLARIUM_API = "http://localhost:8090/api"    # Stellarium's Remote Control plugin (default port 8090)

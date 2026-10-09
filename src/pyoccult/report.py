@@ -503,6 +503,16 @@ fetch('/api/kstars/status').then(function(r){return r.json();}).then(function(j)
    b.textContent=j.ok?'KStars ✓':'KStars ✗';b.title=j.msg;pyoToast(j.msg,!j.ok||j.msg.indexOf('; ')>0);
    setTimeout(function(){b.textContent='KStars';},4000);})
   .catch(function(){b.textContent='KStars ✗';pyoToast('KStars: no answer from the GUI',true);});});});}).catch(function(){});})();
+(function(){var site=__SITE__,bs=document.querySelectorAll('.stbtn');if(!bs.length||location.protocol==='file:')return;
+ bs.forEach(function(b){b.hidden=false;b.addEventListener('click',function(){
+  var q=new URLSearchParams({ra:b.dataset.ra,dec:b.dataset.dec,utc:b.dataset.utc,fov:b.dataset.fov});
+  var st=b.dataset.lat?{lat:b.dataset.lat,lon:b.dataset.lon,ele:b.dataset.ele}:site;
+  if(st){q.set('lat',st.lat);q.set('lon',st.lon);q.set('ele',st.ele||0);}
+  b.textContent='Stellarium …';
+  fetch('/api/stellarium/show?'+q).then(function(r){return r.json();}).then(function(j){
+   b.textContent=j.ok?'Stellarium ✓':'Stellarium ✗';b.title=j.msg;pyoToast(j.msg,!j.ok);
+   setTimeout(function(){b.textContent='Stellarium';},4000);})
+  .catch(function(){b.textContent='Stellarium ✗';pyoToast('Stellarium: no answer from the GUI',true);});});});})();
 </script>"""
 
 PREVIEW_DIALOG = """<dialog id="prevdlg" aria-label="Event preview" style="width:auto;height:auto;max-width:96vw;max-height:96vh">
@@ -621,6 +631,11 @@ def map_cell(e):
           f'data-utc="{esc(e["utc"])}" data-fov="{e["fov"]:.3f}" {ks_site}title="Point KStars at the star at the event '
           f'time, seen from the site (Linux, KStars running, report opened from the GUI)">KStars</button> '
           if e.get("ra") is not None and e.get("dec") is not None else "")
+    if e.get("ra") is not None and e.get("dec") is not None:     # shown whenever the GUI serves the page (blind try)
+        ks += (f'<button class="mapbtn stbtn" type="button" hidden data-ra="{e["ra"]:.7f}" data-dec="{e["dec"]:.7f}" '
+               f'data-utc="{esc(e["utc"])}" data-fov="{e["fov"]:.3f}" {ks_site}title="Point Stellarium at the star at '
+               f'the event time (Stellarium running with its Remote Control plugin on port 8090; report opened from '
+               f'the GUI)">Stellarium</button> ')
     if not e["kml"] and not e.get("preview") and not e.get("globe"):
         return f'<td class="tools">{ks}—</td>' if ks else '<td class="tools">—</td>'
     title = f'{e["label"]} · {fmt_time(e["when"])} UT'

@@ -16,6 +16,14 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   Prepares event kinds with several contact times (planets, moons, eclipses).
 
 ### Added
+- **Stellarium** button next to KStars in the Results and Favorites tables (`pyoccult/stellarium.py`, any
+  system): through Stellarium's Remote Control plugin (port 8090) it sets the event time with the clock stopped,
+  the view on the star (J2000) and the field, and with "KStars/Stellarium: set its location to the event site" the
+  site. Shown whenever the GUI serves the report; a click tries and reports. Also `pyoccult stellarium`.
+- GUI Search and Planets & Moons tabs: **Star G limit** for one run (as in the Pick tab; default from the site's
+  telescope, capped at the selected catalog's limit). Planets use it like any target (no separate planet limit).
+  A limit beyond the catalog is cut to the catalog's; a search notes when `gaia_local_gmax` in your
+  `pyoccult_config.py` caps the limit below the catalog's (older configs have 13).
 - Event preview: the search corridor (the strip searched for stars: Earth radius + body radius + reach, at the
   event distance) as dotted lines on both sides of the track, with its half-width in the legend.
 - All planet systems: Mars, Jupiter, Saturn, Uranus, Neptune and Pluto with their moons
@@ -37,7 +45,7 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   Their positions come from JPL Horizons as a small SPICE kernel per search window (cached; the same ephemeris as
   NAIF's 1 GB satellite kernel, reproduced to ~1 m), radii from the planet constants. Events of a planet or moon
   get **disappearance and reappearance times** at your site (`d_utc`, `r_utc`; also in the database as contacts),
-  a planet has no drop filter but its own star limit (`planet_star_limit`, glare), and the light deflection leaves
+  a planet has no drop filter (any star it covers disappears), and the light deflection leaves
   out the target's own planet. The report shows their name with a "planet"/"moon" badge. Verified: Jupiter's D and
   R put the star exactly one Jupiter radius from its centre in independent geometry. A GUI tab and a results page
   for them follow.

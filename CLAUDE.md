@@ -68,7 +68,7 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `ensure_kernel`: Horizons VECTORS (CENTER 500@<bary>, 20 min, ICRF) -> SPK type 13 via `spkw13` in cache_path
   (~1 m vs Horizons; Horizons = jup365 ephemeris, so no 1 GB NAIF download), furnsh + `boddef(alias)` so all SPICE
   calls take "M:IO". search.py: corridor loop branch (no SBDB/Horizons SPK; size from PCK radii; planets H=None ->
-  no drop cap, star limit `planet_star_limit`; moons H=V10, G=0.3), deflection without own system
+  no drop cap, star limit = MAG_MIN like asteroids (GUI "Star G limit" override; no separate planet limit); moons H from satellites.json, G=MOON_G), deflection without own system
   (`bodies.deflectors`), sigma from REGISTRY, `contact_times` D/R (brentq on |offset|=r; logged d_utc/r_utc,
   duration_s; db contacts), record `kind`. Windows mode skips bodies. Verified 2026-10-08: Jupiter events, D/R at
   exactly the radius by independent topocentric geometry (0.1 km). Report: name + kind badge (no SBDB link).
@@ -132,6 +132,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `KSTARS_OPT`): move KStars to the site (message names the old place) or keep it (warn if > 50 km). KStars ignores
   the tz passed to setGPSLocation and picks its own (Long Island got -6): label only, UT is right. GUI routes `/api/kstars/status|show`; the report's
   hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
+- `pyoccult/stellarium.py` (2026-10-08): Stellarium Remote Control plugin (`URL_STELLARIUM_API`, port 8090, HTTP POST
+  form fields via `net.urlopen`): location/setlocationfields (if KSTARS_OPT set_location) -> main/time (time = JD
+  UT, timerate=0) -> main/view (j2000=[x,y,z]) -> main/fov. Never raises. GUI route `/api/stellarium/show`; report
+  `.stbtn` shown whenever served over http (no status check: blind try, toast). Verified with a running Stellarium.
 - `pyoccult/favorites.py`: favorites in `favorites/` (private, gitignored): `favorites.json` (entry = hits_log record,
   site and run context from the run summary, status, note) and `favorites/<target>_<YYYYMMDDTHHMM>/` with copies of
   KML and preview SVG. Report: hidden `.favbtn` stars, shown only via the GUI (`/api/favorites/keys|add`; add looks
