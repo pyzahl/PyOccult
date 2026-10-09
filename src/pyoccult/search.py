@@ -703,7 +703,8 @@ def write_preview(record, target_id, stem):
                 continue
             _, a_, d_ = spice.recrad(v)
             disks.append(dict(ra=np.degrees(a_), dec=np.degrees(d_), r_arcsec=np.degrees(r_km / np.linalg.norm(v)) * 3600,
-                              label=bodies.name(t), main=(bodies.parse(t)["naif"] == b["naif"])))
+                              label=bodies.name(t), main=(bodies.parse(t)["naif"] == b["naif"]),
+                              moon=bodies.parse(t)["kind"] == "moon"))
         # zoom: the system's bodies near the target (within 15'), at least 8 disk diameters, 2' minimum
         u0 = np.array([math.cos(math.radians(record["star_dec"])) * math.cos(math.radians(record["star_ra"])),
                        math.cos(math.radians(record["star_dec"])) * math.sin(math.radians(record["star_ra"])),

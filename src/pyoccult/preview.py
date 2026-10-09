@@ -42,7 +42,7 @@ def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", sub
     track: list of (minutes from the event, ra, dec) of the asteroid; must include 0
     fov_arcmin: (width, height) of the camera field.
     disks: planets and moons to draw at their angular size, [dict(ra, dec, r_arcsec, label, main)] (main: the
-    occulting body); body_name: the occulting body's name for the legend (a planet or moon) instead of "asteroid";
+    occulting body; moon: marked with a "+" whatever its size); body_name: the occulting body's name for the legend (a planet or moon) instead of "asteroid";
     field_arcmin: the field size instead of the camera-based one (planets and moons: zoomed to their system).
     corridor_arcsec: half-width of the searched strip around the track (dotted lines; corridor_km for the legend)."""
     fw, fh = fov_arcmin
@@ -130,6 +130,10 @@ def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", sub
             fill = "#fde68a" if dk.get("main") else "#cbd5e1"
             out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{rr:.1f}" fill="{fill}" fill-opacity="0.35" stroke="{fill}" '
                        f'stroke-width="1.2"><title>{_esc(dk["label"])}: radius {dk["r_arcsec"]:.1f}″</title></circle>')
+            if dk.get("moon"):                                          # every moon: a "+" at its centre
+                k = max(4.0, rr + 3.0)
+                out.append(f'<path d="M{x - k:.1f},{y:.1f} H{x + k:.1f} M{x:.1f},{y - k:.1f} V{y + k:.1f}" '
+                           f'stroke="#22d3ee" stroke-width="1.3"><title>{_esc(dk["label"])}</title></path>')
             left = x + rr + 4 + 7 * len(dk["label"]) > SIZE - 4             # near the right edge: label on the left
             lx, ly = (x - rr - 4, y - rr - 2) if left else (x + rr + 4, y - rr - 2)
             while any(abs(ly - py_) < 12 and abs(lx - px_) < 60 for px_, py_ in placed):

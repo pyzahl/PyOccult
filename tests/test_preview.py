@@ -33,4 +33,10 @@ lines = [p_ for p_ in ET.fromstring(svg).iter(ns + "polyline") if p_.get("stroke
 assert len(lines) == 2 and "search corridor ±30.0″ (±6,578 km)" in svg
 ys = sorted(float(l.get("points").split()[6].split(",")[1]) for l in lines)
 assert abs(ys[0] - (P.SIZE / 2 - 0.5 * scale)) < 0.3 and abs(ys[1] - (P.SIZE / 2 + 0.5 * scale)) < 0.3, ys
+# planets and moons: every moon gets a "+" (also a tiny one), the planet none
+svg = P.render_svg(stars, dict(ra=ra0, dec=dec0, g=11.0), track, (w, h), disks=[
+    dict(ra=ra0, dec=dec0, r_arcsec=20.0, label="Jupiter", main=True, moon=False),
+    dict(ra=ra0 + east, dec=dec0, r_arcsec=0.01, label="Amalthea", main=False, moon=True)])
+plus = [p_ for p_ in ET.fromstring(svg).iter(ns + "path") if p_.get("stroke") == "#22d3ee"]
+assert len(plus) == 1 and plus[0].find(ns + "title").text == "Amalthea"
 print("PREVIEW TESTS PASSED")
