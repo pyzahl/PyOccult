@@ -974,6 +974,9 @@ Globe view:
 Preview:
 <img width="2200" height="1566" alt="image" src="https://github.com/user-attachments/assets/030ccb68-8a84-482a-93f9-3b540cec49c4" />
 And also KStars + Stellarious auto point options.
+Results and labelled with OWC stations (experimental feature):
+<img width="2256" height="1933" alt="image" src="https://github.com/user-attachments/assets/150ed7b9-416e-4918-a22c-feec0aeef68b" />
+
 
 #### Favorites
 And finally your "Starred" events in Favorites Manager, a experimental OWC feed/station info can be loaded (disabled by default as experimental):
