@@ -389,8 +389,9 @@ pyoccult                 # opens http://127.0.0.1:8080 in your browser (local on
    and the time zone of each event's site (Site). Click a row to see its star-field preview and shadow path map side by side
    below the table, with its size (the diameter and range the search used, its source, H and albedo), its shape and
    rotation where SBDB knows them (axes, rotation period, pole, taxonomic type; fetched once per favorite from the
-   SBDB API, as the pick tool's bulk data holds only the size), and to edit its note. **CSV** downloads all favorites as a table (`favorites_<date>.csv`): `favorites/favorites.csv` is rewritten with every
-   change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
+   SBDB API, as the pick tool's bulk data holds only the size), and to edit its note. **CSV** downloads the favorites
+   table (`favorites_<date>.csv`; columns: see "CSV downloads" below); `favorites/favorites.csv`, with all fields,
+   is rewritten with every change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
    in your browser; the Results report and the Pick table have the same corner).
 
 Settings changed in the GUI apply to that run only; `pyoccult_config.py` is not changed. Details: "Web interface
@@ -456,7 +457,7 @@ To include the maps' KML links in the published page, also copy the `maps` folde
 
 | what | files |
 |---|---|
-| your sites and settings | `sites.py`, `pyoccult_config.py` (created from `src/pyoccult/templates/pyoccult_config.py` on first use) |
+| your sites and settings | `sites.py`, `pyoccult_config.py` (created from `src/pyoccult/templates/pyoccult_config.py` on first use), `csv_exports.py` (the columns of the CSV buttons; created at the first CSV download) |
 | downloaded data | SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`, ~120 MB), Gaia catalogs (`gaia_dr3_g16/` ~4 GB, `gaia_dr3_g18/` ~13 GB), `data/ObsCodes.html` (MPC observatory list) |
 | your results | `pyoccult.db` (the results database: every search run and its events, kept per "results list", and the favorites), `hits_log.csv` (+ `.runs.jsonl`: the current results list, exported from the database after each search), `hits_report.html`, `maps/` (KML, previews, globe plots), `favorites/` (map and preview copies of the favorites), `picks/` (saved picks), `targets.py`, `pick_events.csv` |
 
@@ -783,6 +784,17 @@ pyoccult --port 8090 --no-browser
   2. Same place, **configure**: tick **Server enabled** and **Enable automatically on startup**. Port **8090** is
      the default (PyOccult uses it); leave "Access requires authentication" off. **Save settings**.
 * **Log**: the live output of the running job, with **Stop**.
+
+**CSV downloads** (Pick, Results, Planets & Moons, Favorites): by default the columns and values exactly as the
+table shows them (without the tools column). Results, Planets & Moons and Favorites come from the results database
+(`pyoccult.db`), the pick from its saved file. Which columns, in which order and with which headings is set in
+`csv_exports.py` in the data folder (created from `src/pyoccult/templates/csv_exports.py` at the first download):
+one list per table of `(heading, source)`, where the source is a value as the table shows it (`"altitude"`,
+`"chance"`, ...), a raw field of the event record (`"raw:star"` for the Gaia DR3 id, `"raw:star_ra"`,
+`"raw:best_utc"`, ...), `"*"` for all raw fields not listed yet, or a Python function `f(shown, raw)`. A table your
+file leaves out keeps the default. The files are UTF-8 with a byte order mark (spreadsheets show ° and the Moon
+symbols right). The complete favorites table stays in `favorites/favorites.csv`, the complete search log in
+`hits_log.csv` / `bodies_log.csv`.
 
 Settings chosen in the GUI apply to that run only (via `pyoccult/runner.py`); `pyoccult_config.py` is not changed.
 Each run is its own process. The GUI listens on this computer only (127.0.0.1), because it can start programs.

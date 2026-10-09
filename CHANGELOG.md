@@ -16,6 +16,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   Prepares event kinds with several contact times (planets, moons, eclipses).
 
 ### Added
+- **CSV columns file** `csv_exports.py` in the data folder (`pyoccult/exports.py`, template
+  `templates/csv_exports.py`, created at the first download): which columns the CSV buttons of the Pick, Results,
+  Planets & Moons and Favorites tabs export, in which order and with which headings. Default: exactly the table's
+  columns and values as shown; any raw field of the event record (`"raw:star"`, ...), all of them (`"*"`) or a
+  function can be added. Results, Planets & Moons and Favorites are exported from the results database. UTF-8 with
+  byte order mark for spreadsheets. Before, the buttons downloaded the raw log files with all columns.
 - **Stellarium** button next to KStars in the Results and Favorites tables (`pyoccult/stellarium.py`, any
   system): through Stellarium's Remote Control plugin (port 8090) it sets the event time with the clock stopped,
   the view on the star (J2000) and the field, and with "KStars/Stellarium: set its location to the event site" the

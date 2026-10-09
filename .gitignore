@@ -12,6 +12,7 @@ owc_reference.csv
 owc_refs/
 /sites.py
 /pyoccult_config.py
+/csv_exports.py
 run.sh
 # run outputs (results database: pyoccult.db, its WAL files; owc_check.db)
 *.db

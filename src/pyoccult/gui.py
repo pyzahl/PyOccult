@@ -20,6 +20,7 @@ from pyoccult import favorites
 from pyoccult import cameras
 from pyoccult import occultations
 from pyoccult import binaries
+from pyoccult import exports
 
 PY = sys.executable
 PYOCCULT = [PY, "-u", "-m", "pyoccult"]                             # how runs are started: PYOCCULT + [command, ...]
@@ -335,7 +336,8 @@ def index():
                     "Set the search window to this pick's window and go to the Search tab")
                 ui.button("Reload", on_click=lambda: load_pick()).props("flat dense")
                 ui.button("CSV", on_click=lambda: pick_csv()).props("outline dense").tooltip(
-                    "Download the selected pick's events as a CSV table (all columns of pick_events.csv)")
+                    "Download the selected pick's events as a CSV table."
+                    " Columns: csv_exports.py in the data folder (default: as the table shows them; any log column can be added)")
             pick_info = ui.label().classes("text-sm text-slate-600 w-full")
             targets_info = ui.label().classes("text-sm text-slate-600 w-full")
             cols = [dict(name=k, label=lbl, field=k, sortable=True, align="left") for k, lbl in
@@ -385,7 +387,8 @@ def index():
                 ui.button("Rebuild report", on_click=lambda: build_bodies_report()).props("outline")
                 ui.link("Open in a new tab", "/out/bodies_report.html", new_tab=True).classes("self-center")
                 ui.button("CSV", on_click=lambda: bodies_csv()).props("outline dense").tooltip(
-                    "Download these events (bodies_log.csv) with disappearance and reappearance times")
+                    "Download these events with disappearance and reappearance times."
+                    " Columns: csv_exports.py in the data folder (default: as the table shows them; any log column can be added)")
             ui.label("Disappearance (D) and reappearance (R) at your site, from JPL Horizons positions (a small "
                      "kernel per window). The results are their own list (bodies_log.csv), apart from the asteroid "
                      "search.").classes("text-xs text-slate-500")
@@ -402,7 +405,8 @@ def index():
                         "shown under the asteroid with a link to the OWC event page (one request per second)")
                 ui.link("Open in a new tab", "/out/hits_report.html", new_tab=True)
                 ui.button("CSV", on_click=lambda: hits_csv()).props("outline dense").tooltip(
-                    "Download the search results (hits_log.csv: every event with all its columns)")
+                    "Download the search results as a CSV table."
+                    " Columns: csv_exports.py in the data folder (default: as the table shows them; any log column can be added)")
                 ui.checkbox("KStars/Stellarium: set its location to the event site", value=KSTARS_OPT["set_location"],
                             on_change=lambda e: KSTARS_OPT.update(set_location=bool(e.value))).tooltip(
                     "The report's KStars buttons (Linux, KStars running) and Stellarium buttons (Remote Control "
@@ -417,8 +421,9 @@ def index():
                 ui.button("Reload", on_click=lambda: load_favs()).props("flat dense")
                 ui.link("Open in a new tab", "/fav/favorites.html", new_tab=True)
                 ui.button("CSV", on_click=lambda: fav_csv()).props("outline dense").tooltip(
-                    "Download all favorites as a table (favorites/favorites.csv, rewritten with every change), "
-                    "named favorites_<today>.csv")
+                    "Download all favorites as a table, named favorites_<today>.csv."
+                    " Columns: csv_exports.py in the data folder (default: as the table shows them; any log column can be added). "
+                    "The full table with all columns stays in favorites/favorites.csv")
                 if getattr(config, "owc_lookup", False):                  # experimental, set in pyoccult_config.py
                     ui.button("Check OWC", on_click=lambda: owc_check("favorites")).props("outline dense").tooltip(
                         "Look the favorites up in OccultWatcher Cloud: prediction feeds (tags) and signed-up stations "
@@ -743,7 +748,7 @@ def index():
         if not os.path.isfile(path):
             ui.notify("No planet or moon events yet", type="warning")
             return
-        ui.download(path, f"bodies_{today_utc()}.csv")
+        download_csv("bodies", exports.results_rows(results_db(), "bodies"), f"bodies_{today_utc()}.csv")
 
     async def build_report(rc=0):
         await run_process(PYOCCULT + ["report", config.hits_output_cvs_file], log)
@@ -807,13 +812,7 @@ def index():
             if os.path.isfile(p["csv"]):
                 with open(p["csv"]) as f:
                     rows = list(csv.DictReader(f))
-            for r in rows:
-                for k in ("H", "star_mag", "drop", "dur_s", "mag_margin", "miss_km", "star_alt"):
-                    r[k] = f"{float(r[k]):.2f}" if r.get(k) else ""
-                r["key"] = f"{r.get('number')}_{r.get('utc')}"
-                if str(r.get("D_est")).lower() == "true":                # size from H only (see the report note)
-                    r["name"] = f"{r.get('name', '')} *"
-                r["target"] = "\u2713" if str(r.get("number")) in p["targets"] else ""
+            rows = [dict(exports.pick_shown(r, p["targets"]), key=f"{r.get('number')}_{r.get('utc')}") for r in rows]
             pick_info.text = f"{picks.describe(p)}: {len(rows)} events ({p['csv']})"
             targets_info.text = ("Targets: " + ", ".join(p["targets"][:60]) + (" ..." if len(p["targets"]) > 60 else ""))
         p_table.rows = rows
@@ -836,14 +835,14 @@ def index():
         if p is None or not os.path.isfile(p["csv"]):
             ui.notify("No saved pick with a CSV selected", type="warning")
             return
-        ui.download(p["csv"], os.path.basename(p["csv"]))
+        download_csv("pick", exports.pick_rows(p["csv"], p["targets"]), os.path.basename(p["csv"]))
 
     def fav_csv():
-        path = os.path.join(ROOT, favorites.DIR, "favorites.csv")
-        if not os.path.isfile(path):
+        items = favorites.load(os.path.join(ROOT, favorites.DIR))
+        if not items:
             ui.notify("No favorites yet", type="warning")
             return
-        ui.download(path, f"favorites_{today_utc()}.csv")
+        download_csv("favorites", exports.favorite_rows(items), f"favorites_{today_utc()}.csv")
 
     def hits_csv():
         path = os.path.join(ROOT, config.hits_output_cvs_file)
@@ -855,7 +854,22 @@ def index():
         site, start = (run.get("site") or {}).get("name"), str(run.get("window_start") or "")[:10]
         name = (f"hits_{picks._safe(site)}__{start}_{float(run['window_days']):g}d.csv"
                 if site and start and run.get("window_days") else os.path.basename(path))
-        ui.download(path, name)
+        download_csv("results", exports.results_rows(results_db(), "main"), name)
+
+    def results_db():
+        return os.path.join(ROOT, getattr(config, "results_db", "pyoccult.db"))
+
+    def download_csv(kind, rows, name):
+        """A CSV download with the columns of csv_exports.py (data folder) for this table."""
+        folder = os.path.join(config.cache_path, "pyoccult_exports")
+        os.makedirs(folder, exist_ok=True)
+        try:
+            exports.write(kind, rows, os.path.join(folder, name), home=ROOT)
+        except Exception as ex:                                  # a broken csv_exports.py: say so
+            ui.notify(f"CSV export failed ({type(ex).__name__}: {ex}); check csv_exports.py in the data folder",
+                      type="negative", timeout=10000)
+            return
+        ui.download(os.path.join(folder, name), name)
 
     def use_saved():
         p = next((p for p in saved_list if p["py"] == p_saved.value), None)

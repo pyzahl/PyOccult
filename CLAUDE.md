@@ -132,6 +132,13 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `KSTARS_OPT`): move KStars to the site (message names the old place) or keep it (warn if > 50 km). KStars ignores
   the tz passed to setGPSLocation and picks its own (Long Island got -6): label only, UT is right. GUI routes `/api/kstars/status|show`; the report's
   hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
+- `pyoccult/exports.py` (2026-10-08): GUI CSV downloads. Columns from `csv_exports.py` in HOME (template
+  `templates/csv_exports.py`, copied at first use; user EXPORTS dict per table over the template's): lists of
+  (heading, source), source = shown name | "raw:<field>" | "*" | f(shown, raw). Shown values = the tables' text
+  (`event_shown` from report.build_event + report fmt helpers; `pick_shown` is also what the GUI Pick table uses,
+  so they cannot drift). results_rows reads db.events(lst) of the current series (raw values via db._cell, as the
+  CSV export) with report dedupe + mag sort; favorite_rows from favorites.load(). Written to
+  cache_path/pyoccult_exports, utf-8-sig. Keep event_shown in step with report.html_row / html_row_body.
 - `pyoccult/stellarium.py` (2026-10-08): Stellarium Remote Control plugin (`URL_STELLARIUM_API`, port 8090, HTTP POST
   form fields via `net.urlopen`): location/setlocationfields (if KSTARS_OPT set_location) -> main/time (time = JD
   UT, timerate=0) -> main/view (j2000=[x,y,z]) -> main/fov. Never raises. GUI route `/api/stellarium/show`; report
