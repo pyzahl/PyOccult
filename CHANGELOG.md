@@ -10,7 +10,13 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 - **VERIFICATION.md**: all checks in one place (OWC search results, Occult's star positions, internal and geometric
   checks, what the differences mean), moved out of ABOUT.md Part 5 (now a summary with a link), with a new OWC set
   (Oct 8-11 2026, 50 events: 44 match; two events on Gaia 2-parameter stars the local catalog leaves out, one small
-  asteroid's orbit, three drops by the asteroid's brightness).
+  asteroid's orbit, three drops by the asteroid's brightness) and the full lists of both 50-event sets (matches,
+  misses, extras, time differences over 1.5 s marked). ABOUT.md has a table of contents.
+- `pyoccult owc-check --markdown FILE`: the full comparison as a Markdown table, by star magnitude (every OWC event
+  and PyOccult's extra events, marked); `--hits FILE` compares a saved hit list (with `--compare-only`).
+
+### Fixed
+- `owc-check`: OWC tag words in capitals (e.g. "IBEROC") are no longer taken as part of the asteroid's name.
 
 ## [0.14.0] "New Horizons" - 2026-10-08
 

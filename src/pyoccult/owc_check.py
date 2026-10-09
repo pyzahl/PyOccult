@@ -11,6 +11,7 @@ pyoccult_config.py is not changed: the settings override it for this run only. H
     pyoccult owc-check --compare-only  # compare an existing owc_check_hits.csv
     pyoccult owc-check --ref other_owc_result.txt
     pyoccult owc-check --sea-level     # our side at elevation 0, as OWC online (it ignores the site height)
+    pyoccult owc-check --compare-only --hits saved_hits.csv --markdown list.md   # full list as a Markdown table
 
 Duration = diameter / shadow speed. The report shows our diameter and the one OWC's duration implies (OWC duration x our
 speed); when only the diameters differ, the result is "ok, size differs", not a failure. Drops above DROP_TOTAL mag
@@ -23,6 +24,7 @@ import pandas as pd
 REF = "owc_reference.txt"
 OUT = "owc_check_hits.csv"
 TOL_T, TOL_DROP, TOL_DUR = 10.0, 0.25, 0.10
+WARN_T = 1.5              # Markdown list: a match with a larger time difference is highlighted
 DROP_TOTAL = 5.0          # drops above this are total occultations either way: not compared
 EVENT = re.compile(r"\((\d+)\)\s*([^\t]*)\t\s*(\d{4}-[A-Za-z]{3}-\d{2}),\s*(\d{2}:\d{2}:\d{2})"
                    r"\s*(?:\u263c\s*(-?\d+(?:\.\d+)?)\s*\u00b0?)?"           # twilight events: "\u263c -5\u00b0" = Sun altitude
@@ -30,9 +32,10 @@ EVENT = re.compile(r"\((\d+)\)\s*([^\t]*)\t\s*(\d{4}-[A-Za-z]{3}-\d{2}),\s*(\d{2
 
 
 def _clean_name(text):
-    """'2000 SB350 NALowMagMDMattson' -> '2000 SB350': drop OWC's trailing tag words (capitals run into lowercase)."""
+    """'2000 SB350 NALowMagMDMattson' -> '2000 SB350', '1999 VT109 IBEROC' -> '1999 VT109': drop OWC's trailing tag words
+    (capitals run into lowercase, or all capitals)."""
     words = text.split()
-    while words and re.match(r"^[A-Z]{2,}[A-Za-z]*[a-z]", words[-1]):
+    while words and len(words) > 1 and re.match(r"^(?:[A-Z]{2,}[A-Za-z]*[a-z]|[A-Z]{4,})[A-Za-z]*$", words[-1]):
         words.pop()
     return " ".join(words)
 
@@ -75,15 +78,16 @@ def run(ref, settings):
     runpy.run_module("pyoccult.search", run_name="__main__", alter_sys=True)
 
 
-def compare(ref):
-    hits = pd.read_csv(OUT) if os.path.isfile(OUT) else pd.DataFrame(columns=["target_id", "best_utc"])
+def compare(ref, hits_csv=OUT, markdown=None):
+    hits = pd.read_csv(hits_csv) if os.path.isfile(hits_csv) else pd.DataFrame(columns=["target_id", "best_utc"])
     hits["t"] = pd.to_datetime(hits["best_utc"])
     rows, used = [], set()
     for r in ref.itertuples():
         h = hits[hits.target_id == r.target_id]
         dt = (h.t - pd.Timestamp(r.event_utc)).dt.total_seconds()
         if len(h) == 0 or dt.abs().min() > 600:
-            rows.append(dict(target=r.target_id, name=r.name, owc_utc=r.event_utc, result="NOT FOUND"))
+            rows.append(dict(target=r.target_id, name=r.name, owc_utc=r.event_utc, star_V=r.star_mag_v,
+                             owc_drop=r.mag_drop_v, owc_dur=r.max_dur_s, result="NOT FOUND"))
             continue
         i = dt.abs().idxmin()
         used.add(i)
@@ -113,7 +117,43 @@ def compare(ref):
     n_size = (tab.result == "ok, size differs").sum()
     print(f"\n{n_ok}/{len(tab)} OWC events match (time {TOL_T:g} s, drop {TOL_DROP} mag below {DROP_TOTAL:g}); "
           f"{n_size} of them with a different diameter (duration off > {TOL_DUR:.0%})")
+    if markdown:
+        with open(markdown, "w", encoding="utf-8") as f:
+            f.write(to_markdown(tab, extra))
+        print(f"full list -> {markdown}")
     return n_ok == len(tab)
+
+
+def to_markdown(tab, extra):
+    """The full comparison as a Markdown table, by star magnitude: every OWC event and our extra hits, marked
+    ✅ match, 🟠 match with |dt| > WARN_T s, 🔴 OWC event not found or not matching, 🔵 only ours."""
+    f = lambda v, nd=2: "" if v is None or pd.isna(v) else f"{v:.{nd}f}"
+    rows = []
+    for r in tab.to_dict("records"):
+        res, dt = r["result"], r.get("dt_s")
+        if res.startswith("ok"):
+            mark = "🟠" if abs(dt) > WARN_T else "✅"
+            text = "match" + (", *size differs*" if res == "ok, size differs" else "")
+        else:
+            mark, text = "🔴", "**not found**" if res == "NOT FOUND" else f"**{res.lower().replace('fail', 'differs:')}**"
+        dts = "" if dt is None or pd.isna(dt) else (f"**{dt:+.1f}**" if abs(dt) > WARN_T else f"{dt:+.1f}")
+        mag = r.get("star_G") if r.get("star_G") is not None and not pd.isna(r.get("star_G")) else None
+        rows.append((mag if mag is not None else float("nan"), r["star_V"] if "star_V" in r and not pd.isna(r.get("star_V"))
+                     else float("nan"),
+                     f"| {mark} | ({r['target']}) {r['name']} | {str(r['owc_utc'])[:19].replace('T', ' ')} | {dts} | "
+                     f"{f(mag) or f(r.get('star_V')) + ' (OWC)'} | {f(r.get('drop'))} / {f(r.get('owc_drop'))} | {f(r.get('dur_s'))} / "
+                     f"{f(r.get('owc_dur'))} | {f(r.get('D_km'))} / {f(r.get('D_owc_km'))} | {f(r.get('miss_km'), 1)} | {text} |"))
+    for x in extra.to_dict("records"):
+        rows.append((x["mag"], x["mag"],
+                     f"| 🔵 | ({x['target_id']}) | {str(x['best_utc'])[:19].replace('T', ' ')} (ours) | | {f(x['mag'])} | "
+                     f"{f(x['mag_drop'])} / — | {f(x['max_duration_s'])} / — | {f(2 * x['r_km'])} / — | "
+                     f"{f(x['min_distance'], 1)} | **only ours** |"))
+    key = lambda t: t[0] if not pd.isna(t[0]) else (t[1] if not pd.isna(t[1]) else 99.0)
+    rows.sort(key=key)
+    # OWC events we did not find have no G of ours: place them by OWC's magnitude
+    head = ("| | Asteroid | OWC time (UT) | Δt (s) | Star G | Drop ours / OWC | Duration ours / OWC (s) | "
+            "Diameter ours / OWC-implied (km) | Shadow dist (km) | Result |\n|---|---|---|---:|---:|---|---|---|---:|---|\n")
+    return head + "\n".join(t[2] for t in rows) + "\n"
 
 
 def main():
@@ -121,6 +161,8 @@ def main():
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
     ap.add_argument("--compare-only", action="store_true")
     ap.add_argument("--ref", default=REF, help="OWC search result as text (default owc_reference.txt)")
+    ap.add_argument("--hits", default=OUT, help=f"our hits to compare (default {OUT}; with --compare-only e.g. a saved copy)")
+    ap.add_argument("--markdown", help="also write the full list (OWC events and our extras, by star magnitude) as Markdown")
     ap.add_argument("--sea-level", action="store_true",
                     help="compute at elevation 0 like OWC online (it ignores the site's height); for high sites")
     a = ap.parse_args()
@@ -133,7 +175,7 @@ def main():
           f"{settings['pick_frames']} frames", flush=True)
     if not a.compare_only:
         run(ref, settings)
-    sys.exit(0 if compare(ref) else 1)
+    sys.exit(0 if compare(ref, a.hits, a.markdown) else 1)
 
 
 if __name__ == "__main__":

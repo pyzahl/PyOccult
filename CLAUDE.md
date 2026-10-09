@@ -165,7 +165,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   adding sets there; never delete them.
 - `VERIFICATION.md` (2026-10-08): all validation (OWC sets, Occult star positions, internal/geometric checks, what the
   differences mean); ABOUT Part 5 is a summary with a link. New OWC reference sets: add the numbers there (sites
-  unnamed: "the observer's site", "a second site") and the details to `owc_refs/README.md`.
+  unnamed: "the observer's site", "a second site") and the details to `owc_refs/README.md` Full lists:
+  `pyoccult owc-check --markdown <set>.list.md` (`--compare-only --hits <saved csv>` for a stored run); markers ✅ 🟠
+  (|dt| > WARN_T 1.5 s) 🔴 🔵.
 - `CONTRIBUTING.md`: fork/branch workflow, setup, tests, working with Claude Code, private files, pull requests,
   GPL-3.0-or-later for contributions. `LICENSE` (GPL-3.0 text), `CITATION.cff` (validated with cffconvert).
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).

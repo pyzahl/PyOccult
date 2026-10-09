@@ -10,6 +10,40 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
 
 ---
 
+## Contents
+
+- [Part 1: The tools and how they fit together](#part-1-the-tools-and-how-they-fit-together)
+- [Part 2: The prediction (pyoccult/search.py)](#part-2-the-prediction-pyoccultsearchpy)
+  - [2.1 Pipeline (corridor mode, the default)](#21-pipeline-corridor-mode-the-default)
+  - [2.2 Fundamental (Besselian) plane: besselian_offsets](#22-fundamental-besselian-plane-besselian_offsets)
+  - [2.3 Star magnitude cap and corridor width: plan_corridor](#23-star-magnitude-cap-and-corridor-width-plan_corridor)
+  - [2.4 Local Gaia catalog: pyoccult/gaia_local.py](#24-local-gaia-catalog-pyoccultgaia_localpy)
+  - [2.5 Candidate scan: find_candidates](#25-candidate-scan-find_candidates)
+  - [2.6 Exact closest approach: star_test](#26-exact-closest-approach-star_test)
+  - [2.7 Checks before logging: handle_star](#27-checks-before-logging-handle_star)
+  - [2.8 Asteroid size: get_asteroid_size](#28-asteroid-size-get_asteroid_size)
+  - [2.9 Event metrics: event_metrics, apparent_mag_HG, moon_info](#29-event-metrics-event_metrics-apparent_mag_hg-moon_info)
+  - [2.10 Shadow ground track: pyoccult/paths.py](#210-shadow-ground-track-pyoccultpathspy)
+  - [2.11 Event preview: pyoccult/preview.py](#211-event-preview-pyoccultpreviewpy)
+  - [2.12 Globe plot: pyoccult/globe.py (0.11.0)](#212-globe-plot-pyoccultglobepy-0110)
+- [Part 3: Choosing targets (pyoccult/pick.py)](#part-3-choosing-targets-pyoccultpickpy)
+  - [3.1 Orbits: pyoccult/orbits.py](#31-orbits-pyoccultorbitspy)
+  - [3.2 The screen: pyoccult/screen.py](#32-the-screen-pyoccultscreenpy)
+  - [3.3 Detection rule](#33-detection-rule)
+  - [3.4 Bright-star index: BrightIndex](#34-bright-star-index-brightindex)
+  - [3.5 Speed and output](#35-speed-and-output)
+  - [3.6 Saved picks: pyoccult/picks.py](#36-saved-picks-pyoccultpickspy)
+- [Part 4: Data sources](#part-4-data-sources)
+  - [4.1 Sizes: what Horizons/SBDB has, and what occultations measured](#41-sizes-what-horizonssbdb-has-and-what-occultations-measured)
+  - [4.2 Asteroid satellites](#42-asteroid-satellites)
+- [Part 5: Validation](#part-5-validation) (summary; all checks in [VERIFICATION.md](VERIFICATION.md))
+- [Part 6: Open items](#part-6-open-items)
+  - [Gravitational light deflection and stellar parallax (built in 0.10.0, 2026-10-04)](#gravitational-light-deflection-and-stellar-parallax-built-in-0100-2026-10-04)
+- [Part 7: Future plans](#part-7-future-plans)
+  - [Major solar-system bodies as targets (planets and moons built in 0.14.0; Earth's Moon open)](#major-solar-system-bodies-as-targets-planets-and-moons-built-in-0140-earths-moon-open)
+
+---
+
 ## Part 1: The tools and how they fit together
 
 | Step | Tool | What it does |
@@ -515,7 +549,7 @@ and every path moved by the predicted amount; Occult's star positions now agree 
 
 ## Part 7: Future plans
 
-### Major solar-system bodies as targets (not started)
+### Major solar-system bodies as targets (planets and moons built in 0.14.0; Earth's Moon open)
 
 Can the Moon, the planets and the major moons be targets, as an option? Partly: the Moon is close to straightforward,
 planets and their moons are doable but each needs a few real additions.
@@ -551,12 +585,14 @@ rest.
 The pick tool would not need to change: there are only a handful of major bodies, so they would simply be listed as
 targets.
 
-**Status (2026-10-08): started with the Jupiter system** (`pyoccult/bodies.py`). Items 1-5 below are done for
-planets and moons (brightness rule, D/R contact times, deflection, target preparation, per-body uncertainty);
-6-8 (limb ellipse, report page, preview disk) and the other planets and the Moon are next. One change to the plan:
-no satellite kernel download. JPL Horizons gives the planet and its moons relative to the system barycentre with
-the same ephemeris (jup365), and PyOccult writes them into a small type 13 kernel per search window (~1 m, a few
-kB per body and day) instead of the 1.1 GB file.
+**Status (0.14.0, 2026-10-08): planets and moons are built** (`pyoccult/bodies.py`; usage in README, "Planets and
+moons"; checks in VERIFICATION.md, section 3): Mars to Neptune, Pluto and 91 of their 458 known moons, a GUI tab
+with groups per system, D/R contact times, a results list and report layout of their own, previews with the
+system's disks. Of the items below, 1-5, 7 and 8 are done (the preview without phase and glare halo); open are 6
+(the limb ellipse: the limb is a circle of the equatorial radius, so a graze near a pole of Jupiter or Saturn may be
+a miss; rings not modelled) and the Moon (`L:Moon`: bright limb, daylight, its 30' disk). One change to the plan:
+the positions come from JPL Horizons (the same ephemeris as NAIF's satellite kernels), written into a small type 13
+kernel per search window (~1 m); NAIF's kernels are an optional download (`pyoccult setup --planet-kernels`).
 
 **Implementation notes (2026-10-08, from a review of the current search).** The search loop itself works unchanged
 for major bodies: corridor scan, solver (`besselian_offsets`, `star_test`), local Gaia catalog, star corrections,
