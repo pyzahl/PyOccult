@@ -35,7 +35,7 @@ def _esc(s):
 
 
 def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", subtitle="", min_field_arcmin=10.0,
-               disks=None, body_name=None, field_arcmin=None):
+               disks=None, body_name=None, field_arcmin=None, corridor_arcsec=None, corridor_km=None):
     """SVG text of the preview.
     stars: dict of arrays ra, dec (deg, at the event date), g (Gaia G)
     target: dict ra, dec, g (the occulted star)
@@ -43,7 +43,8 @@ def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", sub
     fov_arcmin: (width, height) of the camera field.
     disks: planets and moons to draw at their angular size, [dict(ra, dec, r_arcsec, label, main)] (main: the
     occulting body); body_name: the occulting body's name for the legend (a planet or moon) instead of "asteroid";
-    field_arcmin: the field size instead of the camera-based one (planets and moons: zoomed to their system)."""
+    field_arcmin: the field size instead of the camera-based one (planets and moons: zoomed to their system).
+    corridor_arcsec: half-width of the searched strip around the track (dotted lines; corridor_km for the legend)."""
     fw, fh = fov_arcmin
     field = field_arcmin or max(field_factor * max(fw, fh), min_field_arcmin)   # square finder field, arcmin
     scale = SIZE / field                                               # px per arcmin
@@ -84,13 +85,27 @@ def render_svg(stars, target, track, fov_arcmin, field_factor=3.0, title="", sub
     out.append(f'<text x="{cx - fw * scale / 2 + 4:.1f}" y="{cy - fh * scale / 2 - 6:.1f}" fill="#38bdf8" '
                f'font-size="11">camera {fw:.1f}′ × {fh:.1f}′</text>')
     # translucent backing for the legend and scale bar (bottom left)
-    out.append(f'<rect x="8" y="{SIZE - 66}" width="320" height="56" rx="4" fill="#05070f" fill-opacity="0.8"/>')
+    leg_h = 56 + (18 if corridor_arcsec and track else 0)
+    out.append(f'<rect x="8" y="{SIZE - 10 - leg_h}" width="320" height="{leg_h}" rx="4" fill="#05070f" fill-opacity="0.8"/>')
     # asteroid track and position
     if track:
         t = np.array([p[0] for p in track], float)
         axi, aeta = _gnomonic([p[1] for p in track], [p[2] for p in track], target["ra"], target["dec"])
         pts = " ".join(f"{px(a):.1f},{py(b):.1f}" for a, b in zip(axi, aeta))
         out.append(f'<polyline points="{pts}" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3 3"/>')
+        if corridor_arcsec and len(t) > 1:                              # searched strip: track +/- half-width
+            tx, ty = np.gradient(np.asarray(axi, float)), np.gradient(np.asarray(aeta, float))
+            n = np.hypot(tx, ty)
+            n[n == 0] = 1.0
+            w = corridor_arcsec / 60.0                                  # arcmin
+            for sgn in (1, -1):
+                pts = " ".join(f"{px(a + sgn * w * -b_ / nn):.1f},{py(b + sgn * w * a_ / nn):.1f}"
+                               for a, b, a_, b_, nn in zip(axi, aeta, tx, ty, n))
+                out.append(f'<polyline points="{pts}" fill="none" stroke="#a3e635" stroke-width="1.2" '
+                           f'stroke-dasharray="1 4" stroke-linecap="round" stroke-opacity="0.8"/>')
+            out.append(f'<g font-size="11" fill="#a3e635"><path d="M16,{SIZE - 70} h22" stroke="#a3e635" stroke-width="1.2" '
+                       f'stroke-dasharray="1 4" stroke-linecap="round"/><text x="44" y="{SIZE - 66}">search corridor '
+                       f'±{corridor_arcsec:.1f}″' + (f' (±{corridor_km:,.0f} km)' if corridor_km else '') + '</text></g>')
         if len(t) > 1:                                                  # arrow at the end: direction of motion
             x1, y1, x0, y0 = px(axi[-1]), py(aeta[-1]), px(axi[-2]), py(aeta[-2])
             ang = math.atan2(y1 - y0, x1 - x0)

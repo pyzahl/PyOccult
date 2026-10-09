@@ -732,6 +732,9 @@ def write_preview(record, target_id, stem):
     rate = np.hypot((a1 - a0) * np.cos(np.radians(d0)), d1 - d0) * 60 / 20.0            # arcmin per minute
     span = int(np.clip(field / 4 / max(rate, 1e-9), 30 if zoom is None else 2, 720))
     track = [(m, *radec(et + 60.0 * m)) for m in np.linspace(-span, span, 13)]
+    # the searched strip (corridor.plan_corridor): Earth radius + body radius + reach, at the event distance
+    corr_km = corridor.EARTH_R_KM + float(record.get("r_max_km") or record.get("r_km") or 0.0) + float(config.max_shadow_dist)
+    delta = float(np.linalg.norm(spice.spkpos(target_id, et, 'J2000', 'CN', '399')[0]))
     svg = preview.render_svg(dict(ra=ra, dec=de, g=stars.phot_g_mean_mag.to_numpy()),
                              dict(ra=record["star_ra"], dec=record["star_dec"], g=record["mag"]), track, fov,
                              config.preview_field_factor,
@@ -739,7 +742,7 @@ def write_preview(record, target_id, stem):
                              subtitle=sub or (f"Gaia DR3 {record['star']} \u00b7 G {record['mag']:.2f} \u00b7 drop "
                                       f"{record['mag_drop']:.2f} mag \u00b7 max {record['max_duration_s']:.2f} s \u00b7 "
                                       f"miss {record['min_distance']:.1f} km"), disks=disks, body_name=name,
-                             field_arcmin=zoom)
+                             field_arcmin=zoom, corridor_arcsec=np.degrees(corr_km / delta) * 3600, corridor_km=corr_km)
     os.makedirs(config.map_dir, exist_ok=True)
     with open(f"{config.map_dir}/{stem}.svg", "w", encoding="utf-8") as f:
         f.write(svg)

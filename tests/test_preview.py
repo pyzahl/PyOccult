@@ -27,4 +27,10 @@ assert float(c0.get("r")) > float(c1.get("r")), "brighter stars are larger"
 poly = next(root.iter(ns + "polyline")); xs = [float(p.split(",")[0]) for p in poly.get("points").split()]
 assert xs[0] > xs[-1], "eastward motion goes to the left"
 assert "T &lt;test&gt; &amp; co" in svg and "camera 7.7" in svg and "track -60 to +60 min" in svg
+# search corridor: two dotted lines parallel to the (east-west) track, half-width above and below
+svg = P.render_svg(stars, dict(ra=ra0, dec=dec0, g=11.0), track, (w, h), corridor_arcsec=30.0, corridor_km=6578.0)
+lines = [p_ for p_ in ET.fromstring(svg).iter(ns + "polyline") if p_.get("stroke-dasharray") == "1 4"]
+assert len(lines) == 2 and "search corridor ±30.0″ (±6,578 km)" in svg
+ys = sorted(float(l.get("points").split()[6].split(",")[1]) for l in lines)
+assert abs(ys[0] - (P.SIZE / 2 - 0.5 * scale)) < 0.3 and abs(ys[1] - (P.SIZE / 2 + 0.5 * scale)) < 0.3, ys
 print("PREVIEW TESTS PASSED")
