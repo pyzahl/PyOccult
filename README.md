@@ -1,18 +1,21 @@
 # PyOccult <img src="src/pyoccult/pyoccult_logo.svg" alt="" width="96" align="right">
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
 
-Python Occultation Searcher by PyZahl (C) 2026, version 0.13.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.14.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md).
 
-Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spiceypy and NiceGUI for a local Webinterface to plan and run all tasks for easy event explorations.
+Experimental occultation search tool for asteroids, planets and their moons, built with Python, Astropy, SpiceyPy and
+NiceGUI: a local web interface to plan and run all tasks for easy event exploration. New here? Start with the
+[Quick start](#quick-start).
 
 ## Contents
 
 - [What is it?](#what-is-it)
 - [Occultation Data](#occultation-data)
 - [Tools in this project](#tools-in-this-project)
+- [Quick start](#quick-start)
 - [Install](#install)
   - [Easiest: with uv (Linux, macOS, Windows)](#easiest-with-uv-linux-macos-windows)
   - [Windows, step by step (with uv)](#windows-step-by-step-with-uv)
@@ -28,10 +31,10 @@ Experimental Asteroid Occultation Search Tool build using Python, Astropy, Spice
 - [Where your data and settings live](#where-your-data-and-settings-live)
 - [Site Configuration and Run Setup](#site-configuration-and-run-setup)
 - [Local Gaia catalog (required)](#local-gaia-catalog-required)
-- [Quick start: choose targets (pick tool)](#quick-start-choose-targets-pick-tool)
+- [Pick tool: choose targets](#pick-tool-choose-targets)
 - [Web interface (GUI)](#web-interface-gui)
 - [Planets and moons](#planets-and-moons)
-- [Quick start: hits_log.csv to HTML report](#quick-start-hits_logcsv-to-html-report)
+- [Report: event list, maps and previews](#report-event-list-maps-and-previews)
 - [GUI Step by Step in Screenshots](#gui-step-by-step-in-screenshots)
 - [Contributing](#contributing)
 - [License](#license)
@@ -74,7 +77,10 @@ everything: `pyoccult` (the web interface) or `pyoccult <command>`, e.g. `pyoccu
 
 | File | What it does |
 |---|---|
-| `pyoccult/search.py` | the search: finds star occultations by your targets for your site, appends to `hits_log.csv` |
+| `pyoccult/search.py` | the search: finds star occultations by your targets (asteroids, planets, moons) for your site; stores them in the results database `pyoccult.db` and writes the current list as `hits_log.csv` |
+| `pyoccult/bodies.py` | planets and moons as targets (`P:Jupiter`, `M:Io`, ...): the satellite table, ephemeris kernels from Horizons or NAIF, sizes and brightness |
+| `pyoccult/db.py` | the results database (`pyoccult.db`, SQLite): runs, events, contact times, favorites |
+| `pyoccult/exports.py` | the CSV downloads of the GUI tables, with the columns of `csv_exports.py` |
 | `pyoccult_config.py` | your run configuration (window, targets, limits, output), in the PyOccult folder; created from `pyoccult/templates/pyoccult_config.py` |
 | `sites.py` | your observing site(s) with their view and equipment; private, created by `pyoccult setup` from `pyoccult/templates/sites_example.py` |
 | `pyoccult/paths.py` | shadow ground track (centre line, limits, 3-sigma) as KML |
@@ -89,10 +95,36 @@ everything: `pyoccult` (the web interface) or `pyoccult <command>`, e.g. `pyoccu
 | `pyoccult/gaia_local.py` | builds and reads the local Gaia catalog (used by `pyoccult/setup.py` and the search) |
 | `pyoccult/gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
 | `pyoccult/owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
-| supporting modules | `pyoccult/corridor.py` (star corridor), `pyoccult/screen.py` + `pyoccult/orbits.py` (pick tool engine), `pyoccult/preview.py` (event preview image), `pyoccult/sbdb.py` (asteroid size cache), `pyoccult/kernels.py` (kernel download), `pyoccult/geo.py` (place and IP lookup), `pyoccult/runner.py` (runs with per-run settings) |
+| supporting modules | `pyoccult/corridor.py` (star corridor), `pyoccult/screen.py` + `pyoccult/orbits.py` (pick tool engine), `pyoccult/preview.py` (event preview image), `pyoccult/globe.py` (whole-Earth plot), `pyoccult/doubles.py` (close and double stars), `pyoccult/binaries.py` (asteroid satellites), `pyoccult/occultations.py` (earlier occultations), `pyoccult/sbdb.py` (asteroid size cache), `pyoccult/cameras.py` (sensor list), `pyoccult/kernels.py` (kernel download), `pyoccult/geo.py` (place and IP lookup), `pyoccult/runner.py` (runs with per-run settings) |
 
 See `ABOUT.md` for the computations, data sources and open points:
 https://github.com/pyzahl/PyOccult/blob/main/ABOUT.md
+
+# Quick start
+
+A few commands, one download (about 2 GB), then everything happens in your browser:
+
+1. **Get it:** install [uv](https://docs.astral.sh/uv/getting-started/installation/), then
+   `git clone https://github.com/pyzahl/PyOccult` (or download the ZIP from GitHub and unpack it). Windows users: see
+   [Windows, step by step](#windows-step-by-step-with-uv). Without uv on Linux/macOS: `sh linux_install.sh` does
+   steps 2 and 3 with pip.
+2. **Set up once**, in the PyOccult folder: `uv run pyoccult setup`. It downloads the SPICE kernels and the local
+   Gaia catalog (G <= 16 from Zenodo; resumes if interrupted) and asks for your first observing site.
+3. **Start the web interface:** `uv run pyoccult` (opens http://127.0.0.1:8080). Work through the tabs from left
+   to right:
+   * **Site**: your position (map, place name or MPC observatory code) and your telescope and camera.
+   * **Pick**: choose a window and **Run pick**: all asteroids are screened for events at your site (a few
+     minutes; saved and reused for that window).
+   * **Planets & Moons** (optional): tick planets and moons and run; no pick needed.
+   * **Search**: **Run search**: exact predictions for the picked asteroids, with maps and previews.
+   * **Results**: the event list with Map, Preview, Globe and KML, KStars and Stellarium pointing, and ☆ to keep an
+     event.
+   * **Favorites**: your starred events, with status and notes.
+4. **Next time:** `uv run pyoccult` again; run a new pick when your window ends. `git pull` updates PyOccult (uv
+   installs new dependencies by itself).
+
+The rest of this README goes into detail: installing with pip, the data folder, sites, the catalog, the pick, the
+GUI, planets and moons, and the report.
 
 # Install
 
@@ -373,15 +405,18 @@ pyoccult                 # opens http://127.0.0.1:8080 in your browser (local on
    (several minutes); a saved pick is reused by every later search of the same site and window. **CSV** downloads the
    selected pick's events as a table (the Results tab has the same button for the search results, named
    `hits_<site>__<start>_<days>d.csv`).
-3. **Search**: the exact prediction for the picked targets (JPL Horizons orbits, local Gaia catalog): event times,
-   drops, durations, shadow paths (KML maps) and star-field previews.
-4. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
+3. **Planets & Moons** (optional): occultations by the planets Mars to Neptune, Pluto and their moons, with
+   disappearance and reappearance times; tick the bodies, choose the window and run. Results in the tab (see
+   "Planets and moons" below).
+4. **Search**: the exact prediction for the picked targets (JPL Horizons orbits, local Gaia catalog): event times,
+   drops, durations, shadow paths (KML maps) and star-field previews. **Star G limit** (default from your telescope)
+   and the minimum drop apply to this run.
+5. **Results**: the event list with a **Map** (shadow path with shadow, 1-sigma and 3-sigma limits and your site),
    a **Preview** (star field and camera frame), a **Globe** (the whole Earth seen from the star with the path and
-   minute marks, and the event parameters as on Occult's plot) and the **KML** for Google Earth for each event; on Linux with KStars
-   running also a **KStars** button that points KStars at the event, a **Stellarium** button (Remote Control
-   plugin), and a **☆** button that adds the event to
-   your favorites.
-5. **Favorites**: the events you starred, from any search and any site, each with its own copy of map and preview
+   minute marks, and the event parameters as on Occult's plot) and the **KML** for Google Earth for each event; a
+   **Stellarium** button that points Stellarium at the event (any system, Remote Control plugin), on Linux with
+   KStars running also a **KStars** button, and a **☆** button that adds the event to your favorites.
+6. **Favorites**: the events you starred, from any search and any site, each with its own copy of map and preview
    (later searches do not change them). The table is the Results table (same columns, sorting and tools: KStars,
    Map, Preview, KML) plus a select box, the site, status, note and when it was added. Check rows to set their
    status (planned / observed / cancelled / clouded) or remove them; **Remove past events** drops every favorite
@@ -408,11 +443,17 @@ commands" at the top of Install). The site is
 |---|---|---|
 | once | `pyoccult setup` | SPICE kernels, local Gaia catalog (Zenodo download or ESA build), bright-star index, `sites.py` |
 | choose | `pyoccult pick --start 2026-10-01 --days 20` | screen all asteroids for events at the site; writes `pick_events.csv`, `targets.py` and the saved pick in `picks/` |
-| predict | `pyoccult search` | exact search for the targets (the saved pick of the site covering the window, else `targets.py`); appends to `hits_log.csv`, writes `maps/` |
+| predict | `pyoccult search` | exact search for the targets (the saved pick of the site covering the window, else `targets.py`); adds the events to the current results list in `pyoccult.db`, writes it as `hits_log.csv`, and `maps/` |
 | present | `pyoccult report hits_log.csv` | HTML event list with maps and previews (`hits_report.html`) |
+| planets | `pyoccult run search '{"targets": ["P:Jupiter", "M:Io"], "results_list": "bodies", "hits_output_cvs_file": "bodies_log.csv"}'` then `pyoccult report bodies_log.csv -o bodies_report.html --layout bodies` | planets and moons as the Planets & Moons tab runs them |
+| point | `pyoccult stellarium <ra> <dec> <utc> [fov]`, `pyoccult kstars ...` | point Stellarium or KStars at a position and time |
 | check | `pyoccult owc-check --ref owc_reference.txt` | rerun an OWC search result you saved as text and compare event by event (`--sea-level`: compute at elevation 0, as OWC online does) |
 
-Useful options: `pyoccult/pick.py --hmax 18 --reach 30 --frames 4 --top 40 --workers 4` (see "Quick start: choose
+`pyoccult run <command> '<JSON>'` runs a command with settings changed for that run only (`pyoccult_config.py`
+stays as it is), e.g. `pyoccult run search '{"ct": "2026-10-01T00:00:00", "days": 8, "MAG_MIN": 15}'`; the GUI starts
+every run this way.
+
+Useful options: `pyoccult pick --hmax 18 --reach 30 --frames 4 --top 40 --workers 4` (see "Pick tool: choose
 targets" below), `pyoccult picks list` (saved picks), `PYOCCULT_CATALOG=gaia_dr3_g16 pyoccult search`
 (another catalog for one run), `pyoccult setup --status` (what is installed).
 
@@ -422,9 +463,8 @@ executable with `chmod +x run.sh`:
 
 ```bash
 #!/bin/sh
-rm -f hits_log.csv                    # start a fresh log (the search appends)
 clear
-pyoccult search
+pyoccult run search '{"results_new_series": true}'   # a fresh results list (older ones stay in pyoccult.db)
 pyoccult report hits_log.csv
 sudo cp hits_report.html /var/www/html/hits_report.html
 ```
@@ -652,10 +692,11 @@ only has to write that layout.
 
 
 
-## Quick start: choose targets (pick tool)
+## Pick tool: choose targets
 
-`pyoccult/pick.py` finds the actual occultation events at your site for all asteroids in a window, like an OWC/Occult
-search, and writes the asteroids of the best events to `targets.py` for `pyoccult/search.py`.
+`pyoccult pick` (the GUI's Pick tab) finds the actual occultation events at your site for all asteroids in a window,
+like an OWC/Occult search, and saves the asteroids of the best events as the targets of `pyoccult search` for that
+site and window.
 
 ```bash
 pyoccult pick                          # window from pyoccult_config.py, site and equipment from sites.py, H < 17
@@ -724,20 +765,13 @@ asteroid (r_max about 5 km) keep events whose centre line passes within 30 km of
 * Positions in the pick are good to about 2 km (orbits integrated from SBDB elements); `pyoccult/search.py` then computes
   the kept events exactly with the JPL Horizons orbit.
 * The stars are first gathered from a wider strip (Earth radius + r_max + reach on each side, plus a margin for proper
-  motion). That strip is only a coarse pre-filter before the exact solve for the site and does not change the result.
+  motion). That strip is only a coarse pre-filter before the exact solve for the site and does not change the result;
+  the search's previews show it as dotted lines along the track ("search corridor").
+* Grazes and near misses are kept: anything within r_max + reach. The **Shadow dist** column says "inside" or how
+  many km outside the shadow edge your site is.
 
-Use the result in `pyoccult_config.py`:
-
-```python
-try:
-    from targets import targets, target_names
-except ImportError:
-    targets = ["218001", "305580", "111287", "115181", "229912", "111286", "54653", "70141", "4272"]
-    target_names = {}
-```
-
-(`from targets import targets` already gives the list, so do not add `targets = targets.targets`.)
-
+Without a saved pick, the search reads `targets.py` (written by the last pick) through `pyoccult_config.py`, which
+imports it when present; or set `targets = ["218001", ...]` there yourself (with `targets_source = "list"`).
 
 
 ## Web interface (GUI)
@@ -761,8 +795,9 @@ pyoccult --port 8090 --no-browser
   saved for the selected site and window. **Saved picks of this site** lists them (newest window first); the
   selected one's events appear in a sortable table, with the target asteroids marked. **Use for search** sets the
   search window to that pick's window. **Reload** rereads the list (e.g. after a pick on the command line).
-* **Search**: window, targets (the saved pick of the selected site that covers the window, or typed in), minimum
-  drop, maps and previews, the astrometric corrections (stellar parallax, light deflection; both on by default),
+* **Planets & Moons**: see "Planets and moons" below.
+* **Search**: window, targets (the saved pick of the selected site that covers the window, or typed in), **Star G
+  limit** (default from the site's telescope, capped at the catalog), minimum drop, maps and previews, the astrometric corrections (stellar parallax, light deflection; both on by default),
   then **Run search**. A line says which saved pick the search will use, or that none
   covers the window.
   The report is rebuilt and shown under **Results** when the run finishes.
@@ -783,6 +818,7 @@ pyoccult --port 8090 --no-browser
   1. Configuration (F2) > Plugins > **Remote Control**: tick **Load at startup**, then restart Stellarium.
   2. Same place, **configure**: tick **Server enabled** and **Enable automatically on startup**. Port **8090** is
      the default (PyOccult uses it); leave "Access requires authentication" off. **Save settings**.
+* **Favorites**: the starred events of all searches and sites (see "Run it" above).
 * **Log**: the live output of the running job, with **Stop**.
 
 **CSV downloads** (Pick, Results, Planets & Moons, Favorites): by default the columns and values exactly as the
@@ -831,19 +867,25 @@ pyoccult.bodies` lists them).
   `plu060.bsp`, Mars `mar099.bsp`; Uranus only via Horizons (NAIF splits it per moon, up to 2 GB each).
 * Coming: Earth's Moon; later solar eclipses (contacts C1-C4).
 
-## Quick start: hits_log.csv to HTML report
+## Report: event list, maps and previews
 
-`pyoccult/report.py` turns the log into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, shadow distance from the centre line) plus **Chance** (the probability that the shadow covers your site, from the shadow distance, the shadow radius and the 1-sigma path uncertainty of JPL Horizons; it falls as the shadow distance grows and is a rough guide for far-future events, whose uncertainty is large) and a **Map** button for each event. Standard library only, no install needed.
+The GUI builds and shows the report after every search; this section is about the page itself and the command.
+The events are kept in the results database `pyoccult.db`; after each search the current results list is also
+written as `hits_log.csv` (planets and moons: `bodies_log.csv`), a plain-text copy to review or use elsewhere.
+`pyoccult report` turns it into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, shadow distance from the centre line) plus **Chance** (the probability that the shadow covers your site, from the shadow distance, the shadow radius and the 1-sigma path uncertainty of JPL Horizons; it falls as the shadow distance grows and is a rough guide for far-future events, whose uncertainty is large) and a **Map** button for each event. Standard library only, no install needed.
 The page header shows the site, its equipment, the magnitude and observing limits, the statistics of the run with the
-saved pick its targets came from, and the Earth orientation data it used (from `hits_log.runs.jsonl`); each event's calculation time is in the `Calc (s)` column. The **Preview** button shows
-the event preview: the star field around the target star at the event date (local Gaia catalog), the camera frame
-(`focal_mm`, `sensor_mm` of the site), the target star, the asteroid's position and track, north up and east left.
+saved pick its targets came from, and the Earth orientation data it used (from `hits_log.runs.jsonl`); each event's
+calculation time is in `hits_log.csv` (`calc_s`). The **Preview** button shows the event preview: the star field
+around the target star at the event date (local Gaia catalog), the camera frame (`focal_mm`, `sensor_mm` of the
+site), the target star, the asteroid's position and track with the search corridor (dotted), north up and east
+left; for planets and moons the bodies of the system as disks at their size, each moon marked with a cyan +.
 
 ```bash
 pyoccult report hits_log.csv                           # writes hits_report.html next to the CSV
 pyoccult report hits_log.csv -o hits_report.md         # Markdown instead
 pyoccult report hits_log.csv --kml-dir maps --max-miss 200 --min-drop 0.3 --title "My events"
 pyoccult report hits_log.csv --sort date               # by event time (default --sort mag: brightest star first)
+pyoccult report bodies_log.csv -o bodies_report.html --layout bodies   # planets and moons: D, closest, R
 ```
 
 * The site (header, compass directions, map pin) comes from the run summary in `hits_log.runs.jsonl`, else from
@@ -907,7 +949,7 @@ Run the final precision search for observable events
 <img width="2190" height="1426" alt="image" src="https://github.com/user-attachments/assets/7b4f536b-9093-4589-935d-8f1285122801" />
 
 #### Results
-View results table. Detail quick path view map button and star field preview (stars only), use for example Kstars (Linux: use Kstars auto point button!) to further investigate and check for other potentially interesting or interfering objects like planets, etc..
+View results table. Detail quick path view map button and star field preview (stars only), use for example Stellarium or KStars (their buttons point them at the event) to further investigate and check for other potentially interesting or interfering objects like planets, etc..
 <img width="1925" height="1865" alt="image" src="https://github.com/user-attachments/assets/3f69dd73-5fa9-4526-8b88-08961a0e67b3" />
 <img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/1cd6d017-8be9-4046-b03f-add32d6741d2" />
 <img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/c9034a2c-4aa2-4ce4-a0dd-63d7b340edbd" />

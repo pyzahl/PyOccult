@@ -2,59 +2,75 @@
 
 All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https://keepachangelog.com), versions:
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
-`pyoccult_version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
+`src/pyoccult/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
 ## [Unreleased]
+
+## [0.14.0] "New Horizons" - 2026-10-08
+
+**Planets and moons** join the asteroids as occulting bodies: Mars to Neptune, Pluto and 91 of their moons, in
+their own GUI tab with disappearance and reappearance times. All results now live in one **results database**
+(`pyoccult.db`). Also new: Stellarium pointing, a column file for the CSV downloads, the star limit per run in the
+Search tab, and the search corridor in the previews. Nothing to do after updating: an existing `hits_log.csv` and
+`favorites/favorites.json` are imported into the database once.
+
+### Added
+- **Planets and moons as targets** (`pyoccult/bodies.py`): `P:Mars`, `P:Jupiter`, ... `P:Neptune`, `P:Pluto` and
+  moons such as `M:Io`, `M:Titan`, `M:Himalia`, `M:Triton`, `M:Charon` in the target list (the prefix keeps them
+  apart from asteroid numbers; `python -m pyoccult.bodies` lists them). Positions from JPL Horizons as a small SPICE
+  kernel per search window (cached; the same ephemeris as NAIF's satellite kernels, reproduced to ~1 m), radii from
+  the planet constants. Events get **disappearance and reappearance times** at the site (`d_utc`, `r_utc`, also as
+  contacts in the database); verified: D and R put the star exactly one Jupiter radius from its centre in
+  independent geometry. A star covered by a planet disappears, so planets have no drop limit; moons and Pluto
+  follow the asteroid rules (drop limit). The light deflection leaves out the target's own planet.
+- Satellite table `src/pyoccult/data/satellites.json`: all 458 moons of Mars to Pluto known to JPL Horizons, with
+  radius and brightness (H with the phase removed, H-G law with G 0.5; within ~0.2 mag of published values for the
+  major moons, Phobos ~1 mag). 91 can be searched; a missing size or brightness is estimated as for asteroids
+  (marked \*); the rest (mostly tiny, recently found moons of magnitude 22-25) have neither. Rebuilt with
+  `python -m pyoccult.bodies build`. Rough 3-sigma path uncertainty by size (15-200 km) for the sigma lines and
+  the chance.
+- GUI tab **Planets & Moons** (after Pick): per system the planet and its larger moons (radius 150 km or more) to
+  tick, one box for its smaller moons; window, star G limit, the moons' minimum drop, Run. Results right in the
+  tab as their own list (`bodies_log.csv`, list "bodies" in the database, apart from the asteroid search) with a
+  report layout for major bodies: D, closest approach and R at the site, duration, star, sky, shadow distance,
+  chance, tools. Previews show the planet and its moons as disks at their size, zoomed to the system, each moon
+  marked with a small cyan **+** whatever its size. File and favorite names use `P-Jupiter` (no ':' for Windows).
+- Optional offline ephemeris: `pyoccult setup --planet-kernels` (also asked on a first-time setup) downloads NAIF's
+  satellite kernels (Jupiter `jup365.bsp` 1.1 GB, Saturn `sat441.bsp`, Neptune `nep097.bsp`, Pluto `plu060.bsp`,
+  Mars `mar099.bsp`), used instead of Horizons when they cover the search window.
+- **Stellarium** button next to KStars in the Results and Favorites tables (`pyoccult/stellarium.py`, any
+  system): through Stellarium's Remote Control plugin (port 8090) it sets the event time with the clock stopped,
+  the view on the star and the field, and with "KStars/Stellarium: set its location to the event site" the site.
+  Shown whenever the GUI serves the report; a click tries and reports. Also `pyoccult stellarium`.
+- **CSV columns file** `csv_exports.py` in the data folder (`pyoccult/exports.py`, template
+  `templates/csv_exports.py`, created at the first download): which columns the CSV buttons of the Pick, Results,
+  Planets & Moons and Favorites tabs export, in which order and with which headings. Default: exactly the table's
+  columns and values as shown; any raw field of the event record (`"raw:star"`, ...), all of them (`"*"`) or a
+  function can be added. UTF-8 with byte order mark for spreadsheets.
+- GUI Search and Planets & Moons tabs: **Star G limit** for one run (as in the Pick tab; default from the site's
+  telescope, capped at the selected catalog's limit). A search notes when `gaia_local_gmax` in your
+  `pyoccult_config.py` caps the limit below the catalog's (older configs have 13).
+- Event preview: the **search corridor** (the strip searched for stars: Earth radius + body radius + reach, at the
+  event distance) as dotted lines on both sides of the track, with its half-width in the legend.
 
 ### Changed
 - **Results database** (`pyoccult/db.py`): searches and favorites are stored in `pyoccult.db` in the data folder
   (SQLite, part of Python): every run with its summary, every event, and the favorites. "Start a fresh hits_log.csv"
   became **Start a fresh results list**: a new list (series) begins, the older ones stay in the database instead of
-  being deleted. `hits_log.csv` and `hits_log.runs.jsonl` are still written after each search, as exports of the
-  current list with consistent columns (the report, the CSV button and other tools read them). An existing
-  `hits_log.csv` and `favorites/favorites.json` are imported once (the latter kept as `favorites.json.migrated`).
-  Prepares event kinds with several contact times (planets, moons, eclipses).
+  being deleted. `hits_log.csv` / `bodies_log.csv` and their `.runs.jsonl` are still written after each search, as
+  plain-text copies of the current list with consistent columns (the reports and other tools read them). An
+  existing `hits_log.csv` and `favorites/favorites.json` are imported once (the latter kept as
+  `favorites.json.migrated`).
+- The CSV buttons export the table as shown (see the columns file above) instead of the raw log with all columns;
+  Results, Planets & Moons and Favorites are exported from the database. The full files stay: `hits_log.csv`,
+  `bodies_log.csv`, `favorites/favorites.csv`.
+- The KStars location checkbox of the Results tab is now "KStars/Stellarium: set its location to the event site".
 
-### Added
-- **CSV columns file** `csv_exports.py` in the data folder (`pyoccult/exports.py`, template
-  `templates/csv_exports.py`, created at the first download): which columns the CSV buttons of the Pick, Results,
-  Planets & Moons and Favorites tabs export, in which order and with which headings. Default: exactly the table's
-  columns and values as shown; any raw field of the event record (`"raw:star"`, ...), all of them (`"*"`) or a
-  function can be added. Results, Planets & Moons and Favorites are exported from the results database. UTF-8 with
-  byte order mark for spreadsheets. Before, the buttons downloaded the raw log files with all columns.
-- **Stellarium** button next to KStars in the Results and Favorites tables (`pyoccult/stellarium.py`, any
-  system): through Stellarium's Remote Control plugin (port 8090) it sets the event time with the clock stopped,
-  the view on the star (J2000) and the field, and with "KStars/Stellarium: set its location to the event site" the
-  site. Shown whenever the GUI serves the report; a click tries and reports. Also `pyoccult stellarium`.
-- GUI Search and Planets & Moons tabs: **Star G limit** for one run (as in the Pick tab; default from the site's
-  telescope, capped at the selected catalog's limit). Planets use it like any target (no separate planet limit).
-  A limit beyond the catalog is cut to the catalog's; a search notes when `gaia_local_gmax` in your
-  `pyoccult_config.py` caps the limit below the catalog's (older configs have 13).
-- Event preview: the search corridor (the strip searched for stars: Earth radius + body radius + reach, at the
-  event distance) as dotted lines on both sides of the track, with its half-width in the legend.
-- All planet systems: Mars, Jupiter, Saturn, Uranus, Neptune and Pluto with their moons
-  (`src/pyoccult/data/satellites.json`: 458 moons from JPL Horizons, 91 with size and brightness to search; built
-  with `python -m pyoccult.bodies build`). The GUI tab lists per system the planet and its larger moons, plus one
-  box for the smaller moons, which behave like asteroids. Pluto follows the asteroid rules; the planets Mars to
-  Neptune the planet rule. Missing sizes or brightness are estimated like for asteroids (marked \*).
-- GUI tab **Planets & Moons** (after Pick): tick the bodies of a group (Jupiter system first), window, the planets'
-  star limit and the moons' minimum drop, Run; the results right in the tab as their own list (`bodies_log.csv`,
-  results list "bodies" in the database, apart from the asteroid search) with a report layout for major bodies:
-  D, closest approach and R at the site, duration, star, sky, shadow distance, chance, tools. The preview shows the
-  planet as a disk at its size with its moons, zoomed to the system. File and favorite names use `P-Jupiter`
-  (no ':' for Windows).
-- Optional offline ephemeris for planets and moons: `pyoccult setup --planet-kernels` (setup also asks on a
-  first-time setup) downloads NAIF's satellite kernel (Jupiter: `jup365.bsp`, 1.1 GB), used instead of Horizons
-  when it covers the search window.
-- **Planets and moons as targets** (`pyoccult/bodies.py`), first the Jupiter system: give `P:Jupiter`, `M:Io`,
-  `M:Europa`, `M:Ganymede`, `M:Callisto` in the target list (the prefix keeps them apart from asteroid numbers).
-  Their positions come from JPL Horizons as a small SPICE kernel per search window (cached; the same ephemeris as
-  NAIF's 1 GB satellite kernel, reproduced to ~1 m), radii from the planet constants. Events of a planet or moon
-  get **disappearance and reappearance times** at your site (`d_utc`, `r_utc`; also in the database as contacts),
-  a planet has no drop filter (any star it covers disappears), and the light deflection leaves
-  out the target's own planet. The report shows their name with a "planet"/"moon" badge. Verified: Jupiter's D and
-  R put the star exactly one Jupiter radius from its centre in independent geometry. A GUI tab and a results page
-  for them follow.
+### Fixed
+- A minimum drop of 0 stopped the search with "math domain error" (now: no drop limit).
+- A star limit set for a planet run was capped by `MAG_MIN` (G 13 with older configs), so faint stars were never
+  searched; the separate planet star limit is gone, the run's Star G limit applies.
+- The asteroid size lookup (SBDB) is no longer tried for planet and moon targets.
 
 ## [0.13.0] "New Horizons" - 2026-10-07
 
@@ -311,6 +327,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[0.14.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.13.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.12.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.11.1]: https://github.com/pyzahl/PyOccult/releases/tag/V0.11.1-NewHorizons
