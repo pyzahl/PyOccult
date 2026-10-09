@@ -938,27 +938,46 @@ To import a KML file into Google Maps, you must use the Google My Maps platform 
 
 ### GUI Step by Step in Screenshots
 #### Site
-Setup site and equippment
-<img width="2196" height="1082" alt="image" src="https://github.com/user-attachments/assets/01c63171-729d-4bb2-b35a-578ded687f09" />
+Setup sit(s)e and equipment.
+<img width="2212" height="1265" alt="image" src="https://github.com/user-attachments/assets/536207cf-5a08-4249-88ba-6089983ceaea" />
 
 #### Pick
-Run Auto Pick Targets for site, this narrows the number of potential target asteroids down to close encounters
-<img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/97ec5c54-6c8f-4bad-a5de-b9c6937ee5fd" />
+Run Auto Pick Targets for site, this narrows the number of potential target asteroids down to close encounters and creates a list of targets the precision search runs on:
+<img width="2207" height="1623" alt="image" src="https://github.com/user-attachments/assets/53e12100-2d71-4121-94d9-727e011f2837" />
+The pre-screening and picking process is teh most compute intense as all 464740 potential targets from Horizons are screened against stars in their from the site apparent motion corridor.
+A computing progress info is updated in the Log window:
+<img width="2207" height="481" alt="image" src="https://github.com/user-attachments/assets/a75000a0-65bb-478c-8f7c-2c3f73c9992a" />
+<img width="2206" height="1687" alt="image" src="https://github.com/user-attachments/assets/47f8f16a-eaf1-4f72-b90c-778696534b31" />
+
+
+#### Planets & Moons
+Additionally to Asteroid star occultations, larger solar system bodies are also supported since version 0.13.0:
+<img width="2207" height="1785" alt="image" src="https://github.com/user-attachments/assets/e4fb9750-eab1-4fd2-b299-790dd53a7d6e" />
+Build in Preview and KStars+Stellarium auto pointing on event.
+<img width="2210" height="1862" alt="image" src="https://github.com/user-attachments/assets/6f084f97-6b80-40bd-b46e-02b93767e38e" />
 
 #### Search
-Run the final precision search for observable events
-<img width="2190" height="1426" alt="image" src="https://github.com/user-attachments/assets/7b4f536b-9093-4589-935d-8f1285122801" />
+Run the final precision search for observable events caused by targets as picked or optionally manually entered. Once completed it runs a Gaia online check of 40 event star(s) (close and double stars), that may take some time or even times out if busy, then this extra info is not be available.
+<img width="2203" height="1470" alt="image" src="https://github.com/user-attachments/assets/8cca7943-67ed-42d1-b1b3-3a661c3b0af8" />
+<img width="2206" height="1687" alt="image" src="https://github.com/user-attachments/assets/4d0ade70-1c09-4508-9846-3b0500718432" />
+
 
 #### Results
-View results table. Detail quick path view map button and star field preview (stars only), use for example Stellarium or KStars (their buttons point them at the event) to further investigate and check for other potentially interesting or interfering objects like planets, etc..
-<img width="1925" height="1865" alt="image" src="https://github.com/user-attachments/assets/3f69dd73-5fa9-4526-8b88-08961a0e67b3" />
-<img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/1cd6d017-8be9-4046-b03f-add32d6741d2" />
-<img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/c9034a2c-4aa2-4ce4-a0dd-63d7b340edbd" />
-<img width="2198" height="1601" alt="image" src="https://github.com/user-attachments/assets/812c5402-e848-46ce-a9b8-f047c8f6b6c5" />
-<img width="2038" height="1767" alt="image" src="https://github.com/user-attachments/assets/4c4ee096-1aa5-4b91-bec2-eeac632ad135" />
+View results table. Detail quick path view map button and star field preview (stars only), use for example Stellarium or KStars (their buttons point them at the event) to further investigate and check for other potentially interesting or interfering objects like planets, etc.. Use the Favorites "Star" Button to move a Event to your Favorites List.
+<img width="2206" height="1687" alt="image" src="https://github.com/user-attachments/assets/15f5c986-193f-49de-88ad-eb491e99775e" />
+<img width="2200" height="1566" alt="image" src="https://github.com/user-attachments/assets/47317ab9-e597-4fd0-a1e1-244645ee412b" />
+Map view, fully interactive:
+<img width="2200" height="1566" alt="image" src="https://github.com/user-attachments/assets/9f9454c3-1895-4223-8435-c2f7bdb2ace4" />
+<img width="2200" height="1566" alt="image" src="https://github.com/user-attachments/assets/e2d6917e-8bf0-4395-b87b-8b27aca84a7a" />
+Globe view:
+<img width="2200" height="1566" alt="image" src="https://github.com/user-attachments/assets/1d510f1d-c7e6-44b6-8e4b-6abb3f5477f7" />
+Preview:
+<img width="2200" height="1566" alt="image" src="https://github.com/user-attachments/assets/030ccb68-8a84-482a-93f9-3b540cec49c4" />
+And also KStars + Stellarious auto point options.
 
 #### Favorites
-<img width="1905" height="2007" alt="image" src="https://github.com/user-attachments/assets/5fcfcb8c-24f8-4384-a858-8e244b880bf4" />
+And finally your "Starred" events in Favorites Manager, a experimental OWC feed/station info can be loaded (disabled by default as experimental):
+<img width="2318" height="2146" alt="image" src="https://github.com/user-attachments/assets/a83acd77-8718-45c9-9bff-11c2487878d1" />
 
 
 ## Contributing
