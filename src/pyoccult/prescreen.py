@@ -8,7 +8,8 @@ region: `pyoccult pick --prescreen FILE` screens only those asteroids instead of
     pyoccult prescreen build --start 2026-11-01 --days 30 --global
     pyoccult prescreen list                                                          # the built ones
     pyoccult prescreen show prescreen/<name>.db
-    pyoccult prescreen extract prescreen/<global>.global.npy --region 24,50,-125,-66  # a region cut from a global one
+    pyoccult prescreen extract prescreen/<global>.global.npy --region usa            # a region cut from a global one
+    pyoccult prescreen extract prescreen/<global>.global.npy --region 35,60,-10,30 --cam-limit 14
     pyoccult prescreen query prescreen/<global>.global.npy                           # asteroids for the site
 
 Whole Earth (--global): instead of testing a region, the build stores per event the shadow's motion across the
@@ -48,7 +49,7 @@ import numpy as np
 from pyoccult import shadowtrack as ST
 
 DIR = "prescreen"
-FORMAT = 2                                   # 2: padded grid, 161-sample tracks widened to a strict superset, global
+FORMAT = 3                                   # 3: padded grid, 161-sample tracks, plane reach -> ground (ground_reach)
 HALF_MAX_S = 6 * 3600.0                      # an event's track: at most +-6 h around its Earth-centre time
 PAD_S = 2 * HALF_MAX_S                       # the build's time grid reaches this far beyond the window
 
@@ -58,6 +59,33 @@ def region_box(lat_min, lat_max, lon_min, lon_max):
     if not (-90 <= lat_min < lat_max <= 90):
         raise ValueError("region: need lat_min < lat_max within -90..90")
     return dict(lat_min=float(lat_min), lat_max=float(lat_max), lon_min=float(lon_min), lon_max=float(lon_max))
+
+
+# named regions (lat min, lat max, lon min, lon max; deg, lon east-positive): --region NAME
+REGIONS = {
+    "usa": (24.0, 50.0, -125.0, -66.0),                  # contiguous United States
+    "north-america": (7.0, 72.0, -170.0, -50.0),
+    "central-america": (7.0, 33.0, -118.0, -59.0),
+    "south-america": (-56.0, 13.0, -82.0, -34.0),
+    "europe": (34.0, 72.0, -25.0, 45.0),
+    "africa": (-35.0, 38.0, -18.0, 52.0),
+    "middle-east": (12.0, 42.0, 25.0, 63.0),
+    "east-asia": (18.0, 54.0, 73.0, 146.0),
+    "japan": (24.0, 46.0, 122.0, 146.0),
+    "australia": (-44.0, -10.0, 112.0, 154.0),
+    "new-zealand": (-48.0, -34.0, 166.0, 179.0),
+}
+
+
+def parse_region(text):
+    """A region box from a name of REGIONS or 'lat_min,lat_max,lon_min,lon_max'."""
+    key = str(text).strip().lower()
+    if key in REGIONS:
+        return region_box(*REGIONS[key])
+    try:
+        return region_box(*[float(x) for x in key.split(",")])
+    except (TypeError, ValueError):
+        raise ValueError(f"region {text!r}: a name ({', '.join(REGIONS)}) or lat_min,lat_max,lon_min,lon_max")
 
 
 def box_around(lat, lon, km):
@@ -467,6 +495,8 @@ def build(start, days, region, cam_limit=16.0, hmax=17.0, min_drop=0.1, reach_km
         n_ev, n_ast = _write_global(con, out, meta)
         con.close()
         os.remove(partial)
+        say(f"  indexing (a lat/lon box per track, for fast site and region queries) ...")
+        index(out, w)
     else:
         with con:
             con.execute("DELETE FROM meta")
@@ -549,27 +579,94 @@ def numbers(path, et0, et1, gmax=None):
 
 
 # ---------------------------------------------------------------- global pre-screens: queries
-def select(path, et0=None, et1=None, gmax=None):
+def select(path, et0=None, et1=None, gmax=None, with_index=False):
     """Events of a global pre-screen whose track touches et0..et1 (default: all) with a star G <= gmax: a ST.DTYPE
-    array in memory (the file is memory-mapped; it is sorted by time, so a window reads only its part)."""
+    array in memory (the file is memory-mapped and sorted by time: a window reads only its part). with_index: also
+    their index rows (ST.IDX_DTYPE, or None without an index file)."""
     a = np.load(path, mmap_mode="r")
+    i0, i1 = 0, len(a)
     if et0 is not None:
-        i0, i1 = np.searchsorted(a["et"], [et0 - HALF_MAX_S, et1 + HALF_MAX_S])
-        a = a[i0:i1]
+        i0, i1 = (int(x) for x in np.searchsorted(a["et"], [et0 - HALF_MAX_S, et1 + HALF_MAX_S]))
+    a = a[i0:i1]
     m = np.ones(len(a), bool)
     if et0 is not None:
         m &= (a["et"] + a["half"] >= et0) & (a["et"] - a["half"] <= et1)
     if gmax is not None:
         m &= a["g"] <= gmax + 1e-4
-    return np.array(a[m])
+    ev = np.array(a[m])
+    if not with_index:
+        return ev
+    ip = _idx_path(path)
+    b = np.array(np.load(ip, mmap_mode="r")[i0:i1][m]) if os.path.exists(ip) else None
+    return ev, b
+
+
+def _idx_path(path):
+    return str(path)[:-len(".npy")] + ".idx.npy"
+
+
+def has_index(path):
+    return os.path.exists(_idx_path(path))
+
+
+def _index_job(args):
+    path, i0, i1, reach_km, min_alt, max_sun_alt = args
+    ev = np.array(np.load(path, mmap_mode="r")[i0:i1])
+    return i0, ST.bounds(_W["spice"], ev, reach_km, min_alt, max_sun_alt)
+
+
+def _init_spice(folder):
+    import spiceypy as spice
+    from pyoccult import screen as SC
+    os.chdir(folder)
+    SC.load_kernels(spice, folder)
+    _W.update(spice=spice)
+
+
+def index(path, workers=4, block=100_000):
+    """Write the index of a global pre-screen (<name>.global.idx.npy): per event the lat/lon box of its track's
+    usable part (ST.bounds with the build's limits). Site and region queries then test only events whose box comes
+    near (about 1 in 20 for a site). Worker processes; minutes for a month."""
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+    from pyoccult.home import HOME
+    from pyoccult import pick as P
+    m = read_meta(path)
+    n = len(np.load(path, mmap_mode="r"))
+    out = _idx_path(path)
+    tmp = out + f".{os.getpid()}.tmp.npy"
+    idx = np.lib.format.open_memmap(tmp, mode="w+", dtype=ST.IDX_DTYPE, shape=(n,))
+    jobs = [(path, i, min(n, i + block), m["reach_km"], m["min_alt"], m["max_sun_alt"]) for i in range(0, n, block)]
+    t0, done = time.time(), 0
+    P.single_thread_workers()
+    try:
+        with ProcessPoolExecutor(max_workers=max(1, workers), mp_context=multiprocessing.get_context("spawn"),
+                                 initializer=_init_spice, initargs=(HOME,)) as ex:
+            for i0, b in ex.map(_index_job, jobs):
+                idx[i0:i0 + len(b)] = b
+                done += len(b)
+                el = time.time() - t0
+                print(f"  index: {done}/{n} events, {el:.0f} s, ETA {_hms(el / done * (n - done))}", file=sys.stderr,
+                      flush=True)
+        idx.flush()
+        del idx
+        os.replace(tmp, out)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return out
 
 
 def site_numbers(path, spice, et0, et1, lat, lon, ele_m, opt):
     """The asteroids of a global pre-screen with an event that can be seen from this site (ST.site_mask) in the
-    window. opt: cam_limit, reach_km, min_alt, max_sun_alt (the pick's). Returns (numbers set, events tested)."""
-    ev = select(path, et0, et1, opt.get("cam_limit"))
+    window. opt: cam_limit, reach_km, min_alt, max_sun_alt (the pick's). With an index, only events whose track box
+    comes within reach of the site are tested. Returns (numbers set, events in the window, events tested)."""
+    ev, b = select(path, et0, et1, opt.get("cam_limit"), with_index=True)
+    n_win = len(ev)
+    if b is not None:
+        ev = ev[ST.near_site(b, ev, lat, lon, opt["reach_km"], opt["min_alt"])]
     keep = ST.site_mask(spice, ev, lat, lon, ele_m, opt["reach_km"], opt["min_alt"], opt["max_sun_alt"])
-    return {int(x) for x in ev["number"][keep]}, len(ev)
+    return {int(x) for x in ev["number"][keep]}, n_win, len(ev)
 
 
 def extract(path, box, out=None, start=None, days=None, gmax=None, name=None):
@@ -587,7 +684,9 @@ def extract(path, box, out=None, start=None, days=None, gmax=None, name=None):
     if et0 < m["et0"] - 1 or et1 > m["et1"] + 1:
         raise RuntimeError(f"window {start} + {days:g} d not in the global pre-screen ({m['start']} + {m['days']:g} d)")
     gmax = min(float(gmax), m["cam_limit"]) if gmax is not None else m["cam_limit"]
-    ev = select(path, et0, et1, gmax)
+    ev, b = select(path, et0, et1, gmax, with_index=True)
+    if b is not None:
+        ev = ev[ST.hits_box(b, ev, box, m["reach_km"], m["min_alt"])]
     keep, where = ST.region_mask(spice, ev, box, m["reach_km"], m["min_alt"], m["max_sun_alt"])
     name = name or "region"
     out = out or os.path.join(os.path.dirname(path) or DIR, f"{name}__{start}_{days:g}d_G{gmax:g}.db")
@@ -679,7 +778,7 @@ def list_files(folder=DIR):
 
 def remove(path):
     """Delete a pre-screen (a global one with its meta file)."""
-    for p in ([path, _meta_path(path)] if is_global(path) else [path]):
+    for p in ([path, _meta_path(path), _idx_path(path)] if is_global(path) else [path]):
         if os.path.exists(p):
             os.remove(p)
 
@@ -712,7 +811,8 @@ def main(argv=None):
     b.add_argument("--start", required=True, help="UTC date YYYY-MM-DD")
     b.add_argument("--days", type=float, default=30.0)
     where = b.add_mutually_exclusive_group(required=True)
-    where.add_argument("--region", help="lat_min,lat_max,lon_min,lon_max in degrees (lon east-positive)")
+    where.add_argument("--region", help="a name (usa, europe, south-america, ...: see REGIONS) or "
+                                        "lat_min,lat_max,lon_min,lon_max in degrees (lon east-positive)")
     where.add_argument("--around-site", type=float, metavar="KM", help="a box this far around the configured site")
     where.add_argument("--around-sites", type=float, metavar="KM",
                        help="one box this far around all sites of sites.py (one pre-screen for all of them)")
@@ -741,7 +841,7 @@ def main(argv=None):
     x = sub.add_parser("extract", help="cut a region pre-screen from a global one (seconds)")
     x.add_argument("file", help="a global pre-screen (.global.npy)")
     xw = x.add_mutually_exclusive_group(required=True)
-    xw.add_argument("--region", help="lat_min,lat_max,lon_min,lon_max in degrees (lon east-positive)")
+    xw.add_argument("--region", help=f"a name ({', '.join(REGIONS)}) or lat_min,lat_max,lon_min,lon_max (deg)")
     xw.add_argument("--around-site", type=float, metavar="KM", help="a box this far around the configured site")
     xw.add_argument("--around-sites", type=float, metavar="KM", help="one box this far around all sites of sites.py")
     x.add_argument("--start", help="a later start (default: the global one's)")
@@ -749,6 +849,9 @@ def main(argv=None):
     x.add_argument("--cam-limit", type=float, help="a brighter star limit (smaller file)")
     x.add_argument("--name")
     x.add_argument("-o", "--output")
+    ix = sub.add_parser("index", help="(re)build the lat/lon index of a global pre-screen (done after every build)")
+    ix.add_argument("file")
+    ix.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     q = sub.add_parser("query", help="asteroids of a global pre-screen with events seen from the configured site")
     q.add_argument("file", help="a global pre-screen (.global.npy)")
     q.add_argument("--start", help="UTC date (default: the pre-screen's start)")
@@ -764,14 +867,20 @@ def main(argv=None):
             n_ev, n_ast = counts(p)
             age = age_days(m)
             print(f"{p}\n    {describe(p, m)}\n    {n_ast} asteroids, {n_ev} events"
-                  + (f", {age:.0f} days old" if age is not None else ""))
+                  + (f", {age:.0f} days old" if age is not None else "")
+                  + ("" if not is_global(p) else ", indexed" if has_index(p) else ", no index"))
         return 0
     if a.cmd == "show":
         m = read_meta(a.file)
         n_ev, n_ast = counts(a.file)
         print(describe(a.file, m))
         print(f"{n_ev} events of {n_ast} asteroids (of {m.get('asteroids_screened')} screened), build {m.get('build_s')} s"
-              + (f", {os.path.getsize(a.file) / 1e6:.0f} MB" if is_global(a.file) else ""))
+              + (f", {os.path.getsize(a.file) / 1e6:.0f} MB, " + ("indexed" if has_index(a.file) else "no index")
+                 if is_global(a.file) else ""))
+        return 0
+    if a.cmd == "index":
+        t = time.time()
+        print(f"index written: {index(a.file, a.workers)} in {_hms(time.time() - t)}")
         return 0
     if a.cmd == "query":
         import spiceypy as spice
@@ -784,17 +893,19 @@ def main(argv=None):
         et0 = spice.str2et(f"{a.start or m['start']}T00:00:00")
         et1 = et0 + float(a.days or m["days"]) * 86400.0
         t = time.time()
-        nums, n_ev = site_numbers(a.file, spice, et0, et1, c("lat"), c("lon"), c("ele", 0.0),
-                                  dict(cam_limit=a.cam_limit, reach_km=a.reach, min_alt=a.min_alt,
-                                       max_sun_alt=a.max_sun_alt))
-        print(f"site {c('site')}: {len(nums)} asteroids ({n_ev} events tested, G <= {a.cam_limit:g}, reach {a.reach:g} "
-              f"km, star >= {a.min_alt:g}, Sun <= {a.max_sun_alt:g}) in {time.time() - t:.1f} s")
+        nums, n_win, n_ev = site_numbers(a.file, spice, et0, et1, c("lat"), c("lon"), c("ele", 0.0),
+                                         dict(cam_limit=a.cam_limit, reach_km=a.reach, min_alt=a.min_alt,
+                                              max_sun_alt=a.max_sun_alt))
+        print(f"site {c('site')}: {len(nums)} asteroids ({n_ev} of {n_win} events tested"
+              f"{', index' if has_index(a.file) else ', no index'}; G <= {a.cam_limit:g}, reach {a.reach:g} km, "
+              f"star >= {a.min_alt:g}, Sun <= {a.max_sun_alt:g}) in {time.time() - t:.1f} s")
         if a.numbers:
             print(" ".join(str(x) for x in sorted(nums)))
         return 0
     if a.cmd == "extract":
         if a.region:
-            box, name = region_box(*[float(x) for x in a.region.split(",")]), a.name or "region"
+            box = parse_region(a.region)
+            name = a.name or (a.region.lower() if a.region.lower() in REGIONS else "region")
         elif a.around_sites is not None:
             box, name = box_around_all(c("sites"), a.around_sites), a.name or f"sites_{a.around_sites:g}km"
         else:
@@ -814,7 +925,8 @@ def main(argv=None):
             ap.error("--around-sites needs sites in sites.py")
         region, name = box_around_all(c("sites"), a.around_sites), a.name or f"sites_{a.around_sites:g}km"
     elif a.region:
-        region, name = region_box(*[float(x) for x in a.region.split(",")]), a.name or "region"
+        region = parse_region(a.region)
+        name = a.name or (a.region.lower() if a.region.lower() in REGIONS else "region")
     else:
         if c("lat") is None:
             ap.error("--around-site needs a configured site")

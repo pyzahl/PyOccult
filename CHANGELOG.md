@@ -7,6 +7,9 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 ## [Unreleased]
 
 ### Fixed
+- Pre-screen region and sky tests: the reach is a distance in the fundamental plane, which on the ground is stretched
+  by up to 1/sin(star altitude); the tests used it as ground km, so events seen at low star altitude by an observer
+  away from the track's ground point could be missed. Exact bound now (`shadowtrack.ground_reach`; format 3).
 - Pre-screen region test: the ground track was sampled at 41 points (up to ~400 km apart) and the star and Sun
   altitudes were taken at the shadow axis, so tracks crossing the region between samples, or seen from an observer
   within reach but not at the axis, were missed (about 21 % of the asteroids for a 500 km region, compared with dense
@@ -44,6 +47,10 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   among them); `prescreen query` (asteroids for the site), `prescreen extract` (a region file in seconds, optionally
   shorter window and brighter star limit). Builds checkpoint the elements as blobs and write the sorted file through
   memory maps.
+- Global pre-screen **index** (`<name>.global.idx.npy`, `prescreen index`, written after a global build): per event
+  the lat/lon box of its track and its star altitude range; site and region queries test only events whose box can
+  reach them (widened at query time for the query's reach and minimum altitude): ~1/5 of the events, nothing dropped
+  (checked at many sites and limits). Named regions for `--region` (usa, europe, south-america, ...).
 - GUI Pick tab: "Asteroids" = auto (default) / all (any place and time) / a fitting pre-screen, with a line saying
   what the pick will screen; a "Pre-screens" panel to build one (start, days, region: this site, all my sites, whole
   Earth; box km) with its progress in the log (Stop saves, the same build resumes), and a table of the built ones

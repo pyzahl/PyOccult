@@ -106,12 +106,13 @@ def sample_times(tc, half, n=N_SAMPLES):
 
 
 # ---------------------------------------------------------------- ground track (build and region test)
-def ground_track(px, py, tau, sdir, fr, r_km, box, reach_km, sin_alt, sin_sun):
-    """keep (c,) and where (c,4: lat, lon, sun alt, star alt of the first matching sample) for shadow-axis plane
-    positions px, py (c,s) at times tau (c,s), star directions sdir (c,3); fr = frames(). Kept if a sample is on the
-    Earth (or within radius + reach of its limb) with the star above and the Sun below the limits there and, with a
-    box, inside the box widened by radius + reach; all tests widened so that the continuous track is covered (see
-    below): a superset. box None: no region test."""
+def _track(px, py, tau, sdir, fr, r_km, reach_km, sin_alt, sin_sun, latlon=True):
+    """The samples of shadow-axis ground tracks: plane positions px, py (c,s) at times tau (c,s), star directions sdir
+    (c,3); fr = frames(). Returns dict: ok (c,s) = on the Earth (or within radius + reach of its limb) with the star
+    above and the Sun below the limits; lat, lon (deg; None if not latlon); gs (half step to the neighbours, km);
+    star_up, sun_up (sines); r_km (c,1). Every test is widened by what can change between two samples, so a
+    continuous track cannot pass a condition between samples, and the sky test by the distance an observer can be from
+    the axis (radius + reach: their star and Sun altitudes differ by up to that / R radians): a superset."""
     R = EARTH_R_KM
     ets, rot, sun_u = fr["ets"], fr["rot"], fr["sun_u"]
     ex, ny = plane(sdir)
@@ -121,34 +122,165 @@ def ground_track(px, py, tau, sdir, fr, r_km, box, reach_km, sin_alt, sin_sun):
     scale = np.where(rho > R, R / np.maximum(rho, 1e-9), 1.0)                     # off the limb: the nearest limb point
     s = (px * scale)[..., None] * ex[:, None, :] + (py * scale)[..., None] * ny[:, None, :] \
         + depth[..., None] * sdir[:, None, :]                                      # (c,s,3) J2000, km
-    # every test is widened by what can change between two samples (half the step to the neighbours), so a
-    # continuous track cannot pass a condition between samples, and the sky test by the distance an observer can be
-    # from the axis (radius + reach: their star and Sun altitudes differ by up to that / R radians)
     gs = _half_steps(s)                                                            # (c,s) km on the ground
     ps = _half_steps(np.stack([px, py], 2))                                        # (c,s) km in the plane
     on = rho < R + r_km + reach_km + ps
-    tol = (gs + r_km + reach_km) / R                                               # radians (>= change of sin(alt))
     up = s / np.linalg.norm(s, axis=2, keepdims=True)
     star_up = np.einsum("csx,cx->cs", up, sdir)
+    # an observer within radius + reach of the axis IN THE PLANE can be much farther away on the ground (the plane
+    # is stretched by 1/sin(star altitude)): the largest ground distance, and their sky differs by up to that / R
+    dg = ground_reach(star_up, r_km + reach_km, sin_alt)                           # (c,s) km
+    tol = (gs + dg) / R                                                            # radians (>= change of sin(alt))
     i = np.clip(np.round((tau - ets[0]) / fr["step"]).astype(int), 0, len(ets) - 1)
     sun_up = np.einsum("csx,csx->cs", up, sun_u[i])
-    ok = on & (star_up > sin_alt - tol) & (sun_up < sin_sun + tol)
-    lat = lon = None
-    if box is not None:
+    out = dict(ok=on & (star_up > sin_alt - tol) & (sun_up < sin_sun + tol), gs=gs, dg=dg, star_up=star_up,
+               sun_up=sun_up, r_km=r_km, lat=None, lon=None)
+    if latlon:
         ang = OMEGA * (tau - ets[i])                                              # spin since the grid time
         itrf = np.einsum("csij,csj->csi", rot[i], s)
         ca, sa = np.cos(ang), np.sin(ang)
         x, y = ca * itrf[..., 0] + sa * itrf[..., 1], -sa * itrf[..., 0] + ca * itrf[..., 1]
-        lat = np.degrees(np.arcsin(np.clip(itrf[..., 2] / R, -1, 1)))
-        lon = np.degrees(np.arctan2(y, x))
-        ok &= in_box(lat, lon, box, r_km + reach_km + gs)
+        out["lat"] = np.degrees(np.arcsin(np.clip(itrf[..., 2] / R, -1, 1)))
+        out["lon"] = np.degrees(np.arctan2(y, x))
+    return out
+
+
+def ground_reach(sin_h, rho_km, sin_min):
+    """The largest ground distance (km) between the shadow axis's ground point A, where the star is at altitude h
+    (sin_h), and an observer P within rho_km of the axis in the fundamental plane who sees the star at least at
+    altitude asin(sin_min). The plane is the orthographic projection along the star: |proj| = R cos(h), so
+    cos h_P lies within cos h_A -+ rho/R, which bounds sin h_P; the chord |PA|^2 = (plane distance)^2 + R^2 (sin h_P -
+    sin h_A)^2 then bounds the arc. Exact for low stars, where a plane km is many ground km."""
+    R = EARTH_R_KM
+    q = rho_km / R
+    cA = np.sqrt(np.maximum(1.0 - sin_h * sin_h, 0.0))
+    c_lo, c_hi = cA - q, cA + q
+    s_hi = np.where(c_lo <= 0.0, 1.0, np.sqrt(np.maximum(1.0 - c_lo * c_lo, 0.0)))
+    s_lo = np.maximum(np.where(c_hi >= 1.0, -1.0, np.sqrt(np.maximum(1.0 - c_hi * c_hi, 0.0))), sin_min)
+    d = np.maximum(np.maximum(s_hi - sin_h, sin_h - s_lo), 0.0)
+    chord = np.sqrt(rho_km * rho_km + (R * d) ** 2)
+    return 2.0 * R * np.arcsin(np.minimum(chord / (2.0 * R), 1.0))
+
+
+def ground_track(px, py, tau, sdir, fr, r_km, box, reach_km, sin_alt, sin_sun):
+    """keep (c,) and where (c,4: lat, lon, sun alt, star alt of the first matching sample) for shadow-axis ground
+    tracks (see _track): kept if a sample passes the sky tests and, with a box, lies inside the box widened by
+    radius + reach (+ half the step to the neighbours). box None: no region test. A superset."""
+    t = _track(px, py, tau, sdir, fr, r_km, reach_km, sin_alt, sin_sun, latlon=box is not None)
+    ok, lat, lon = t["ok"], t["lat"], t["lon"]
+    if box is not None:
+        ok = ok & in_box(lat, lon, box, t["dg"] + t["gs"])
     first = np.argmax(ok, axis=1)
     c_ = np.arange(len(px))
     if lat is None:
         lat, lon = np.full(px.shape, np.nan), np.full(px.shape, np.nan)
+    sun_up, star_up = t["sun_up"], t["star_up"]
     where = np.stack([lat[c_, first], lon[c_, first], np.degrees(np.arcsin(np.clip(sun_up[c_, first], -1, 1))),
                       np.degrees(np.arcsin(np.clip(star_up[c_, first], -1, 1)))], 1)
     return ok.any(axis=1), where
+
+
+# ---------------------------------------------------------------- the index: a lat/lon box per track
+IDX_DTYPE = np.dtype([("lat_lo", "f4"), ("lat_hi", "f4"), ("lon_w", "f4"), ("lon_width", "f4"),
+                      ("sin_lo", "f4"), ("sin_hi", "f4")])                       # star altitude range (sines)
+POLAR_LAT = 80.0                             # a track reaching beyond this latitude gets all longitudes
+
+
+def track_bounds(t):
+    """Per track (from _track with lat/lon): the latitude range and the longitude arc (west end, width east, deg) of
+    its usable samples (ok), each widened by its half step + the ground reach of its observers (ground_reach): IDX_DTYPE values (c,). A track with no usable
+    sample gets NaN (no pick can see it); one near a pole, or one whose longitudes are ambiguous (steps between
+    samples not much smaller than the largest gap), all longitudes."""
+    ok, lat, lon = t["ok"], t["lat"], t["lon"]
+    pad = t["gs"] + t["r_km"]                                                      # km: the shadow's own width
+    c = len(ok)
+    out = np.full(c, np.nan, IDX_DTYPE)
+    n = ok.sum(axis=1)
+    has = n > 0
+    dlat = pad / 111.2
+    out["lat_lo"] = np.where(has, np.where(ok, lat - dlat, 999.0).min(axis=1), np.nan)
+    out["lat_hi"] = np.where(has, np.where(ok, lat + dlat, -999.0).max(axis=1), np.nan)
+    dlon = np.where(ok, pad / (111.2 * np.maximum(np.cos(np.radians(lat)), 0.05)), 0.0).max(axis=1)
+    L = np.sort(np.where(ok, lon, np.nan), axis=1)                                 # NaN last
+    last = np.clip(n - 1, 0, None)
+    rows = np.arange(c)
+    gaps = np.diff(L, axis=1)                                                      # between sorted neighbours
+    wrap = L[:, 0] + 360.0 - L[rows, last]
+    gaps = np.concatenate([np.nan_to_num(gaps, nan=-1.0), wrap[:, None]], axis=1)
+    g = np.argmax(gaps, axis=1)
+    big = gaps[rows, g]
+    is_wrap = g == gaps.shape[1] - 1
+    nxt = L[rows, np.clip(g + 1, 0, L.shape[1] - 1)]
+    w = np.where(is_wrap, L[:, 0], nxt)
+    width = np.where(is_wrap, L[rows, last] - L[:, 0], 360.0 - big)
+    # the largest step in time order between usable neighbours (the track passes those longitudes)
+    dl = np.abs(((np.diff(lon, axis=1) + 180.0) % 360.0) - 180.0)
+    step = np.where(ok[:, 1:] & ok[:, :-1], dl, 0.0).max(axis=1)
+    full = (np.maximum(np.abs(out["lat_lo"]), np.abs(out["lat_hi"])) > POLAR_LAT) | (big < 4 * step + 1e-9) | \
+        (width + 2 * dlon >= 360.0)
+    out["lon_w"] = np.where(has, np.where(full, -180.0, ((w - dlon + 180.0) % 360.0) - 180.0), np.nan)
+    out["lon_width"] = np.where(has, np.where(full, 360.0, width + 2 * dlon), np.nan)
+    ds = t["gs"] / EARTH_R_KM                                                      # altitude change to a neighbour
+    out["sin_lo"] = np.where(has, np.where(ok, t["star_up"] - ds, 9.0).min(axis=1), np.nan)
+    out["sin_hi"] = np.where(has, np.where(ok, t["star_up"] + ds, -9.0).max(axis=1), np.nan)
+    return out
+
+
+def _reach_pad(b, rho_km, sin_min, n=33):
+    """Per index row: the largest ground distance of an observer within rho_km (plane) of the track, over the
+    track's star altitude range (ground_reach on n points + 3 %: it is smooth but not monotonic)."""
+    u = np.linspace(0.0, 1.0, n)[None, :]
+    sh = b["sin_lo"].astype(float)[:, None] + (b["sin_hi"] - b["sin_lo"]).astype(float)[:, None] * u
+    rho = np.broadcast_to(np.asarray(rho_km, float), (len(b),))[:, None]
+    return 1.03 * ground_reach(np.clip(sh, -1, 1), rho, sin_min).max(axis=1) + 1.0
+
+
+def bounds(spice, ev, reach_km, min_alt, max_sun_alt, block=5000):
+    """The index (IDX_DTYPE, one per event) of events ev (DTYPE): the box of each track's usable part with the
+    build's limits (reach_km, min_alt, max_sun_alt), so every pick or region within those limits is covered."""
+    out = np.zeros(len(ev), IDX_DTYPE)
+    # the same margins as the site and region tests (TOL_DEG, TOL_KM), so the index never drops what they keep
+    sin_alt = math.sin(math.radians(min_alt - TOL_DEG))
+    sin_sun = math.sin(math.radians(max_sun_alt + TOL_DEG))
+    reach_km = reach_km + TOL_KM
+    for b0 in range(0, len(ev), block):
+        e = ev[b0:b0 + block]
+        tau = sample_times(e["et"], e["half"].astype(float), N_TRACK)
+        fr = frames(spice, tau.min(), tau.max())
+        px, py = positions(e, tau)
+        t = _track(px, py, tau, star_dirs(e), fr, e["r_km"].astype(float) + e["err"].astype(float), reach_km,
+                   sin_alt, sin_sun)
+        out[b0:b0 + block] = track_bounds(t)
+    return out
+
+
+def near_site(b, ev, lat, lon, reach_km, min_alt):
+    """Index rows b (IDX_DTYPE) of events ev whose track box comes near enough to the site that an observer there
+    within reach_km (plane) can see the shadow with the star above min_alt: the box widened per event by the ground
+    reach over its star altitude range (TOL_KM, TOL_DEG margins as the site test)."""
+    km = _reach_pad(b, ev["r_km"].astype(float) + ev["err"].astype(float) + reach_km + TOL_KM,
+                    math.sin(math.radians(min_alt - TOL_DEG)))
+    dlat = km / 111.2
+    edge = np.minimum(np.abs(lat) + dlat, 89.0)
+    dlon = km / (111.2 * np.maximum(np.cos(np.radians(edge)), 0.02))
+    ok = (b["lat_lo"] - dlat <= lat) & (b["lat_hi"] + dlat >= lat)
+    rel = (lon - b["lon_w"]) % 360.0
+    return ok & ((rel <= b["lon_width"] + dlon) | (rel >= 360.0 - dlon))
+
+
+def hits_box(b, ev, box, reach_km, min_alt):
+    """Index rows b of events ev whose track box, widened like near_site, overlaps the region box."""
+    km = _reach_pad(b, ev["r_km"].astype(float) + ev["err"].astype(float) + reach_km + TOL_KM,
+                    math.sin(math.radians(min_alt - TOL_DEG)))
+    dlat = km / 111.2
+    ok = (b["lat_lo"] - dlat <= box["lat_max"]) & (b["lat_hi"] + dlat >= box["lat_min"])
+    edge = np.minimum(np.maximum(np.abs(box["lat_min"]), np.abs(box["lat_max"])) + dlat, 89.0)
+    dlon = km / (111.2 * np.maximum(np.cos(np.radians(edge)), 0.02))
+    bwidth = (box["lon_max"] - box["lon_min"]) % 360.0 or 360.0
+    w = b["lon_w"] - dlon
+    width = b["lon_width"] + 2 * dlon
+    return ok & ((width >= 360.0) | (bwidth >= 360.0) | ((box["lon_min"] - w) % 360.0 <= width)
+                 | ((w - box["lon_min"]) % 360.0 <= bwidth))
 
 
 def _half_steps(p):

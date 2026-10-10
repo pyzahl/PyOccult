@@ -806,13 +806,30 @@ for all 465k asteroids; a brighter `--cam-limit` makes it much smaller (~1/13 at
 ```bash
 pyoccult pick --start 2026-11-03 --days 7 --prescreen auto        # any site: tests the stored paths in seconds
 pyoccult prescreen query prescreen/<name>.global.npy              # how many asteroids for the configured site
-pyoccult prescreen extract prescreen/<name>.global.npy --region 24,50,-125,-66 --cam-limit 14   # a region file
+pyoccult prescreen extract prescreen/<name>.global.npy --region usa --cam-limit 14   # a region file
+pyoccult prescreen index prescreen/<name>.global.npy              # (re)build its index (done after every build)
 ```
+
+Named regions for `--region` (build and extract): usa, north-america, central-america, south-america, europe,
+africa, middle-east, east-asia, japan, australia, new-zealand; or `lat_min,lat_max,lon_min,lon_max`.
+
+**The index** (`<name>.global.idx.npy`, written after a global build; `prescreen index FILE` for older files): per
+event the latitude/longitude box of its track's usable part and the star's altitude range along it. A site or region
+query first drops the events whose box (widened for the query's reach, see below) cannot reach it, then tests the
+rest exactly: about 1 in 5 to 1 in 7 events remain, so a site test takes about a fifth of the time. Checked on 4 days
+(1.7 M events): never dropped an event the full test keeps (the observer's site at three settings, 20 random sites in
+a 500 km box, sites in Iceland, Sydney, Svalbard and Tierra del Fuego).
+
+**Reach is measured in the fundamental plane** (as the pick's miss distance), and on the ground a plane km is
+stretched by up to 1/sin(star altitude): 210 km in the plane is 210 km on the ground with the star overhead, ~280 km
+at 50 deg, ~730 km at 20 deg, up to ~1600 km at the horizon. Region tests and the index use this exact bound
+(`shadowtrack.ground_reach`); before (format 2 and older), low-altitude events seen by an observer off the track's
+ground point could be missed.
 
 The site test computes the site's position in each event's plane (Earth rotation from SPICE) and keeps the event if
 the shadow passes within radius + reach of it with the star up and the Sun down there: for the observer's site it
 kept 40 of 2039 asteroids, including all 39 of the full pick's events. `extract` cuts a region pre-screen (the same
-`.db` as a region build) in seconds, e.g. a continent with a brighter star limit to share. In the GUI: Region
+`.db` as a region build) quickly, e.g. a continent with a brighter star limit to share. In the GUI: Region
 "whole Earth (any site)".
 
 **Saved picks are reused.** Picking is the slow part, so you only need it once per site and window: `pyoccult/search.py`

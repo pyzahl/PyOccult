@@ -262,9 +262,10 @@ def main(argv=None):
             return 2
         if PS.is_global(a.prescreen):                   # whole Earth: the site test on the stored shadow elements
             t_q = time.time()
-            keep, n_tested = PS.site_numbers(a.prescreen, spice, et0, et1, a.lat, a.lon, a.ele, opt)
-            how = (f"site test of {n_tested} events (G <= {a.cam_limit:g}, reach {a.reach:g} km) "
-                   f"in {time.time() - t_q:.1f} s")
+            keep, n_win, n_tested = PS.site_numbers(a.prescreen, spice, et0, et1, a.lat, a.lon, a.ele, opt)
+            how = (f"site test of {n_tested} of {n_win} events (G <= {a.cam_limit:g}, reach {a.reach:g} km"
+                   + (", index" if PS.has_index(a.prescreen) else "; no index: pyoccult prescreen index FILE")
+                   + f") in {time.time() - t_q:.1f} s")
         else:
             keep = PS.numbers(a.prescreen, et0, et1, a.cam_limit)
             how = f"events in the window with a star G <= {a.cam_limit:g}"

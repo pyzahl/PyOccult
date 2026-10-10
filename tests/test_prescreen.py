@@ -69,4 +69,11 @@ path, m, other = PS.best_fit(0.0, 86400.0, 40.87, -72.86, pick, d)
 assert path == new_ and m["name"] == "new" and [os.path.basename(x[0]) for x in other] == ["far.db"], (path, other)
 assert PS.best_fit(0.0, 30 * 86400.0, 40.87, -72.86, pick, d)[0] is None, "window not covered: no pre-screen"
 assert abs(PS.age_days(dict(built=time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(time.time() - 3 * 86400)))) - 3) < 0.01
+assert PS.parse_region("Europe") == PS.region_box(*PS.REGIONS["europe"])
+assert PS.parse_region("35,60,-130,-60") == box
+try:
+    PS.parse_region("atlantis")
+    raise AssertionError("unknown region name must be refused")
+except ValueError:
+    pass
 print("PRESCREEN TESTS PASSED")

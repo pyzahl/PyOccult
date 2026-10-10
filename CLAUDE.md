@@ -77,7 +77,14 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `region_mask`, `site_mask` (Site.at on a 1-min grid, segment distances between N_SAMPLES 81 samples, TOL_KM 10,
   TOL_DEG 1), `frames`, `in_box`. Global files: prescreen `<name>.global.npy` sorted by et + `.global.json` meta
   (kind global, n_events, n_asteroids); `PS.select` (searchsorted window +- half, g), `site_numbers`, `extract` ->
-  region .db, `remove`, `is_global`; pick uses `site_numbers` for a global file; CLI `query`, `extract`.
+  region .db, `remove`, `is_global`; pick uses `site_numbers` for a global file; CLI `query`, `extract`, `index`.
+  Reach is a PLANE distance: `ground_reach(sin_h, rho, sin_min)` = exact largest ground distance of an observer
+  within rho (plane) of the axis point (|proj| = R cos h; chord^2 = rho^2 + R^2 dsin^2): 210 km -> 280 km at 50 deg,
+  730 at 20, 1640 at 0; used for in_box margins and the sky tolerance in `_track` (FORMAT 3). Index
+  `<name>.global.idx.npy` (IDX_DTYPE: lat_lo/hi, lon_w, lon_width, sin_lo/hi; `track_bounds` pads only gs + r;
+  `near_site`/`hits_box` add `_reach_pad` = max ground_reach over the track's altitude range (not monotonic in h:
+  33 points + 3 %) for the query's reach/min_alt, TOL margins; validated 2026-10-10: 0 dropped at all tested
+  sites/limits, passes 14-26 % of events). Named regions `REGIONS` / `parse_region`.
 - `pyoccult/corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
 - `linux_install.sh` (user's quick install, Linux/macOS): creates `.venv` with python3, installs the project via
