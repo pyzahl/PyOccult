@@ -38,6 +38,8 @@ con.executemany("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?)",
 con.executemany("INSERT INTO meta VALUES (?, ?)", [(k, json.dumps(v)) for k, v in meta.items()] + [("name", '"t"')])
 con.commit(); con.close()
 assert PS.numbers(p, 0.0, 86400.0) == {30819} and PS.numbers(p, 0.0, 7 * 86400.0) == {30819, 101716}
+assert PS.numbers(p, 0.0, 7 * 86400.0, 11.0) == {30819}, "the pick's star limit drops asteroids with fainter stars only"
+assert PS.numbers(p, 0.0, 7 * 86400.0, 11.5) == {30819, 101716}, "a star exactly at the limit is kept"
 assert PS.read_meta(p)["reach_km"] == 200.0 and "lat 36.4" in PS.describe(p)
 assert PS.counts(p) == (2, 2)
 

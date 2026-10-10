@@ -368,15 +368,20 @@ def index():
                          "minutes for a few weeks. A pre-screen does the site-independent part once for a region and a "
                          "window (about 1-2 hours for 20 days, 4 workers) and keeps only the asteroids with possible "
                          "events there; every later pick of a site inside that region and window ('Asteroids: auto') "
-                         "then screens only those. Build it for the next weeks, around all your sites; rebuild after a "
-                         "few weeks (orbits are those of the build day). Uses the H limit and workers above; star limit "
+                         "then screens only those (a pick then takes seconds). Build it for the next weeks, around all your "
+                         "sites, or for the whole Earth (same build time, bigger file: any site, also later ones); "
+                         "rebuild after a few weeks (orbits are those of the build day). Uses the H limit and workers above; star limit "
                          "at least G 16; loose limits (reach 200 km, Sun below 0, star above 0). Stop saves; the same "
                          "build again resumes.").classes("text-sm text-slate-600")
                 with ui.row().classes("items-end gap-4"):
                     ps_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date").classes("w-36")
                     ps_days = ui.number("Days", value=30, min=1, step=1).classes("w-24")
                     ps_where = ui.select({"site": "around this site", "sites": "around all my sites",
-                                          "global": "whole Earth"}, value="sites", label="Region").classes("w-48")
+                                          "global": "whole Earth (any site)"}, value="sites",
+                                         label="Region").classes("w-52").tooltip(
+                        "Whole Earth stores the shadow's path of every event (~1 GB per month at G 16, less with a "
+                        "brighter star limit), so a pick at any site tests it in seconds; command line: "
+                        "'pyoccult prescreen extract' cuts a small region file from it")
                     ps_km = ui.number("Box (km)", value=300, min=50, step=50).classes("w-28").tooltip(
                         "The region is a latitude/longitude box (a rectangle on the map, not a circle): this many km "
                         "north, south, east and west of the site (around all sites: of every site, at least this "
@@ -913,7 +918,8 @@ def index():
                 opts[path] = "pre-screen " + PS.describe(path, m)
                 fit.append((m.get("built", ""), path, m))
             reg = m.get("region")
-            inside = [n for n, v in sites.items() if "lat" in v and PS.contains(m, v["lat"], v["lon"])]
+            inside = ["all (site test)"] if not reg else \
+                [n for n, v in sites.items() if "lat" in v and PS.contains(m, v["lat"], v["lon"])]
             try:
                 n_ev, n_ast = PS.counts(path)
             except Exception:
@@ -949,9 +955,10 @@ def index():
         if not sel:
             ui.notify("Select pre-screens in the table first", type="warning")
             return
+        from pyoccult import prescreen as PS
         for p in sel:
             try:
-                os.remove(p)
+                PS.remove(p)
             except OSError as e:
                 ui.notify(f"{os.path.basename(p)}: {e}", type="negative")
         ps_table.selected = []

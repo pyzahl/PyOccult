@@ -45,7 +45,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `targets` override sets `"list"`). Engine `pyoccult/screen.py` (site solve, OWC observability formula), orbits `pyoccult/orbits.py` (SBDB full-precision
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= index_gmax(cam_limit) = max(15, ceil(limit)), cells sorted by G; a missing one is
   built by `run_screen` in the parent before the workers start, low-memory via a memmap). Worker processes.
-- `pyoccult/prescreen.py` (0.16 dev): pre-screens = per region/window the asteroids with possible events (build:
+- `pyoccult/prescreen.py` (0.16 dev; FORMAT 2 since 2026-10-10: time grid +-PAD_S 12 h, candidates kept if
+  tc +- half touches the window, `numbers` +- HALF_MAX_S; region test via shadowtrack.ground_track; FORMAT 1 builds
+  missed ~21 % of a 500 km region's asteroids through 41-sample gaps and axis-only sky tests): pre-screens = per region/window the asteroids with possible events (build:
   pick.fetch_sbdb/build_rows, orbits.propagate, BrightIndex.near_path with Earth radius + r_max + reach, corridor
   find_candidates, then a vectorized ground track per candidate: shadow axis in the fundamental plane -> surface
   point (sphere), J2000->ITRF from pxform on the 10-min grid + spin OMEGA*dt, region box (+ r_max + reach margin,
@@ -60,13 +62,22 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   + `done` numbers + meta 'settings'; resumed only with equal settings, `--fresh` discards), finished -> meta,
   DROP done, VACUUM, os.replace. Worker RSS peak includes the memory-mapped bright index pages (reclaimable); the
   progress line also shows RssAnon after the chunk. SIGTERM (GUI Stop) is handled like Ctrl-C. Use: pick `--prescreen auto`
-  -> `best_fit` (newest by meta 'built' among check()==[]; else full screen + reasons); `box_around_all` (CLI
+  -> PS.numbers(et0, et1, gmax=cam_limit) (pick never uses stars fainter than cam_limit: G 13.2 -> ~1/40 of the
+  asteroids vs ~1/6 at G 16) -> `best_fit` (newest by meta 'built' among check()==[]; else full screen + reasons); `box_around_all` (CLI
   `--around-sites`, all sites.py sites, widest longitude gap outside; lon width at the poleward edge, so >= km
   everywhere; `box_around` (single site) uses cos(site lat): ~7 % narrower at the north edge for 500 km at 41 N,
   documented, change only between builds: resume compares the stored region); targets.py line "# asteroids screened:".
   GUI Pick tab: p_pre "auto"/"all"/path (PRE_FIXED), `pre_info` line, expansion "Pre-screens" (ps_start, ps_days,
   ps_where site/sites/global, ps_km, `run_prescreen`, ps_table with fit reasons, `delete_prescreens`);
   prescreen_options() mirrors PS.check without SPICE (`_day_et`: both windows start 00:00 UTC).
+- `pyoccult/shadowtrack.py` (2026-10-10): shadow elements per event (DTYPE 80 B: number, star, et=tc, g, m_ast,
+  geo_miss, star dir sx/sy/sz f4, x0/y0/vx/vy/ax/ay f4 quadratic in dt=t-tc over +-half, half, r_km, err = misfit at 9
+  points; measured <= 0.3 km), `fit`, `positions`, `ground_track` (shared by build and region test: N_TRACK 161
+  samples, all tests widened by `_half_steps` and the sky by (r + reach)/R: strict superset vs 1281 samples),
+  `region_mask`, `site_mask` (Site.at on a 1-min grid, segment distances between N_SAMPLES 81 samples, TOL_KM 10,
+  TOL_DEG 1), `frames`, `in_box`. Global files: prescreen `<name>.global.npy` sorted by et + `.global.json` meta
+  (kind global, n_events, n_asteroids); `PS.select` (searchsorted window +- half, g), `site_numbers`, `extract` ->
+  region .db, `remove`, `is_global`; pick uses `site_numbers` for a global file; CLI `query`, `extract`.
 - `pyoccult/corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
 - `linux_install.sh` (user's quick install, Linux/macOS): creates `.venv` with python3, installs the project via

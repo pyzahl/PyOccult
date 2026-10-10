@@ -260,10 +260,17 @@ def main(argv=None):
             print(f"pre-screen {a.prescreen} does not fit this pick: " + "; ".join(bad) +
                   ". Build a fitting one (pyoccult prescreen build) or pick without --prescreen.", file=sys.stderr)
             return 2
-        keep = PS.numbers(a.prescreen, et0, et1)
+        if PS.is_global(a.prescreen):                   # whole Earth: the site test on the stored shadow elements
+            t_q = time.time()
+            keep, n_tested = PS.site_numbers(a.prescreen, spice, et0, et1, a.lat, a.lon, a.ele, opt)
+            how = (f"site test of {n_tested} events (G <= {a.cam_limit:g}, reach {a.reach:g} km) "
+                   f"in {time.time() - t_q:.1f} s")
+        else:
+            keep = PS.numbers(a.prescreen, et0, et1, a.cam_limit)
+            how = f"events in the window with a star G <= {a.cam_limit:g}"
         n_all = len(rows)
         rows = [r for r in rows if int(r["number"]) in keep]
-        print(f"pre-screen {PS.describe(a.prescreen, meta)}: {len(rows)} of {n_all} asteroids", file=sys.stderr)
+        print(f"pre-screen {PS.describe(a.prescreen, meta)}: {len(rows)} of {n_all} asteroids ({how})", file=sys.stderr)
         a.screened = f"{len(rows)} of {n_all} (pre-screen {os.path.basename(a.prescreen)})"
     a.site = c("site") if (a.lat, a.lon) == (c("lat"), c("lon")) else None
     print(f"{len(rows)} asteroids, {a.start} + {a.days:g} d, site {a.site or ''} {a.lat:.4f} {a.lon:.4f}, reach {a.reach:g} km, "

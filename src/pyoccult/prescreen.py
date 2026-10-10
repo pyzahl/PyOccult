@@ -8,6 +8,15 @@ region: `pyoccult pick --prescreen FILE` screens only those asteroids instead of
     pyoccult prescreen build --start 2026-11-01 --days 30 --global
     pyoccult prescreen list                                                          # the built ones
     pyoccult prescreen show prescreen/<name>.db
+    pyoccult prescreen extract prescreen/<global>.global.npy --region 24,50,-125,-66  # a region cut from a global one
+    pyoccult prescreen query prescreen/<global>.global.npy                           # asteroids for the site
+
+Whole Earth (--global): instead of testing a region, the build stores per event the shadow's motion across the
+fundamental plane (star direction, a quadratic in time, its misfit; ~80 bytes, see shadowtrack.py), sorted by time in
+<name>.global.npy (+ .json). From it, any site is tested in seconds (pick --prescreen, auto included; query) and any
+region cut out (extract: a small region file for picks there, or to share). The build costs about the same as a region
+build (the region test was never the expensive part); size ~29 events per asteroid per 20 days at G 16 (~1 GB for
+465k asteroids), ~1/13 of that at G 13.2.
 
 Memory and progress: the asteroids go to the worker processes in chunks sized from the free memory (a chunk's numpy
 arrays take ~12 x 3 x 8 bytes per asteroid and 10-min time step: 0.29 MB for 7 days, 1.2 MB for 30 days); --max-mem
@@ -36,9 +45,12 @@ Horizons orbit for the final prediction anyway.
 from pyoccult.version import __version__
 import argparse, glob, json, math, os, sqlite3, sys, tempfile, time
 import numpy as np
+from pyoccult import shadowtrack as ST
 
 DIR = "prescreen"
-OMEGA = 7.2921150e-5                         # Earth's rotation, rad/s (sidereal)
+FORMAT = 2                                   # 2: padded grid, 161-sample tracks widened to a strict superset, global
+HALF_MAX_S = 6 * 3600.0                      # an event's track: at most +-6 h around its Earth-centre time
+PAD_S = 2 * HALF_MAX_S                       # the build's time grid reaches this far beyond the window
 
 
 # ---------------------------------------------------------------- region
@@ -78,14 +90,7 @@ def box_around_all(points, km):
     return region_box(max(lat_lo - dlat, -90.0), min(lat_hi + dlat, 90.0), w, e)
 
 
-def in_box(lat, lon, box, margin_km):
-    """Boolean array: (lat, lon) within the box widened by margin_km (longitudes wrap)."""
-    dlat = margin_km / 111.2
-    ok = (lat >= box["lat_min"] - dlat) & (lat <= box["lat_max"] + dlat)
-    dlon = margin_km / (111.2 * np.maximum(np.cos(np.radians(lat)), 0.02))
-    width = (box["lon_max"] - box["lon_min"]) % 360.0 or (360.0 if box["lon_max"] != box["lon_min"] else 0.0)
-    rel = (lon - box["lon_min"]) % 360.0                         # 0..360 east of the box's west edge
-    return ok & ((rel <= width + dlon) | (rel >= 360.0 - dlon))
+in_box = ST.in_box
 
 
 def contains(meta, lat, lon):
@@ -108,17 +113,21 @@ def _init(folder, catalog_dir, cam_limit):
     _W.update(spice=spice, index=L.BrightIndex(catalog_dir, L.index_gmax(cam_limit)))
 
 
-def build_chunk(spice, rows, et0, et1, index, opt, step_s=600.0, n_track=41):
+def build_chunk(spice, rows, et0, et1, index, opt, step_s=600.0, n_track=ST.N_TRACK):
     """The pre-screen events of these asteroids (pick.build_rows dicts). opt: cam_limit, min_drop, reach_km,
-    max_sun_alt, min_alt, region (box dict or None = global)."""
+    max_sun_alt, min_alt, region (box dict, or None = global). A region build returns a list of event tuples (the
+    events table), a global build a ST.DTYPE array (the shadow elements of every event that falls on the Earth in
+    the dark with the star up somewhere)."""
     import pandas as pd
     from pyoccult import orbits as O, screen as SC
     from pyoccult.corridor import find_candidates, propagate_linear, pad_for_pm, _unit, EARTH_R_KM, GAIA_EPOCH_YEAR
-    ets = np.arange(et0, et1 + step_s, step_s)
+    # the grid reaches PAD_S beyond the window: an event's track can start or end up to HALF_MAX_S from its
+    # Earth-centre time, and the shadow elements need the orbit on both sides of it
+    ets = np.arange(et0 - PAD_S, et1 + PAD_S + step_s, step_s)
     sun = np.asarray(spice.spkpos("10", ets, "J2000", "LT+S", "399")[0])
-    sun_u = sun / np.linalg.norm(sun, axis=1, keepdims=True)
+    fr = dict(ets=ets, step=step_s, sun_u=sun / np.linalg.norm(sun, axis=1, keepdims=True),
+              rot=np.array([spice.pxform("J2000", "ITRF93", float(t)) for t in ets]))      # (T,3,3)
     sun_bary = np.asarray(spice.spkpos("10", ets, "J2000", "NONE", "0")[0]) / O.AU_KM
-    rot = np.array([spice.pxform("J2000", "ITRF93", float(t)) for t in ets])        # (T,3,3)
     pad = pad_for_pm(1500.0, ets)
     years = 2000.0 + ets.mean() / (365.25 * 86400.0) - GAIA_EPOCH_YEAR
     dm_drop = SC.drop_cut(opt["min_drop"]) if opt["min_drop"] > 0 else 99.0
@@ -135,7 +144,7 @@ def build_chunk(spice, rows, et0, et1, index, opt, step_s=600.0, n_track=41):
     speed = np.zeros_like(delta)
     speed[:, 1:] = np.linalg.norm(np.diff(U, axis=1), axis=2) / step_s * delta[:, 1:]
     speed[:, 0] = speed[:, 1]
-    out = []
+    out, elems = [], []
     for k, row in enumerate(rows):
         m_ast = SC.hg_mag(row["H"], row["G"], rh[k], delta[k] / O.AU_KM, cos_ph[k])
         cap = min(opt["cam_limit"], float(m_ast.max()) + dm_drop)
@@ -151,58 +160,49 @@ def build_chunk(spice, rows, et0, et1, index, opt, step_s=600.0, n_track=41):
                                 block_cells=SCAN_CELLS)
         if len(cands) == 0:
             continue
+        tc = cands.et_guess.to_numpy()
+        js = cands.j.to_numpy()
+        half = np.minimum(1.3 * margin / np.maximum(speed[k][js], 0.3), HALF_MAX_S)
+        inwin = (tc + half >= et0) & (tc - half <= et1)                             # the track touches the window
+        if not inwin.any():
+            continue
+        cands, tc, js, half = cands[inwin], tc[inwin], js[inwin], half[inwin]
         ra, de = propagate_linear(sdf.iloc[cands.star.to_numpy()], years)
         sdir = _unit(ra, de)                                                         # (c,3)
-        tc = cands.et_guess.to_numpy()
-        keep, where = np.ones(len(cands), bool), np.full((len(cands), 4), np.nan)    # lat, lon, sun alt, star alt
-        if box is not None:
-            v = np.maximum(speed[k][cands.j.to_numpy()], 0.3)
-            for b0 in range(0, len(tc), CAND_BLOCK):                                 # bounded memory per block
-                sl = slice(b0, b0 + CAND_BLOCK)
-                keep[sl], where[sl] = _ground_track(g[k], ets, tc[sl], v[sl], sdir[sl], rot, sun_u, margin, r_max,
-                                                    box, opt["reach_km"], sin_alt, sin_sun, step_s, n_track)
-        js = cands.j.to_numpy()
-        for q in np.where(keep)[0]:
-            out.append((int(row["number"]), int(sdf.source_id.iloc[cands.star.iloc[q]]), float(tc[q]),
-                        float(sdf.phot_g_mean_mag.iloc[cands.star.iloc[q]]), float(m_ast[js[q]]),
-                        float(cands.d_km.iloc[q]), *[None if not np.isfinite(x) else float(x) for x in where[q]]))
+        stars_i = cands.star.to_numpy()
+        for b0 in range(0, len(tc), CAND_BLOCK):                                     # bounded memory per block
+            sl = slice(b0, b0 + CAND_BLOCK)
+            tau = ST.sample_times(tc[sl], half[sl], n_track)
+            gs = ST.interp(g[k], ets, tau)                                           # (c,s,3)
+            ex, ny = ST.plane(sdir[sl])
+            px, py = np.einsum("csx,cx->cs", gs, ex), np.einsum("csx,cx->cs", gs, ny)
+            keep, where = ST.ground_track(px, py, tau, sdir[sl], fr, r_max, box, opt["reach_km"], sin_alt, sin_sun)
+            idx = np.where(keep)[0]
+            if not len(idx):
+                continue
+            if box is not None:
+                for q in idx:
+                    i = b0 + q
+                    out.append((int(row["number"]), int(sdf.source_id.iloc[stars_i[i]]), float(tc[i]),
+                                float(sdf.phot_g_mean_mag.iloc[stars_i[i]]), float(m_ast[js[i]]),
+                                float(cands.d_km.iloc[i]), *[None if not np.isfinite(x) else float(x) for x in where[q]]))
+                continue
+            step9 = (n_track - 1) // 8                                               # the 9 fit points among the samples
+            f = ST.fit(px[idx][:, ::step9], py[idx][:, ::step9], half[sl][idx])
+            e = np.zeros(len(idx), ST.DTYPE)
+            i = b0 + idx
+            e["number"] = int(row["number"])
+            e["star"] = sdf.source_id.to_numpy()[stars_i[i]]
+            e["et"], e["g"] = tc[i], sdf.phot_g_mean_mag.to_numpy()[stars_i[i]]
+            e["m_ast"], e["geo_miss"] = m_ast[js[i]], cands.d_km.to_numpy()[i]
+            e["sx"], e["sy"], e["sz"] = sdir[i, 0], sdir[i, 1], sdir[i, 2]
+            for key in ("x0", "y0", "vx", "vy", "ax", "ay", "err"):
+                e[key] = f[key]
+            e["half"], e["r_km"] = half[i], r_max
+            elems.append(e)
+    if box is None:
+        return np.concatenate(elems) if elems else np.zeros(0, ST.DTYPE)
     return out
-
-
-def _ground_track(gk, ets, tc, v, sdir, rot, sun_u, margin, r_max, box, reach_km, sin_alt, sin_sun, step_s, n_track):
-    """keep (c,) and where (c,4: lat, lon, sun alt, star alt) for candidates at times tc: the ground track of the
-    shadow axis, +-(Earth radius + margin) of along-track motion around closest approach."""
-    from pyoccult import screen as SC
-    from pyoccult.corridor import EARTH_R_KM
-    half = np.minimum(1.3 * margin / v, 6 * 3600.0)
-    tau = tc[:, None] + half[:, None] * np.linspace(-1, 1, n_track)[None, :]       # (c,s)
-    tau = np.clip(tau, ets[0], ets[-1])
-    gs = SC._interp(gk, ets, tau.ravel()).reshape(len(tc), n_track, 3)
-    ex, ny = SC._plane(sdir)
-    px, py = np.einsum("csx,cx->cs", gs, ex), np.einsum("csx,cx->cs", gs, ny)
-    rho = np.hypot(px, py)
-    R = EARTH_R_KM
-    on = rho < R + r_max + reach_km
-    depth = np.sqrt(np.maximum(R * R - rho * rho, 0.0))                           # towards the star (day side of it)
-    scale = np.where(rho > R, R / np.maximum(rho, 1e-9), 1.0)                     # off the limb: the nearest limb point
-    s = (px * scale)[..., None] * ex[:, None, :] + (py * scale)[..., None] * ny[:, None, :] \
-        + depth[..., None] * sdir[:, None, :]                                      # (c,s,3) J2000, km
-    up = s / np.linalg.norm(s, axis=2, keepdims=True)
-    star_up = np.einsum("csx,cx->cs", up, sdir)
-    i = np.clip(np.round((tau - ets[0]) / step_s).astype(int), 0, len(ets) - 1)
-    sun_up = np.einsum("csx,csx->cs", up, sun_u[i])
-    ang = OMEGA * (tau - ets[i])                                                  # spin since the grid time
-    itrf = np.einsum("csij,csj->csi", rot[i], s)
-    ca, sa = np.cos(ang), np.sin(ang)
-    x, y = ca * itrf[..., 0] + sa * itrf[..., 1], -sa * itrf[..., 0] + ca * itrf[..., 1]
-    lat = np.degrees(np.arcsin(np.clip(itrf[..., 2] / R, -1, 1)))
-    lon = np.degrees(np.arctan2(y, x))
-    ok = on & (star_up > sin_alt) & (sun_up < sin_sun) & in_box(lat, lon, box, r_max + reach_km)
-    first = np.argmax(ok, axis=1)
-    c_ = np.arange(len(tc))
-    where = np.stack([lat[c_, first], lon[c_, first], np.degrees(np.arcsin(np.clip(sun_up[c_, first], -1, 1))),
-                      np.degrees(np.arcsin(np.clip(star_up[c_, first], -1, 1)))], 1)
-    return ok.any(axis=1), where
 
 
 SCHEMA = """
@@ -215,7 +215,7 @@ CREATE INDEX IF NOT EXISTS events_et ON events (et);
 
 
 # ---------------------------------------------------------------- memory: the chunk plan
-CAND_BLOCK = 4096                 # candidates per ground-track block (bounds the per-asteroid transient, ~50 MB)
+CAND_BLOCK = 1024                 # candidates per ground-track block (161 samples: ~60 MB transient)
 SCAN_CELLS = 4e6                  # stars x time steps per candidate-scan block (~30 B each: ~120 MB; corridor's 2.5e7: 730 MB)
 BYTES_PER_STEP = 12 * 3 * 8       # per asteroid and time step: the (n,T,3) float64 arrays of a chunk (measured ~10)
 CHUNK_FIXED = 120e6               # per chunk on top: one scan block, star lists, one ground-track block (measured ~60 MB)
@@ -317,7 +317,8 @@ def _chunk_job(args):
 # ---------------------------------------------------------------- the build driver (checkpointed)
 def _settings(start, days, region, cam_limit, hmax, min_drop, reach_km, max_sun_alt, min_alt, catalog):
     return dict(start=start, days=days, region=region, cam_limit=cam_limit, hmax=hmax, min_drop=min_drop,
-                reach_km=reach_km, max_sun_alt=max_sun_alt, min_alt=min_alt, catalog=os.path.basename(str(catalog)))
+                reach_km=reach_km, max_sun_alt=max_sun_alt, min_alt=min_alt, catalog=os.path.basename(str(catalog)),
+                format=FORMAT)
 
 
 def open_partial(path, settings, fresh=False):
@@ -326,7 +327,8 @@ def open_partial(path, settings, fresh=False):
     if fresh and os.path.exists(path):
         os.remove(path)
     con = sqlite3.connect(path)
-    con.executescript(SCHEMA + "CREATE TABLE IF NOT EXISTS done (number INTEGER PRIMARY KEY);")
+    con.executescript(SCHEMA + "CREATE TABLE IF NOT EXISTS done (number INTEGER PRIMARY KEY);"
+                      "CREATE TABLE IF NOT EXISTS chunks (n INTEGER, data BLOB);")
     row = con.execute("SELECT value FROM meta WHERE key = 'settings'").fetchone()
     if row is None:
         con.execute("INSERT INTO meta VALUES ('settings', ?)", (json.dumps(settings),))
@@ -361,21 +363,23 @@ def build(start, days, region, cam_limit=16.0, hmax=17.0, min_drop=0.1, reach_km
                region=region)
     L.BrightIndex(catalog, L.index_gmax(cam_limit))                 # build a missing index here, once
     name = name or ("global" if region is None else "region")
-    out = out or os.path.join(DIR, f"{name}__{start}_{days:g}d_G{cam_limit:g}.db")
+    out = out or os.path.join(DIR, f"{name}__{start}_{days:g}d_G{cam_limit:g}" + (".global.npy" if region is None
+                                                                                  else ".db"))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     partial = out + ".partial"
     settings = _settings(start, days, region, cam_limit, hmax, min_drop, reach_km, max_sun_alt, min_alt, catalog)
     con = open_partial(partial, settings, fresh)
     done_nums = {r[0] for r in con.execute("SELECT number FROM done")}
-    n_events = con.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+    n_events = con.execute("SELECT COUNT(*) FROM events").fetchone()[0] + \
+        (con.execute("SELECT SUM(n) FROM chunks").fetchone()[0] or 0)
     todo = [r for r in rows if int(r["number"]) not in done_nums]
     say(f"pre-screen {name}: {len(rows)} asteroids, {start} + {days:g} d, G <= {cam_limit:g}, reach {reach_km:g} km, "
-        f"region {region or 'global'}")
+        f"region {region or 'whole Earth (shadow elements of every event, ' + str(ST.DTYPE.itemsize) + ' B each)'}")
     if done_nums:
         say(f"  resuming {partial}: {len(done_nums)} asteroids done, {n_events} events so far, {len(todo)} to go")
 
     # the chunk plan from the memory model and the free memory
-    steps = int(round((et1 - et0) / 600.0)) + 1
+    steps = int(round((et1 - et0 + 2 * PAD_S) / 600.0)) + 1
     avail, total, swap = mem_status()
     budget = max_mem if max_mem else (avail * mem_frac if avail else 4e9)
     if chunk:
@@ -421,7 +425,10 @@ def build(start, days, region, cam_limit=16.0, hmax=17.0, min_drop=0.1, reach_km
                 pending.pop(f)
                 ev, nums, wp, wa, dt = f.result()
                 with con:
-                    con.executemany("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?)", ev)
+                    if region is None:
+                        con.execute("INSERT INTO chunks VALUES (?, ?)", (len(ev), ev.tobytes()))
+                    else:
+                        con.executemany("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?)", ev)
                     con.executemany("INSERT OR IGNORE INTO done VALUES (?)", [(x,) for x in nums])
                 n_done += len(nums)
                 n_events += len(ev)
@@ -456,20 +463,70 @@ def build(start, days, region, cam_limit=16.0, hmax=17.0, min_drop=0.1, reach_km
                 asteroids_screened=len(rows), sbdb_fetched=fetched, built=time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
                 build_s=round(time.time() - t0), catalog=os.path.basename(str(catalog)), version=__version__,
                 resumed=bool(done_nums))
-    with con:
-        con.execute("DELETE FROM meta")
-        con.executemany("INSERT INTO meta VALUES (?, ?)", [(k, json.dumps(v)) for k, v in meta.items()])
-        con.execute("DROP TABLE done")
-    con.execute("VACUUM")
-    n_ev, n_ast = con.execute("SELECT COUNT(*), COUNT(DISTINCT number) FROM events").fetchone()
-    con.close()
-    os.replace(partial, out)
+    if region is None:
+        n_ev, n_ast = _write_global(con, out, meta)
+        con.close()
+        os.remove(partial)
+    else:
+        with con:
+            con.execute("DELETE FROM meta")
+            con.executemany("INSERT INTO meta VALUES (?, ?)", [(k, json.dumps(v)) for k, v in meta.items()])
+            con.execute("DROP TABLE done")
+            con.execute("DROP TABLE chunks")
+        con.execute("VACUUM")
+        n_ev, n_ast = con.execute("SELECT COUNT(*), COUNT(DISTINCT number) FROM events").fetchone()
+        con.close()
+        os.replace(partial, out)
     say(f"pre-screen written: {out}: {n_ev} events of {n_ast} asteroids (of {len(rows)}), {_hms(time.time() - t0)}")
     return out, n_ev, n_ast
 
 
+def _write_global(con, out, meta):
+    """The chunks of a global build -> one ST.DTYPE array sorted by time (out, memory-mapped, so the parent never holds
+    all events at once) + its meta (out without .npy + .json). Returns (events, asteroids)."""
+    n = con.execute("SELECT COALESCE(SUM(n), 0) FROM chunks").fetchone()[0]
+    folder = os.path.dirname(os.path.abspath(out))
+    tmp_u = os.path.join(folder, f".unsorted_{os.getpid()}.npy")
+    tmp_s = out + f".{os.getpid()}.tmp.npy"
+    try:
+        u = np.lib.format.open_memmap(tmp_u, mode="w+", dtype=ST.DTYPE, shape=(n,))
+        i = 0
+        for k, blob in con.execute("SELECT n, data FROM chunks"):
+            u[i:i + k] = np.frombuffer(blob, ST.DTYPE)
+            i += k
+        order = np.argsort(u["et"], kind="stable")
+        srt = np.lib.format.open_memmap(tmp_s, mode="w+", dtype=ST.DTYPE, shape=(n,))
+        for b0 in range(0, n, 1_000_000):
+            srt[b0:b0 + 1_000_000] = u[order[b0:b0 + 1_000_000]]
+        n_ast = int(len(np.unique(srt["number"]))) if n else 0
+        srt.flush()
+        del srt, u
+        meta = dict(meta, kind="global", n_events=int(n), n_asteroids=n_ast, dtype=str(ST.DTYPE.descr))
+        mtmp = _meta_path(out) + ".tmp"
+        with open(mtmp, "w") as f:
+            json.dump(meta, f, indent=1)
+        os.replace(tmp_s, out)
+        os.replace(mtmp, _meta_path(out))
+    finally:
+        for p in (tmp_u, tmp_s):
+            if os.path.exists(p):
+                os.remove(p)
+    return int(n), n_ast
+
+
 # ---------------------------------------------------------------- use
+def is_global(path):
+    return str(path).endswith(".global.npy")
+
+
+def _meta_path(path):
+    return str(path)[:-len(".npy")] + ".json"
+
+
 def read_meta(path):
+    if is_global(path):
+        with open(_meta_path(path)) as f:
+            return json.load(f)
     con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         return {k: json.loads(v) for k, v in con.execute("SELECT key, value FROM meta")}
@@ -477,14 +534,80 @@ def read_meta(path):
         con.close()
 
 
-def numbers(path, et0, et1):
-    """The asteroid numbers with pre-screen events between et0 and et1."""
+def numbers(path, et0, et1, gmax=None):
+    """The asteroid numbers with events of a region pre-screen between et0 and et1 (+- HALF_MAX_S: the stored time
+    is the Earth-centre one, the site's can be hours away for slow asteroids), with a star no fainter than gmax (the
+    pick's star limit: the pick never uses fainter stars, screen.screen caps at cam_limit; same Gaia G). A pre-screen
+    built to G 16 keeps ~1 in 6 asteroids, to G 13.2 only ~1 in 40."""
     con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    g = 99.0 if gmax is None else float(gmax) + 1e-4
     try:
-        return {int(r[0]) for r in con.execute("SELECT DISTINCT number FROM events WHERE et BETWEEN ? AND ?",
-                                               (et0 - 3600.0, et1 + 3600.0))}
+        return {int(r[0]) for r in con.execute("SELECT DISTINCT number FROM events WHERE et BETWEEN ? AND ? AND g <= ?",
+                                               (et0 - HALF_MAX_S, et1 + HALF_MAX_S, g))}
     finally:
         con.close()
+
+
+# ---------------------------------------------------------------- global pre-screens: queries
+def select(path, et0=None, et1=None, gmax=None):
+    """Events of a global pre-screen whose track touches et0..et1 (default: all) with a star G <= gmax: a ST.DTYPE
+    array in memory (the file is memory-mapped; it is sorted by time, so a window reads only its part)."""
+    a = np.load(path, mmap_mode="r")
+    if et0 is not None:
+        i0, i1 = np.searchsorted(a["et"], [et0 - HALF_MAX_S, et1 + HALF_MAX_S])
+        a = a[i0:i1]
+    m = np.ones(len(a), bool)
+    if et0 is not None:
+        m &= (a["et"] + a["half"] >= et0) & (a["et"] - a["half"] <= et1)
+    if gmax is not None:
+        m &= a["g"] <= gmax + 1e-4
+    return np.array(a[m])
+
+
+def site_numbers(path, spice, et0, et1, lat, lon, ele_m, opt):
+    """The asteroids of a global pre-screen with an event that can be seen from this site (ST.site_mask) in the
+    window. opt: cam_limit, reach_km, min_alt, max_sun_alt (the pick's). Returns (numbers set, events tested)."""
+    ev = select(path, et0, et1, opt.get("cam_limit"))
+    keep = ST.site_mask(spice, ev, lat, lon, ele_m, opt["reach_km"], opt["min_alt"], opt["max_sun_alt"])
+    return {int(x) for x in ev["number"][keep]}, len(ev)
+
+
+def extract(path, box, out=None, start=None, days=None, gmax=None, name=None):
+    """A region pre-screen (SQLite, like a region build) cut from a global one: the events whose ground track
+    touches the box (ST.region_mask with the global build's limits), optionally for a shorter window and a brighter
+    star limit. Seconds instead of a build. Returns (out, events, asteroids)."""
+    import spiceypy as spice
+    from pyoccult.home import HOME
+    from pyoccult import screen as SC
+    SC.load_kernels(spice, HOME)
+    m = read_meta(path)
+    start, days = start or m["start"], float(days or m["days"])
+    et0 = spice.str2et(f"{start}T00:00:00")
+    et1 = et0 + days * 86400.0
+    if et0 < m["et0"] - 1 or et1 > m["et1"] + 1:
+        raise RuntimeError(f"window {start} + {days:g} d not in the global pre-screen ({m['start']} + {m['days']:g} d)")
+    gmax = min(float(gmax), m["cam_limit"]) if gmax is not None else m["cam_limit"]
+    ev = select(path, et0, et1, gmax)
+    keep, where = ST.region_mask(spice, ev, box, m["reach_km"], m["min_alt"], m["max_sun_alt"])
+    name = name or "region"
+    out = out or os.path.join(os.path.dirname(path) or DIR, f"{name}__{start}_{days:g}d_G{gmax:g}.db")
+    meta = dict(m, name=name, start=start, days=days, et0=et0, et1=et1, region=box, cam_limit=gmax,
+                source=os.path.basename(path), extracted=time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()))
+    for k in ("kind", "n_events", "n_asteroids", "dtype"):
+        meta.pop(k, None)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(out)), suffix=".tmp")
+    os.close(fd)
+    con = sqlite3.connect(tmp)
+    con.executescript(SCHEMA)
+    e, w = ev[keep], where[keep]
+    con.executemany("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    [(int(a["number"]), int(a["star"]), float(a["et"]), float(a["g"]), float(a["m_ast"]),
+                      float(a["geo_miss"]), *[None if not np.isfinite(x) else float(x) for x in b]) for a, b in zip(e, w)])
+    con.executemany("INSERT INTO meta VALUES (?, ?)", [(k, json.dumps(v)) for k, v in meta.items()])
+    con.commit()
+    con.close()
+    os.replace(tmp, out)
+    return out, int(keep.sum()), len(set(e["number"].tolist()))
 
 
 def check(meta, et0, et1, lat, lon, opt):
@@ -518,6 +641,9 @@ def age_days(meta):
 
 def counts(path):
     """(events, asteroids) of a pre-screen file."""
+    if is_global(path):
+        m = read_meta(path)
+        return m.get("n_events"), m.get("n_asteroids")
     con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
         return con.execute("SELECT COUNT(*), COUNT(DISTINCT number) FROM events").fetchone()
@@ -539,20 +665,30 @@ def best_fit(et0, et1, lat, lon, opt, folder=DIR):
 
 
 def list_files(folder=DIR):
+    """[(path, meta)] of the region (.db) and global (.global.npy + .json) pre-screens in folder."""
     out = []
-    for p in sorted(glob.glob(os.path.join(folder, "*.db"))):
+    paths = glob.glob(os.path.join(folder, "*.db")) + \
+        [p for p in glob.glob(os.path.join(folder, "*.global.npy")) if os.path.exists(_meta_path(p))]
+    for p in sorted(paths):
         try:
             out.append((p, read_meta(p)))
-        except sqlite3.Error:
+        except (sqlite3.Error, OSError, ValueError):
             continue
     return out
+
+
+def remove(path):
+    """Delete a pre-screen (a global one with its meta file)."""
+    for p in ([path, _meta_path(path)] if is_global(path) else [path]):
+        if os.path.exists(p):
+            os.remove(p)
 
 
 def describe(path, meta=None):
     m = meta or read_meta(path)
     reg = m.get("region")
-    where = "global" if not reg else (f"lat {reg['lat_min']:.1f}..{reg['lat_max']:.1f}, "
-                                      f"lon {reg['lon_min']:.1f}..{reg['lon_max']:.1f}")
+    where = "whole Earth" if not reg else (f"lat {reg['lat_min']:.1f}..{reg['lat_max']:.1f}, "
+                                           f"lon {reg['lon_min']:.1f}..{reg['lon_max']:.1f}")
     return (f"{m.get('name', '?')}: {m['start']} + {m['days']:g} d, {where}, G <= {m['cam_limit']:g}, "
             f"reach {m['reach_km']:g} km, H < {m.get('hmax')}, built {m.get('built', '?')[:16]}")
 
@@ -563,7 +699,8 @@ def main(argv=None):
         from pyoccult import config as C
         g = lambda k, d: getattr(C, k, d)
         cfg = dict(sites=[(v["lat"], v["lon"]) for v in getattr(C, "sites", {}).values() if "lat" in v],
-                   lat=C.LAT, lon=C.LON, site=g("site_name", None), catalog=g("gaia_local_dir", "gaia_dr3_g16"),
+                   lat=C.LAT, lon=C.LON, ele=g("ELE", 0.0), reach=g("max_shadow_dist", 20.0), min_alt=g("MIN_STAR_ALT", 10.0),
+                   max_sun_alt=g("MAX_SUN_ALT", -6.0), site=g("site_name", None), catalog=g("gaia_local_dir", "gaia_dr3_g16"),
                    cache=C.cache_path, hmax=g("pick_hmax", 17.0), cam_limit=g("pick_cam_limit", 16.0))
     except (ImportError, AttributeError):
         pass
@@ -579,7 +716,9 @@ def main(argv=None):
     where.add_argument("--around-site", type=float, metavar="KM", help="a box this far around the configured site")
     where.add_argument("--around-sites", type=float, metavar="KM",
                        help="one box this far around all sites of sites.py (one pre-screen for all of them)")
-    where.add_argument("--global", dest="glob", action="store_true", help="the whole Earth (no region test)")
+    where.add_argument("--global", dest="glob", action="store_true",
+                       help="the whole Earth: stores the shadow elements of every event (~80 B each), so any site "
+                            "(pick --prescreen) or region (prescreen extract) can be cut from it later")
     b.add_argument("--name", help="name of the pre-screen (default: region / site name / global)")
     b.add_argument("--cam-limit", type=float, default=max(float(c("cam_limit", 16.0)), 16.0), help="faintest star, G")
     b.add_argument("--hmax", type=float, default=c("hmax", 17.0))
@@ -599,6 +738,26 @@ def main(argv=None):
     sub.add_parser("list", help="the pre-screens in prescreen/")
     s = sub.add_parser("show", help="settings and numbers of one pre-screen")
     s.add_argument("file")
+    x = sub.add_parser("extract", help="cut a region pre-screen from a global one (seconds)")
+    x.add_argument("file", help="a global pre-screen (.global.npy)")
+    xw = x.add_mutually_exclusive_group(required=True)
+    xw.add_argument("--region", help="lat_min,lat_max,lon_min,lon_max in degrees (lon east-positive)")
+    xw.add_argument("--around-site", type=float, metavar="KM", help="a box this far around the configured site")
+    xw.add_argument("--around-sites", type=float, metavar="KM", help="one box this far around all sites of sites.py")
+    x.add_argument("--start", help="a later start (default: the global one's)")
+    x.add_argument("--days", type=float, help="a shorter window (default: the global one's)")
+    x.add_argument("--cam-limit", type=float, help="a brighter star limit (smaller file)")
+    x.add_argument("--name")
+    x.add_argument("-o", "--output")
+    q = sub.add_parser("query", help="asteroids of a global pre-screen with events seen from the configured site")
+    q.add_argument("file", help="a global pre-screen (.global.npy)")
+    q.add_argument("--start", help="UTC date (default: the pre-screen's start)")
+    q.add_argument("--days", type=float, help="default: the pre-screen's window")
+    q.add_argument("--cam-limit", type=float, default=c("cam_limit", 16.0), help="faintest star, G")
+    q.add_argument("--reach", type=float, default=c("reach", 20.0), help="km")
+    q.add_argument("--min-alt", type=float, default=c("min_alt", 10.0))
+    q.add_argument("--max-sun-alt", type=float, default=c("max_sun_alt", -6.0))
+    q.add_argument("--numbers", action="store_true", help="print the asteroid numbers")
     a = ap.parse_args(argv)
     if a.cmd == "list":
         for p, m in list_files():
@@ -609,10 +768,44 @@ def main(argv=None):
         return 0
     if a.cmd == "show":
         m = read_meta(a.file)
-        con = sqlite3.connect(f"file:{a.file}?mode=ro", uri=True)
-        n_ev, n_ast = con.execute("SELECT COUNT(*), COUNT(DISTINCT number) FROM events").fetchone()
+        n_ev, n_ast = counts(a.file)
         print(describe(a.file, m))
-        print(f"{n_ev} events of {n_ast} asteroids (of {m.get('asteroids_screened')} screened), build {m.get('build_s')} s")
+        print(f"{n_ev} events of {n_ast} asteroids (of {m.get('asteroids_screened')} screened), build {m.get('build_s')} s"
+              + (f", {os.path.getsize(a.file) / 1e6:.0f} MB" if is_global(a.file) else ""))
+        return 0
+    if a.cmd == "query":
+        import spiceypy as spice
+        from pyoccult.home import HOME
+        from pyoccult import screen as SC
+        if c("lat") is None:
+            ap.error("query needs a configured site")
+        SC.load_kernels(spice, HOME)
+        m = read_meta(a.file)
+        et0 = spice.str2et(f"{a.start or m['start']}T00:00:00")
+        et1 = et0 + float(a.days or m["days"]) * 86400.0
+        t = time.time()
+        nums, n_ev = site_numbers(a.file, spice, et0, et1, c("lat"), c("lon"), c("ele", 0.0),
+                                  dict(cam_limit=a.cam_limit, reach_km=a.reach, min_alt=a.min_alt,
+                                       max_sun_alt=a.max_sun_alt))
+        print(f"site {c('site')}: {len(nums)} asteroids ({n_ev} events tested, G <= {a.cam_limit:g}, reach {a.reach:g} "
+              f"km, star >= {a.min_alt:g}, Sun <= {a.max_sun_alt:g}) in {time.time() - t:.1f} s")
+        if a.numbers:
+            print(" ".join(str(x) for x in sorted(nums)))
+        return 0
+    if a.cmd == "extract":
+        if a.region:
+            box, name = region_box(*[float(x) for x in a.region.split(",")]), a.name or "region"
+        elif a.around_sites is not None:
+            box, name = box_around_all(c("sites"), a.around_sites), a.name or f"sites_{a.around_sites:g}km"
+        else:
+            box, name = box_around(c("lat"), c("lon"), a.around_site), a.name or f"{c('site') or 'site'}_{a.around_site:g}km"
+        t = time.time()
+        try:
+            out, n_ev, n_ast = extract(a.file, box, a.output, a.start, a.days, a.cam_limit, name)
+        except RuntimeError as e:
+            print(f"pre-screen: {e}", file=sys.stderr)
+            return 2
+        print(f"extracted {out}: {n_ev} events of {n_ast} asteroids in {time.time() - t:.1f} s")
         return 0
     if a.glob:
         region, name = None, a.name or "global"
