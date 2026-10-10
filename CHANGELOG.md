@@ -6,55 +6,50 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
-### Fixed
-- Pre-screen region and sky tests: the reach is a distance in the fundamental plane, which on the ground is stretched
-  by up to 1/sin(star altitude); the tests used it as ground km, so events seen at low star altitude by an observer
-  away from the track's ground point could be missed. Exact bound now (`shadowtrack.ground_reach`; format 3).
-- Pre-screen region test: the ground track was sampled at 41 points (up to ~400 km apart) and the star and Sun
-  altitudes were taken at the shadow axis, so tracks crossing the region between samples, or seen from an observer
-  within reach but not at the axis, were missed (about 21 % of the asteroids for a 500 km region, compared with dense
-  sampling). Now 161 samples with every test widened by what can change between samples and by radius + reach for
-  the sky: a strict superset (nothing missed against 1281 samples). Builds also cover events whose track touches the
-  window but whose Earth-centre time is outside it (orbit grid +-12 h; such an event 19 min after the window was
-  missing). Region pre-screens built before should be rebuilt.
-- Pick and pre-screen workers use one numpy (OpenBLAS) thread each: before, every worker started one thread per
-  CPU (4 workers on 8 cores: 32 busy threads, each worker at ~40 % of a CPU).
+## [0.16.0] "New Horizons" - 2026-10-10
+
+Picks in seconds instead of minutes: a pre-screen does the site-independent part of a pick (which asteroids can put
+a star's shadow on the Earth at all) once for a window and stores it, for a region or for the whole Earth. A
+whole-Earth pre-screen stores each event's shadow path (Besselian-element style), so any site, or any region cut from
+it, is tested in seconds; for a 4-day window the pick with it gave exactly the full pick's events in 14 s instead of
+210 s. In the GUI, "Asteroids: auto" uses a fitting pre-screen by itself, and a Pre-screens panel builds and lists
+them. Picks and builds also run up to 2.4x faster with one math thread per worker.
 
 ### Added
-- **Pre-screens** (`pyoccult/prescreen.py`, `pyoccult prescreen build|list|show`): the asteroids with possible
-  occultations in a region (a lat/lon box, or a box around the site) or anywhere on the Earth during a window, built
-  once and stored in SQLite (`prescreen/`), using the pick's own parts (SBDB elements, orbits, bright-star index,
-  candidate scan) for the whole Earth plus each candidate's ground track (region, darkness, star altitude). New pick
-  option `--prescreen FILE` (GUI Pick tab: "Asteroids"): screens only those asteroids, otherwise unchanged; it checks
-  that the pre-screen covers the window and the site and that its limits are at least as loose, and refuses
-  otherwise. The full pick stays the default.
-- Pre-screen builds fit the free memory and resume: chunk size and workers are planned from the available memory and
-  a measured model of the numpy arrays (~12 x 3 x 8 bytes per asteroid and 10-min step), chunks shrink when memory
-  runs low, every chunk is saved at once in `<name>.db.partial` and the same command resumes after a crash or Ctrl-C
-  (`--fresh`, `--chunk`, `--max-mem`, `--mem-frac`). Verbose progress: the plan, then per chunk the rate, ETA, free
-  memory, swap and worker memory. The candidate scan and ground tracks run in bounded blocks (the 30-day peak per
-  chunk of 400 asteroids fell from 1.1 GB to 0.5 GB; same events).
-- Using pre-screens: pick `--prescreen auto` takes the newest pre-screen that fits the site, window and limits, else
-  screens all asteroids (and says why none fits); `targets.py` notes which asteroids were screened. Pre-screens
-  around all sites of sites.py (`--around-sites KM`: one box, the short way round across the date line), so one
-  build serves every site. `pyoccult prescreen list` shows asteroids, events and age. A pick takes only the
-  pre-screen's asteroids with an event star within its own star limit (a G 16 pre-screen keeps ~1 in 6 asteroids;
-  for a G 13.2 pick only ~1 in 40 are screened).
+- **Pre-screens** (`pyoccult/prescreen.py`, `pyoccult prescreen build|list|show|query|extract|index`): the asteroids
+  with possible occultations in a window, using the pick's own parts (SBDB elements, orbits, bright-star index,
+  candidate scan) for the whole Earth plus each candidate's ground track (161 samples, the Earth's rotation from SPICE).
+  Regions: a box around the site (`--around-site KM`), one box around all sites of sites.py (`--around-sites KM`,
+  the short way round across the date line), named regions (`--region usa|europe|south-america|...`) or a lat/lon
+  box. A strict superset of what any fitting pick finds: every test is widened by what can change between samples,
+  and the reach, a distance in the fundamental plane, is turned into the exact largest ground distance of an
+  observer (`shadowtrack.ground_reach`: up to 1/sin(star altitude) longer); the orbit grid reaches 12 h beyond the
+  window, so events whose track touches it are found. Checked against dense sampling and the exact site test at many
+  sites (VERIFICATION.md).
 - **Whole-Earth pre-screens** (`prescreen build --global`, new `pyoccult/shadowtrack.py`): per event the shadow's
-  motion across the fundamental plane (star direction, quadratic in time, misfit; ~80 B, Besselian-element style)
-  in a time-sorted `.global.npy` + `.json`; same build cost as a region. Picks use it for any site (`--prescreen`,
-  `auto`: a site test in seconds; for the observer's site 40 of 2039 asteroids kept, all 39 events of the full pick
-  among them); `prescreen query` (asteroids for the site), `prescreen extract` (a region file in seconds, optionally
-  shorter window and brighter star limit). Builds checkpoint the elements as blobs and write the sorted file through
-  memory maps.
-- Global pre-screen **index** (`<name>.global.idx.npy`, `prescreen index`, written after a global build): per event
-  the lat/lon box of its track and its star altitude range; site and region queries test only events whose box can
-  reach them (widened at query time for the query's reach and minimum altitude): ~1/5 of the events, nothing dropped
-  (checked at many sites and limits). Named regions for `--region` (usa, europe, south-america, ...).
+  motion across the fundamental plane (star direction, quadratic in time, misfit; 80 bytes) in a time-sorted
+  `.global.npy` + `.json`, at about the cost of a region build (~1 GB per month at G 16 for 465k asteroids). An
+  **index** (`.idx.npy`, written after the build; `prescreen index` for older files) holds each track's lat/lon box
+  and star altitude range, so a site or region query tests only the events that can reach it (14-26 %).
+  `prescreen query` (asteroids for the site), `prescreen extract` (a region file, optionally shorter window and
+  brighter star limit, e.g. a continent to share).
+- **Picks with pre-screens**: `pick --prescreen FILE|auto`; auto takes the newest pre-screen that fits the site,
+  window and limits, else screens all asteroids and says why none fits. Only the pre-screen's asteroids with an event
+  in the window and a star within the pick's star limit are screened (a whole-Earth file: those passing the site
+  test). `targets.py` notes which asteroids were screened. Same events as the full pick (checked).
+- **Pre-screen builds fit the free memory and resume**: chunk size and workers from the available memory and a
+  measured model of the NumPy arrays; chunks shrink when memory runs low; every chunk is committed to `<name>.partial`
+  and the same command resumes after a crash, Ctrl-C or the GUI's Stop (`--fresh` starts over; a build of an older
+  format is refused with a clear message). Verbose progress: the plan, then per chunk rate, ETA, free memory, swap
+  and worker memory. Stop ends the workers at once. The candidate scan and ground tracks run in bounded blocks.
 - GUI Pick tab: "Asteroids" = auto (default) / all (any place and time) / a fitting pre-screen, with a line saying
   what the pick will screen; a "Pre-screens" panel to build one (start, days, region: this site, all my sites, whole
-  Earth; box km) with its progress in the log (Stop saves, the same build resumes), and a table of the built ones
-  (window, region, sites inside, limits, asteroids/events, age, fits this pick or why not) with delete.
+  Earth; box km; Start over) with its progress in the log, and a table of the built ones (window, region, sites
+  inside, limits, asteroids/events, age, fits this pick or why not) with delete.
+
+### Fixed
+- Pick workers use one NumPy (OpenBLAS) thread each: before, every worker started one thread per CPU (4 workers on
+  8 cores: 32 busy threads, each worker at ~40 % of a CPU); a pre-screen build ran 2.4x faster with the fix.
 
 ## [0.15.0] "New Horizons" - 2026-10-10
 

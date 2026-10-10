@@ -33,6 +33,7 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
   - [3.4 Bright-star index: BrightIndex](#34-bright-star-index-brightindex)
   - [3.5 Speed and output](#35-speed-and-output)
   - [3.6 Saved picks: pyoccult/picks.py](#36-saved-picks-pyoccultpickspy)
+  - [3.7 Pre-screens: pyoccult/prescreen.py, pyoccult/shadowtrack.py (0.16.0)](#37-pre-screens-pyoccultprescreenpy-pyoccultshadowtrackpy-0160)
 - [Part 4: Data sources](#part-4-data-sources)
   - [4.1 Sizes: what Horizons/SBDB has, and what occultations measured](#41-sizes-what-horizonssbdb-has-and-what-occultations-measured)
   - [4.2 Asteroid satellites](#42-asteroid-satellites)
@@ -50,6 +51,7 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
 |---|---|---|
 | once | `pyoccult/setup.py` | downloads the SPICE kernels, installs the local Gaia catalog (ready-made from Zenodo, or built from ESA's files) and builds the bright-star index |
 | choose | `pyoccult/pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` and saves the pick per site and window in `picks/` |
+| pre-screen | `pyoccult/prescreen.py`, `pyoccult/shadowtrack.py` | once per window: the asteroids with possible events in a region, or the shadow elements of every event on the Earth, so picks there take seconds |
 | predict | `pyoccult/search.py` | computes the events of the target asteroids exactly, appends them to `hits_log.csv`, writes KML maps |
 | present | `pyoccult/report.py` | turns `hits_log.csv` into an HTML or Markdown event list with an embedded map |
 | operate | `pyoccult/gui.py` | local web interface (NiceGUI): sites on a map, runs, live log, results |
@@ -315,10 +317,10 @@ workers x (0.5 GB + 55 MB x days) well below the free memory.
 * **Days**: the per-worker chunk arrays (above) and longer star lists. For long windows use fewer workers, or split
   the window into several picks (each is saved and reused by searches).
 
-**CPU.** NumPy's linear algebra may run several threads of its own in each worker. With many workers that
-oversubscribes the CPU (seen: load 18 on 8 threads, single workers at 320 %), which costs time rather than gaining
-it. One math thread per worker is usually faster:
-`OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 pyoccult` (or before `pyoccult pick`).
+**CPU.** NumPy's linear algebra (OpenBLAS) starts one thread per CPU in every process. With several workers that
+oversubscribed the CPU (seen: 4 workers on 8 cores, load 24, each worker's own thread at ~40 % of a CPU), which cost
+time rather than gaining it. Since 0.16.0 the pick and pre-screen workers start with one math thread each
+(`OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS`/`MKL_NUM_THREADS` = 1 unless set): a pre-screen build ran 2.4x faster.
 Workers up to the number of physical cores; the GUI default is half the logical CPUs.
 
 Output: `pick_events.csv`, a ranked table (brightest star first by default) and `targets.py` with the
@@ -332,6 +334,65 @@ names and `pick_meta`: site, position, window, settings, time of the pick) plus 
 search window and that was made at the site's current position (within 0.01 deg); otherwise `targets.py` or the
 config list. An explicit target list (GUI text field, a run override, the OWC check) always wins. The run summary
 records which list was used, and the report header shows it.
+
+### 3.7 Pre-screens: `pyoccult/prescreen.py`, `pyoccult/shadowtrack.py` (0.16.0)
+
+A pick spends most of its time on a site-independent question: which asteroids pass close enough to a star that its
+shadow touches the Earth at all. A pre-screen answers it once for a window and stores the answer; a pick then screens
+only the asteroids that can matter at its site (`pick --prescreen FILE|auto`). Same parts as the pick (3.1-3.4), for
+the whole Earth:
+
+1. Per asteroid, the stars (G <= the build's limit and bright enough for a drop >= `min_drop`) within Earth radius +
+   r_max + reach of its geocentric path, then the candidate scan (2.5): every star whose shadow can touch the Earth.
+   The orbit grid reaches 12 h beyond the window, so an event whose ground track touches the window is found even when
+   its Earth-centre time lies outside it (an event can take up to 6 h to cross the Earth).
+2. Per candidate, the ground track of the shadow axis: the axis's plane position projected onto the Earth along the
+   star direction (off the limb: the nearest limb point), the Earth's rotation from `pxform` every 10 min plus the
+   spin in between, sampled at 161 points over +-half (half = 1.3 x (Earth radius + r_max + reach) / speed, at most 6 h).
+3. Region build: kept if a sample is in the region box with the star up and the Sun down there; whole-Earth build:
+   kept if a sample has the star up and the Sun down anywhere, and the event's shadow elements are stored (below).
+
+**Strict superset.** Every test is widened so that nothing the pick would find can be dropped:
+- *Between samples*: by half the distance to the neighbouring samples (on the ground for the box, in the plane for
+  "on the Earth", and as an angle for the altitudes). Checked against 1281 samples: none missed, 13 % extra asteroids.
+  The first version (41 samples, no widening) missed 21 % of the asteroids of a 500 km region.
+- *The reach is a plane distance* (the pick's miss distance is measured across the shadow, in the fundamental plane).
+  On the ground it is stretched: the plane is the orthographic projection of the Earth along the star, so a point at
+  star altitude h lies at R cos h from the axis of the projection. An observer P within rho (plane) of the axis's
+  ground point A therefore has cos h_P within cos h_A -+ rho/R, which bounds sin h_P, and the chord satisfies
+  |PA|^2 = rho^2 + R^2 (sin h_P - sin h_A)^2 (`ground_reach`). For rho = 210 km: 210 km on the ground with the star
+  overhead, ~280 km at 50 deg, ~730 km at 20 deg, ~1640 km at the horizon. This ground distance widens the region box
+  and, divided by R, the star and Sun altitude tests (the observer's sky differs from the axis point's by that angle).
+
+**Shadow elements** (whole Earth, `shadowtrack.DTYPE`, 80 bytes per event): number, star, Earth-centre time tc, G,
+asteroid magnitude, geocentric miss, star direction (3 x float32), and the axis's plane position as a quadratic in
+dt = t - tc over +-half, fitted to the integrated orbit at -half, 0, +half, with the largest misfit at 9 points (`err`;
+measured at most 0.3 km, median 0.000 km), plus half and the radius. Sorted by tc in `<name>.global.npy`, so a window
+is a binary search. The site test (`site_mask`) puts the site (`Site.at` on a 1-min grid, cubic interpolation) into
+each event's plane at 81 times over +-half and computes the closest distance on each segment between them (the
+relative motion is linear there); kept if it is below r_max + err + reach + 10 km with the star above the pick's
+minimum altitude and the Sun below its limit (both widened by 1 deg) at either end of the segment.
+
+**Index** (`<name>.global.idx.npy`, 24 bytes per event): the latitude range and the longitude arc of the track's
+usable samples (widened by the half step + radius; a track near a pole, or with ambiguous longitudes, gets all
+longitudes) and the star's altitude range along it. A site or region query widens each box by the largest
+`ground_reach` over that altitude range for its own reach and minimum altitude (not monotonic in h: 33 points + 3 %)
+and tests only the events whose box can reach it: 14-26 % of the events at the sites tried.
+
+**Validation** (details in VERIFICATION.md): region pre-screen pick 38 of 39 events of the full pick at the observer's
+site over 20 days (the 39th, 19 min after the window, is why the grid now reaches beyond it); whole Earth, 4 days,
+all asteroids with H < 17: the pick with it gave the same 12 events as the full pick (14 s against 210 s); the site
+test kept 40 of 2039 asteroids including all 39 with events; the index and the region test never dropped an event the
+exact site test keeps (the observer's site at three settings, 20 random sites in a 500 km box, sites in Iceland,
+Sydney, Svalbard and Tierra del Fuego).
+
+**Build memory and progress.** Chunk size and workers follow the free memory: a chunk's arrays take ~12 x 3 x 8
+bytes per asteroid and 10-min step (measured ~10), plus a fixed part; the candidate scan runs in blocks of 4 M
+stars x steps (the corridor's default 25 M made a ~730 MB transient for 30-day paths) and the ground tracks in blocks
+of 1024 candidates. After every chunk the results are committed to `<out>.partial` (SQLite: region events, or the
+elements as blobs, plus the done asteroid numbers and the settings); a rerun with the same settings resumes, a
+different format version is refused. A global build's chunks become one time-sorted file through memory maps, then
+the index is computed in worker processes.
 
 ---
 

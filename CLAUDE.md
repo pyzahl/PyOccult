@@ -45,7 +45,7 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `targets` override sets `"list"`). Engine `pyoccult/screen.py` (site solve, OWC observability formula), orbits `pyoccult/orbits.py` (SBDB full-precision
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= index_gmax(cam_limit) = max(15, ceil(limit)), cells sorted by G; a missing one is
   built by `run_screen` in the parent before the workers start, low-memory via a memmap). Worker processes.
-- `pyoccult/prescreen.py` (0.16 dev; FORMAT 2 since 2026-10-10: time grid +-PAD_S 12 h, candidates kept if
+- `pyoccult/prescreen.py` (0.16.0; FORMAT 3 since 2026-10-10: time grid +-PAD_S 12 h, candidates kept if
   tc +- half touches the window, `numbers` +- HALF_MAX_S; region test via shadowtrack.ground_track; FORMAT 1 builds
   missed ~21 % of a 500 km region's asteroids through 41-sample gaps and axis-only sky tests): pre-screens = per region/window the asteroids with possible events (build:
   pick.fetch_sbdb/build_rows, orbits.propagate, BrightIndex.near_path with Earth radius + r_max + reach, corridor

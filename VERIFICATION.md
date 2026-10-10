@@ -2,7 +2,7 @@
 
 How PyOccult's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
 event plots, against its own older code paths, and with independent geometry. What is computed and how: `ABOUT.md`;
-open items: `ABOUT.md`, Part 6. Updated 2026-10-08 (PyOccult 0.14.0).
+open items: `ABOUT.md`, Part 6. Updated 2026-10-10 (PyOccult 0.16.0).
 
 Contents:
 
@@ -280,6 +280,23 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 - **Pick screen** (blind, 465k asteroids, Oct 1 + 8 d, 20 km reach): all 13 OWC reference events with H < 17 among its
   39 events; the 14th (819762, H 18.45) with `--all`; times within 5 s, drops and durations as the search.
 - **Orbits of the pick** (integrated from SBDB elements): 102 asteroids against JPL Horizons, worst 0.01".
+- **Pre-screens** (0.16.0, 2026-10-10; `ABOUT.md` 3.7), all at the observer's site unless stated:
+  - Region pre-screen (500 km around the site, Oct 10 + 20 d, built with the first version): the pick with it found
+    38 of the full pick's 39 events, identical in star and time (0.0 s), screening 10273 of 464740 asteroids in
+    ~10 s. The 39th lay 19 min after the window end, beyond the build's orbit grid; the grid now reaches 12 h beyond.
+  - Region test against dense sampling (1000 asteroids, 20 d, 500 km box): the first version (41 samples) missed 55 of
+    256 asteroids (21 %); 161 samples with the widened tests miss none against 1281 samples (13 % extra).
+  - Shadow elements (2039 asteroids incl. the 39 with events, 20 d): quadratic misfit at most 0.3 km (median 0.000);
+    site test kept 40 asteroids, all 39 with events among them; the exact pick screen on the same asteroids found
+    those 39.
+  - Whole Earth, Oct 17 + 4 d, all 464740 asteroids with H < 17 (1.73 M events, 132 MB, 13.5 min with 4 workers):
+    pick with it 134 asteroids, the same 12 events as the full pick (asteroids, stars, times identical), 14 s
+    against 210 s.
+  - Index and region test against the exact site test (G <= 13.2 events of the same file): nothing dropped for the
+    site at reach 200/45/100 km and star >= 0/10/5 deg, for 20 random sites in a 500 km box, and for sites in
+    Iceland, Sydney, Svalbard and Tierra del Fuego; the index passes 14-26 % of the events to the exact test. A first
+    index that took the reach as ground km dropped 1 % at the loosest limits (low-altitude events seen off the track):
+    found and fixed with `ground_reach`.
 - **Planets and moons** (0.14.0):
   - Ephemeris: the kernel built from Horizons vectors (SPK type 13, 20 min steps) reproduces Horizons to ~1 m;
     NAIF's `jup365.bsp` and Horizons agree to millimetres at sample times.
@@ -292,7 +309,8 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 - **Tests** (`python tests/<name>.py`, stand-ins for SPICE, astropy and the network): corridor and loop recall, local
   catalog build and lookup, solver convergence at realistic ephemeris times, size cache, pick tool, paths, astrometric
   corrections (deflection and parallax sizes, switches off = unchanged), planets and moons, results database, CSV
-  exports, Stellarium pointing.
+  exports, Stellarium pointing, pre-screens (regions, fit check, global file and selection) and shadow elements
+  (fit, ground track, gap margin).
 
 ---
 
