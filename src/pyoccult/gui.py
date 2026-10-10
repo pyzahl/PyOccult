@@ -376,18 +376,19 @@ def index():
                 with ui.row().classes("items-end gap-4"):
                     ps_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date").classes("w-36")
                     ps_days = ui.number("Days", value=30, min=1, step=1).classes("w-24")
-                    ps_where = ui.select({"site": "around this site", "sites": "around all my sites",
-                                          "global": "whole Earth (any site)"}, value="sites",
-                                         label="Region").classes("w-52").tooltip(
-                        "Whole Earth stores the shadow's path of every event (~1 GB per month at G 16, less with a "
-                        "brighter star limit), so a pick at any site tests it in seconds; command line: "
-                        "'pyoccult prescreen extract' cuts a small region file from it")
+                    ps_where = ui.select(prescreen_regions(), value="sites", label="Region").classes(
+                        "w-60").tooltip(
+                        "Around this site / all my sites: a box this many km around them (Box). A named region: its "
+                        "lat/lon box (Box not used). Whole Earth stores the shadow's path of every event (~1 GB per "
+                        "month at G 16, less with a brighter star limit), so a pick at any site tests it in seconds; "
+                        "command line: 'pyoccult prescreen extract' cuts a region file from it")
                     ps_km = ui.number("Box (km)", value=300, min=50, step=50).classes("w-28").tooltip(
                         "The region is a latitude/longitude box (a rectangle on the map, not a circle): this many km "
                         "north, south, east and west of the site (around all sites: of every site, at least this "
                         "far everywhere). Around one site the poleward edge is a little narrower in km (about 465 of "
                         "500 km at 41 N). Events count if the shadow path comes within the asteroid's radius + 200 km "
                         "(reach) of the box, so the effective region is the box widened by 200 km or more")
+                    ps_where.on_value_change(lambda e: ps_km.set_visibility(e.value in ("site", "sites")))
                     ps_fresh = ui.checkbox("Start over").tooltip(
                         "Discard a stopped build of the same name and window instead of resuming it (needed when "
                         "the build format changed after an update)")
@@ -1180,8 +1181,10 @@ def index():
         if not catalog_ok():
             return
         ensure_saved()
-        where = {"site": ["--around-site", f"{float(ps_km.value or 300):g}"],
-                 "sites": ["--around-sites", f"{float(ps_km.value or 300):g}"], "global": ["--global"]}[ps_where.value]
+        v = ps_where.value
+        where = (["--region", v.split(":", 1)[1]] if v.startswith("region:") else
+                 {"site": ["--around-site", f"{float(ps_km.value or 300):g}"],
+                  "sites": ["--around-sites", f"{float(ps_km.value or 300):g}"], "global": ["--global"]}[v])
         args = PYOCCULT + ["prescreen", "build", "--start", ps_start.value, "--days", str(int(ps_days.value)),
                            *where, "--workers", str(int(p_workers.value))]
         args += ["--all"] if p_all.value else ["--hmax", str(p_hmax.value)]
@@ -1229,6 +1232,19 @@ def local_double_check(config):
 
 
 PRE_FIXED = {"auto": "auto: a fitting pre-screen, else all", "all": "all asteroids (any place and time; slower)"}
+
+
+def prescreen_regions():
+    """Region choices of the Pre-screens panel: around the site(s), the named regions of prescreen.REGIONS (with
+    their lat/lon box), the whole Earth."""
+    from pyoccult import prescreen as PS
+    hemi = lambda x, p, n: f"{abs(x):g}{p if x >= 0 else n}"
+    out = {"site": "around this site", "sites": "around all my sites"}
+    for k, (la0, la1, lo0, lo1) in PS.REGIONS.items():
+        out["region:" + k] = (f"{k.replace('-', ' ').title().replace('Usa', 'USA')} ({hemi(la0, 'N', 'S')}..{hemi(la1, 'N', 'S')}, "
+                              f"{hemi(lo0, 'E', 'W')}..{hemi(lo1, 'E', 'W')})")
+    out["global"] = "whole Earth (any site)"
+    return out
 
 
 def _day_et(date):

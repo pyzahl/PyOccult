@@ -402,10 +402,25 @@ pyoccult                 # opens http://127.0.0.1:8080 in your browser (local on
 2. **Pick**: choose a window (start date, today by default, and days), the asteroids (**H below**: an asteroid with a
    larger H is never found by the pick, but the search finds it if you enter its number) and the **Star G limit**
    (from the site's telescope, capped at the catalog; change it for one run), and run the pick: it screens all asteroids (H below 17 by default)
-   for actual events at your site and saves the best targets for this site and window. This is the slow step
-   (several minutes); a saved pick is reused by every later search of the same site and window. **CSV** downloads the
-   selected pick's events as a table (the Results tab has the same button for the search results, named
+   for actual events at your site and saves the best targets for this site and window. Without a pre-screen this is
+   the slow step (several minutes); a saved pick is reused by every later search of the same site and window. **CSV**
+   downloads the selected pick's events as a table (the Results tab has the same button for the search results, named
    `hits_<site>__<start>_<days>d.csv`).
+
+   **Faster picks with a pre-screen.** The **Asteroids** selector next to the pick settings decides which asteroids
+   the pick screens: **auto** (default) uses a pre-screen that fits this site, window and limits, else all asteroids;
+   **all** always screens every asteroid (any place and time, no pre-screen needed, slower); or choose one fitting
+   pre-screen by name. The line next to **Run pick** says which will be used. A pre-screen does the part of the work
+   that does not depend on your site once for a window, so later picks take seconds instead of minutes, with the
+   same events. Build one in the **Pre-screens** panel below the Run button: choose the start date and days (e.g. the
+   coming week or month), the **Region** (around this site or around all your sites, with **Box (km)**; a named region
+   such as USA, Europe or Australia; or **whole Earth (any site)**, which serves every site and is the most flexible,
+   ~1 GB per month) and click **Build pre-screen**. A build takes about as long as a few full picks (roughly an hour or two
+   for a month with 4 workers), shows its progress in the log, and can be stopped with **Stop** and resumed by
+   clicking **Build pre-screen** again (**Start over** discards a stopped build instead). The table lists the built
+   pre-screens with their window, region, the sites inside, limits, size, age (rebuild after a few weeks: orbits
+   are those of the build day) and whether each fits the current pick, or why not. Details: "Pick tool: choose
+   targets" below.
 3. **Planets & Moons** (optional): occultations by the planets Mars to Neptune, Pluto and their moons, with
    disappearance and reappearance times; tick the bodies, choose the window and run. Results in the tab (see
    "Planets and moons" below).
