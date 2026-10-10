@@ -363,8 +363,13 @@ def open_partial(path, settings, fresh=False):
         con.commit()
     elif json.loads(row[0]) != json.loads(json.dumps(settings)):
         con.close()
+        old = json.loads(row[0])
+        if old.get("format") != settings.get("format"):
+            raise RuntimeError(f"{path} is a partial build of an older format ({old.get('format')}; now "
+                               f"{settings.get('format')}: improved selection), so it cannot be resumed: start over "
+                               f"with --fresh (GUI: 'Start over')")
         raise RuntimeError(f"{path} is a partial build with other settings ({row[0]}); "
-                           f"use --fresh to discard it, or rerun with those settings to resume it")
+                           f"use --fresh to discard it (GUI: 'Start over'), or rerun with those settings to resume it")
     return con
 
 

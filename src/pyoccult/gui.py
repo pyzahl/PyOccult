@@ -388,6 +388,9 @@ def index():
                         "far everywhere). Around one site the poleward edge is a little narrower in km (about 465 of "
                         "500 km at 41 N). Events count if the shadow path comes within the asteroid's radius + 200 km "
                         "(reach) of the box, so the effective region is the box widened by 200 km or more")
+                    ps_fresh = ui.checkbox("Start over").tooltip(
+                        "Discard a stopped build of the same name and window instead of resuming it (needed when "
+                        "the build format changed after an update)")
                     ui.button("Build pre-screen", on_click=lambda: run_prescreen()).props("outline")
                     ui.button("Delete selected", on_click=lambda: delete_prescreens()).props(
                         "flat dense color=negative")
@@ -1183,6 +1186,9 @@ def index():
                            *where, "--workers", str(int(p_workers.value))]
         args += ["--all"] if p_all.value else ["--hmax", str(p_hmax.value)]
         args += ["--cam-limit", f"{max(16.0, float(p_mag.value or 0)):g}"]
+        if ps_fresh.value:
+            args += ["--fresh"]
+            ps_fresh.value = False
 
         async def done(rc):
             prescreen_options()
