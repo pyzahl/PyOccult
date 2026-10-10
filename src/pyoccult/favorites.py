@@ -14,7 +14,7 @@ Used by gui.py (report star buttons, Favorites tab). Standard library only.
 """
 from pyoccult.version import __version__
 from pyoccult import urls as U
-import glob, json, os, shutil, sys, tempfile
+import glob, json, math, os, shutil, sys, tempfile
 from datetime import datetime, timezone
 
 DIR = "favorites"
@@ -60,7 +60,7 @@ def _save(items, folder):
     write_csv(items, folder)
 
 
-PHYS_KEYS = ("H", "G", "diameter", "diameter_sigma", "extent", "albedo", "rot_per", "pole", "spec_T", "spec_B")
+PHYS_KEYS = ("H", "G", "diameter", "diameter_sigma", "extent", "albedo", "rot_per", "pole", "spec_T", "spec_B", "orbit")
 
 
 def phys_of(entry):
@@ -245,8 +245,9 @@ def backfill_phys(lookup, folder=DIR):
     time). Saves (and rewrites the CSV) only if something changed. Returns the number updated."""
     items, n = load(folder), 0
     for e in items:
-        if e.get("phys_src") == "sbdb.api":
-            continue
+        tid = str(e["record"].get("target_id", "")).strip()
+        if not tid.isdigit() or (e.get("phys_src") == "sbdb.api" and "orbit" in (e.get("phys") or {})):
+            continue                                              # (the orbit solution: added 0.14.x)
         entry = lookup(str(e["record"].get("target_id", "")).strip())
         if not entry:
             continue
@@ -323,6 +324,269 @@ def backfill_timezones(lookup, folder=DIR):
     if n:
         _save(items, folder)
     return n
+
+
+EVENT_KEYS = ("dist_au", "motion_ra_ash", "motion_dec_ash", "sun_elong_deg", "m_combined", "shadow_from_utc",
+              "shadow_to_utc")
+
+
+def horizons_event(target_id, utc, timeout=30):
+    """OWC-style event data for favorites saved before the search logged it (search.event_context): distance,
+    motion, solar elongation and the 1-sigma error ellipse from one JPL Horizons observer query (geocentric) at the
+    event minute; None if Horizons cannot be reached. Planets and moons (P:/M: targets) by their NAIF id."""
+    import csv as _csv, io, urllib.parse
+    from pyoccult import net, bodies
+    b = bodies.parse(target_id)
+    cmd = str(b["naif"]) if b else f"{str(target_id).strip()};"
+    t0 = str(utc)[:16].replace("T", " ")
+    q = {"format": "json", "COMMAND": f"'{cmd}'", "EPHEM_TYPE": "OBSERVER", "CENTER": "'500@399'",
+         "START_TIME": f"'{t0}'", "STOP_TIME": f"'{t0[:-2]}{int(t0[-2:]) + 1:02d}'" if not t0.endswith("59") else f"'{t0}:59'",
+         "STEP_SIZE": "'1m'", "QUANTITIES": "'3,20,23,37'", "CSV_FORMAT": "YES", "OBJ_DATA": "NO"}
+    try:
+        with net.urlopen(U.URL_JPL_HORIZONS_API + "?" + urllib.parse.urlencode(q), timeout=timeout) as r:
+            text = json.load(r).get("result", "")
+        head = text[:text.index("$$SOE")].strip().splitlines()[-2]
+        row = text[text.index("$$SOE") + 5:text.index("$$EOE")].strip().splitlines()[0]
+        cols = [c.strip() for c in next(_csv.reader(io.StringIO(head)))]
+        vals = [c.strip() for c in next(_csv.reader(io.StringIO(row)))]
+        d = dict(zip(cols, vals))
+        out = dict(dist_au=float(d["delta"]), motion_ra_ash=float(d["dRA*cosD"]), motion_dec_ash=float(d["d(DEC)/dt"]),
+                   sun_elong_deg=float(d["S-O-T"]))
+        try:                                                      # the 1-sigma error ellipse (small bodies only)
+            out.update(ast_err_smaa_mas=float(d["SMAA_3sig"]) / 3 * 1000, ast_err_smia_mas=float(d["SMIA_3sig"]) / 3 * 1000,
+                       ast_err_pa_deg=(90.0 - float(d["Theta"])) % 180.0)
+        except (KeyError, ValueError):
+            pass
+        return out
+    except (OSError, ValueError, KeyError, IndexError, StopIteration):
+        return None
+
+
+def backfill_event(lookup=horizons_event, folder=DIR):
+    """Event data (EVENT_KEYS) for favorites whose record lacks it (saved before 0.14.x): lookup(target_id, utc) ->
+    dict or None (offline: tried again next time); the combined magnitude from the record, From/To from the KML's
+    first and last minute mark (approximate, marked with '~'). Returns the number updated."""
+    import re
+    items, n = load(folder), 0
+    for e in items:
+        r = e["record"]
+        if str(r.get("dist_au") or "").strip():
+            continue
+        got = lookup(r.get("target_id", ""), r.get("best_utc", ""))
+        if not got:
+            continue
+        r.update({k: str(v) for k, v in got.items()})
+        try:
+            m, ma = float(r.get("mag")), float(r.get("m_ast"))
+            r["m_combined"] = str(-2.5 * math.log10(10 ** (-0.4 * m) + 10 ** (-0.4 * ma)))
+        except (TypeError, ValueError):
+            pass
+        kml = (e.get("files") or {}).get("kml")
+        if kml and os.path.isfile(os.path.join(folder, kml)):
+            marks = re.findall(r"<name>(\d\d:\d\d) UTC</name>", open(os.path.join(folder, kml), encoding="utf-8").read())
+            if marks:
+                day = str(r.get("best_utc", ""))[:10]
+                r["shadow_from_utc"], r["shadow_to_utc"] = f"~{day}T{marks[0]}", f"~{day}T{marks[-1]}"
+        n += 1
+    if n:
+        _save(items, folder)
+    return n
+
+
+def backfill_errors(ast_lookup=horizons_event, star_lookup=None, folder=DIR):
+    """The error ellipses for favorites saved without them: the target's from JPL Horizons (ast_lookup(target_id,
+    utc) -> dict with ast_err_*), the star's from the Gaia archive for all (star_lookup(source_ids) ->
+    {id: row} or None; default doubles.fetch_star_errors), carried to each event date. Marked 'err_checked' when
+    both answered, so it runs once per favorite (offline: next time). Returns the number updated."""
+    from pyoccult import ellipses, doubles
+    items = load(folder)
+    todo = [e for e in items if not e.get("err_checked")]
+    if not todo:
+        return 0
+    stars = (star_lookup or doubles.fetch_star_errors)([e["record"].get("star") for e in todo
+                                                         if str(e["record"].get("star") or "").strip()])
+    n = 0
+    for e in todo:
+        r, done = e["record"], True
+        tid = str(r.get("target_id", ""))
+        if ":" not in tid and not str(r.get("ast_err_smaa_mas") or "").strip():
+            got = ast_lookup(tid, r.get("best_utc", ""))
+            if got is None:
+                done = False
+            else:
+                r.update({k: str(v) for k, v in got.items() if k.startswith("ast_err_")})
+        if stars is None:
+            done = False
+        elif not str(r.get("star_err_smaa_mas") or "").strip():
+            g = stars.get(int(r.get("star") or 0))
+            years = 2000.0 + float(r.get("best_et") or 0) / (365.25 * 86400) - 2016.0
+            se = ellipses.star_ellipse(g, years) if g else None
+            if se:
+                r.update(star_err_smaa_mas=str(se[0]), star_err_smia_mas=str(se[1]), star_err_pa_deg=str(se[2]))
+        if done:
+            e["err_checked"] = True
+        n += 1 if done or any(str(r.get(k) or "").strip() for k in ("ast_err_smaa_mas", "star_err_smaa_mas")) else 0
+    if n:
+        _save(items, folder)
+    return n
+
+
+def error_svg(entry, size=300):
+    """The favorite's sky-plane 1-sigma error ellipses (target, star, combined) as one SVG (ellipses.svg), with the
+    error across the track in mas and km; without Gaia's errors for the star a typical star of its G (marked '!');
+    the star where it stands as seen from the site, unless that is more than 2 shadow widths outside. None when
+    neither ellipse is known."""
+    from pyoccult import ellipses
+    r = entry["record"]
+    trip = lambda p: tuple(_f(r.get(f"{p}_{k}")) for k in ("smaa_mas", "smia_mas", "pa_deg"))
+    ast, star = trip("ast_err"), trip("star_err")
+    ast, star = (ast if None not in ast else None), (star if None not in star else None)
+    missing, star_note = {}, ""
+    if not star:                                                  # no Gaia errors: a typical star of this G, marked
+        g, et = _f(r.get("mag")), _f(r.get("best_et"))
+        if g is not None and et is not None:
+            star = ellipses.typical_star(g, 2000.0 + et / (365.25 * 86400) - 2016.0)
+            star_note = f"typical for G {g:.1f} ({'no Gaia errors' if entry.get('err_checked') else 'Gaia: none yet'})"
+        else:
+            missing["Star"] = "no Gaia errors"
+    if not ast and not star:
+        return None
+    mra, mde, dist = _f(r.get("motion_ra_ash")), _f(r.get("motion_dec_ash")), _f(r.get("dist_au"))
+    note = ""
+    if mra is not None and mde is not None:
+        c = ellipses.add(*[ellipses.cov(*e) for e in (ast, star) if e])
+        x = ellipses.across_track(c, mra, mde)
+        if x is not None:
+            note = f"across track (dashed: motion): 1σ {x:.1f} mas" + (
+                f" = {x / 206264806.2 * dist * 1.495978707e8:.1f} km" if dist else "")
+    if not ast:
+        missing["Target"] = ("planet or moon: no error ellipse (ephemeris error see Path 1σ)"
+                             if ":" in str(r.get("target_id", "")) else
+                             "no error ellipse from JPL Horizons" if entry.get("err_checked") else "not fetched yet")
+    star_at, disk, at_note = None, None, ""
+    ox, oy, rad = _f(r.get("offset_east_km")), _f(r.get("offset_north_km")), _f(r.get("r_km"))
+    if dist and ox is not None and oy is not None:                # the star seen from the site: -(axis - observer)
+        k = 206264806.2 / (dist * 1.495978707e8)                  # mas per km at the target
+        star_at, disk = (-ox * k, -oy * k), (rad * k if rad else None)
+        off = math.hypot(ox, oy)
+        inside = rad is not None and off < rad
+        at_note = (f"star at site (dashed): {math.hypot(*star_at):.1f} mas = {off:.1f} km"
+                   + (", inside" if inside else ", outside"))
+        if rad and off > 2 * (2 * rad):                           # far outside: no zoom out for it, not drawn
+            at_note = f"star at site: {off:.1f} km off (> 2 widths, not drawn)"
+            star_at, disk = None, None
+    return ellipses.svg(ast, star, (mra, mde) if mra is not None and mde is not None else None, size, note=note,
+                        missing=missing, star_note=star_note, star_at=star_at, disk_mas=disk, star_at_note=at_note)
+
+
+def _f(v):
+    try:
+        x = float(v)
+        return x if math.isfinite(x) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _hms(deg, hours=False, nd=3):
+    v = abs(deg) / (15.0 if hours else 1.0)
+    a, rest = int(v), (v - int(v)) * 60
+    b, c = int(rest), (rest - int(rest)) * 60
+    if round(c, nd) >= 60:
+        b, c = b + 1, 0.0
+    if b >= 60:
+        a, b = a + 1, 0
+    if hours:
+        return f"{a:02d}h {b:02d}m {c:0{3 + nd}.{nd}f}s"
+    return f"{'-' if deg < 0 else '+'}{a:02d}° {b:02d}′ {c:0{3 + nd - 1}.{nd - 1}f}″"
+
+
+def event_info(entry):
+    """The favorite as OWC's event page summarises it: [(group, [(label, value), ...])] for Prediction, Event,
+    Star and Object. Values the record does not have are left out ('—' where OWC always shows one)."""
+    from pyoccult import binaries
+    r, ph, run = entry["record"], entry.get("phys") or {}, entry.get("run") or {}
+    f = lambda k: _f(r.get(k))
+    rad, speed, s1 = f("r_km"), f("speed_kms"), f("path_sigma1_km")
+    body = ":" in str(r.get("target_id", ""))
+    t = lambda u: (str(u).replace("T", " ")[:19] + " UT") if u else "—"
+    hm = lambda u: (("≈ " if str(u).startswith("~") else "") + str(u).lstrip("~")[11:19] + " UT") if u else "—"
+    pred = [("Last updated", t(run.get("run_utc"))),
+            ("Computed by", f"PyOccult {entry.get('version', '?')}"),
+            ("Data sources", "JPL Horizons / Gaia DR3 (local catalog)" + (", NAIF" if body else "")),
+            ("Orbit", (ph.get("orbit") or ["—"])[0] if not body else "planetary ephemeris (Horizons)"),
+            ("Error (path widths)", f"{s1 / (2 * rad):.2f}" if s1 and rad else "—"),
+            ("Error in time", f"≈ {s1 / speed:.1f} s" if s1 and speed else "—"),
+            ("Path 1σ", f"{s1:.1f} km ({r.get('sigma_source') or '?'}" + (": 3σ RSS / 3)" if r.get("sigma_source") == "Horizons" else ")")
+             if s1 else "—"),
+            ("Id", entry.get("key", ""))]
+    m_ast, mag, drop = f("m_ast"), f("mag"), f("mag_drop")
+    illum, msep, elong = f("moon_illum_pct"), f("moon_sep_deg"), f("sun_elong_deg")
+    ev = [("From", hm(r.get("shadow_from_utc"))), ("To", hm(r.get("shadow_to_utc"))),
+          ("At the site", t(r.get("best_utc"))),
+          ("Combined mag (G)", f"{f('m_combined'):.2f}" if f("m_combined") is not None else "—"),
+          ("Max duration", f"{f('max_duration_s'):.2f} s" if f("max_duration_s") is not None else "—"),
+          ("Mag drop (G)", f"{drop:.2f}" if drop is not None else "—"),
+          ("Shadow width", f"{2 * rad:.1f} km" if rad else "—"),
+          ("Moon phase", f"{illum:.0f}% sunlit" if illum is not None else "—"),
+          ("Solar elong.", f"{elong:.0f}°" if elong is not None else "—"),
+          ("Moon elong.", f"{msep:.0f}°" if msep is not None else "—")]
+    ra, dec = f("star_ra"), f("star_dec")
+    star = [("Name", f"Gaia DR3 {r.get('star', '')}"), ("G mag", f"{mag:.2f}" if mag is not None else "—")]
+    if ra is not None and dec is not None:
+        try:
+            import warnings
+            from astropy.coordinates import SkyCoord, TETE, get_constellation
+            from astropy.time import Time
+            import astropy.units as au
+            c = SkyCoord(ra * au.deg, dec * au.deg, frame="icrs")
+            star.insert(1, ("Constellation", get_constellation(c)))
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                app = c.transform_to(TETE(obstime=Time(str(r.get("best_utc"))[:23], scale="utc")))
+            apparent = (_hms(app.ra.deg, True, 4), _hms(app.dec.deg))
+        except Exception:
+            apparent = None
+        star += [("RA [ICRS]", _hms(ra, True, 4)), ("Dec [ICRS]", _hms(dec))]
+        if apparent:
+            star += [("RA [apparent]", apparent[0]), ("Dec [apparent]", apparent[1])]
+    ruwe = f("gaia_ruwe")
+    star += [("RUWE", f"{ruwe:.2f}" if ruwe is not None else "< 1.4 (local catalog)"),
+             ("Close/double", double_text(entry) or "not checked yet")]
+    dist = f("dist_au")
+    mas = (2 * rad / (dist * 1.495978707e8) * 206264806.2) if rad and dist else None
+    rng = (f" (range {2 * f('r_min_km'):.1f} to {2 * f('r_max_km'):.1f})" if f("r_min_km") is not None and f("r_max_km") is not None
+           else "")
+    obj = [("Name", (r.get("target_name") or r.get("target_id") or "").strip()),
+           ("Class", r.get("kind") or "asteroid"),
+           ("Diameter", f"{2 * rad:.2f} km{rng}, {str(r.get('size_source', '')).split(' (ref')[0]}"
+            + (" (* estimate, uncertain by a factor ~1.7)" if str(r.get("size_source", "")).lower().startswith("h only")
+               else "") if rad else "—"),
+           ("Diameter (angular)", f"{mas:.2f} mas" if mas else "—"),
+           ("Distance", f"{dist:.4f} au" if dist else "—"),
+           ("Mag", f"{m_ast:.1f}" if m_ast is not None else "—"),
+           ("Motion RA", f"{f('motion_ra_ash'):.2f} ″/h" if f("motion_ra_ash") is not None else "—"),
+           ("Motion Dec", f"{f('motion_dec_ash'):.2f} ″/h" if f("motion_dec_ash") is not None else "—"),
+           ]
+    for k, label in (("H", "H"), ("albedo", "Albedo")):
+        if k in ph:
+            obj.append((label, str(ph[k][0])))
+    if not body:
+        obj += [("Shape, rotation", shape_text(entry) or "not known"),
+                ("Satellites", binaries.text(r.get("target_id", "")) or "none known (Johnston 2019)")]
+    return [("Prediction", pred), ("Event", ev), ("Star", star), ("Object", obj)]
+
+
+def title_text(entry):
+    """'369152 (2008 SJ52) occults Gaia DR3 3160985089639151616 around 2026-10-12 04:58:57 UT at Camp (40.8699,
+    -72.8620, 29 m)'."""
+    r, site = entry["record"], entry.get("site") or {}
+    where = site.get("name", "?")
+    if site.get("lat") is not None and site.get("lon") is not None:
+        where += f" ({float(site['lat']):.4f}, {float(site['lon']):.4f}" + (
+            f", {float(site['ele']):.0f} m)" if site.get("ele") is not None else ")")
+    star = f"Gaia DR3 {r['star']} " if str(r.get("star") or "").strip() else ""
+    return (f"{(r.get('target_name') or r.get('target_id') or '').strip()} occults {star}around "
+            f"{str(r.get('best_utc'))[:19].replace('T', ' ')} UT at {where}")
 
 
 def size_text(entry):

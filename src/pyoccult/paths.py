@@ -109,16 +109,17 @@ def site_probability(miss_km, r_km, sigma1_km):
     return max(0.0, min(1.0, phi((r - d) / sigma1_km) - phi((-r - d) / sigma1_km)))
 
 
-def path_sigma3_km(target_id, utc_time):
-    """3-sigma plane-of-sky position uncertainty (RSS) from Horizons, converted to km at the asteroid.
-
-    Returns None if Horizons has no covariance for the object or the query fails.
-    """
+def path_error(target_id, utc_time):
+    """The asteroid's plane-of-sky position uncertainty from JPL Horizons at utc_time (quantities 37 and 38):
+    dict(sigma3_km = 3-sigma RSS converted to km at the asteroid, smaa_mas / smia_mas = the 1-sigma error ellipse's
+    semi-axes (mas), pa_deg = position angle of its major axis, from north through east), the ellipse values None
+    where Horizons gives none. None if Horizons has no covariance for the object or the query fails.
+    Horizons' Theta is measured from the RA axis (east) towards north, so PA = 90 - Theta (as OccultWatcher shows it)."""
     from astroquery.jplhorizons import Horizons
     from astropy.time import Time
     try:
         eph = Horizons(id=str(target_id), id_type='smallbody', location='500',
-                       epochs=Time(utc_time, scale='utc').jd).ephemerides(quantities='20,38')
+                       epochs=Time(utc_time, scale='utc').jd).ephemerides(quantities='20,37,38')
         names = list(eph.colnames)
         col = next((c for c in names if 'RSS' in c.upper()), None) or \
               next((c for c in names if '3SIGMA' in c.upper() or 'POS' in c.upper()), None)
@@ -126,10 +127,23 @@ def path_sigma3_km(target_id, utc_time):
             raise KeyError(f"no 3-sigma position column among {names}")
         rss_arcsec = float(eph[col][0])
         delta_km = float(eph['delta'][0]) * AU_KM
-        return rss_arcsec * np.pi / 648000.0 * delta_km
+        out = dict(sigma3_km=rss_arcsec * np.pi / 648000.0 * delta_km, smaa_mas=None, smia_mas=None, pa_deg=None)
+        try:
+            out.update(smaa_mas=float(eph['SMAA_3sigma'][0]) / 3 * 1000, smia_mas=float(eph['SMIA_3sigma'][0]) / 3 * 1000,
+                       pa_deg=(90.0 - float(eph['Theta_3sigma'][0])) % 180.0)
+        except (KeyError, ValueError, TypeError):
+            pass
+        return out
     except Exception as e:                                              # optional lookup: report and fall back
         print(f"No Horizons uncertainty for {target_id}: {e}")
         return None
+
+
+def path_sigma3_km(target_id, utc_time):
+    """3-sigma plane-of-sky position uncertainty (RSS) from Horizons, converted to km at the asteroid; None if
+    Horizons has no covariance for the object or the query fails."""
+    e = path_error(target_id, utc_time)
+    return e["sigma3_km"] if e else None
 
 
 def write_shadow_kml(paths, filename, title, observer=None, tick_every=10):

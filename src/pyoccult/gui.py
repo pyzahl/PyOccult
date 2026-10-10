@@ -36,6 +36,30 @@ SITE_KEYS = [  # key, label, default, step  (optional site keys, see sites_examp
 
 
 # ---------------------------------------------------------------- sites.py
+UI_STATE = os.path.join(ROOT, "gui_state.json")                  # last selected site and catalog (data folder)
+
+
+def load_ui_state():
+    try:
+        with open(UI_STATE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_ui_state(**kw):
+    """Remember GUI choices across restarts (gui_state.json in the data folder, written atomically)."""
+    import tempfile
+    st = dict(load_ui_state(), **kw)
+    try:
+        fd, tmp = tempfile.mkstemp(dir=ROOT, suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(st, f)
+        os.replace(tmp, UI_STATE)
+    except OSError:
+        pass
+
+
 def load_sites():
     path = "sites.py" if os.path.isfile("sites.py") else os.path.join(PKG, "templates", "sites_example.py")
     g = runpy.run_path(path)
@@ -148,7 +172,8 @@ def resizable_box(key, default_vh, scroll=False):
 def index():
     from pyoccult import config
     sites, default_site = load_sites()
-    state = dict(name=default_site)
+    last = load_ui_state()                                       # the site and catalog chosen last time
+    state = dict(name=last["site"] if last.get("site") in sites else default_site)
     ui.page_title("PyOccult")
     ui.add_body_html(RESIZE_JS)                                  # resizable list boxes (resizable_box)
     with ui.header().classes("items-center bg-slate-800"):
@@ -168,7 +193,8 @@ def index():
                                                          f"/{gaia_local.status(os.path.join(ROOT, d))['total']}")
                 for d, g, ok, _ in found}
         ui.label("Catalog:").classes("text-slate-300")
-        cat_sel = ui.select(cats, value=config.gaia_local_dir if config.gaia_local_dir in complete else
+        cat_sel = ui.select(cats, value=last["catalog"] if last.get("catalog") in complete else
+                            config.gaia_local_dir if config.gaia_local_dir in complete else
                             (min(complete) if complete else (next(iter(cats)) if cats else None))
                             ).props("dark dense options-dense standout").classes("w-64").tooltip(
             "Local Gaia catalogs in the project folder. Install or add one with: pyoccult setup [--gmax 16]")
@@ -449,31 +475,29 @@ def index():
                     ui.label("marker: site")
                 with ui.column().classes("w-full"):
                     f_title = ui.label().classes("text-lg font-semibold")
-                    f_facts = ui.label().classes("text-sm text-slate-600")
-                    f_size = ui.label().classes("text-sm text-slate-600")
-                    f_shape = ui.label().classes("text-sm text-slate-600")
-                    f_dbl = ui.label().classes("text-sm text-slate-600").tooltip(
-                        "Close and double stars: neighbours within a few arcseconds whose light stays in the camera "
-                        "image (the drop with their light), and Gaia's hints that the star itself is double (online "
-                        "check of a search run)")
-                    f_bin = ui.label().classes("text-sm text-slate-600").tooltip(
-                        "Known satellites of this asteroid (W. R. Johnston, Binary Minor Planets Compilation, NASA PDS "
-                        "2019; and satellites seen in occultations). Their shadows pass within the dotted 'satellite "
-                        "zone' lines on the map. Newer discoveries: johnstonsarchive.net/astro/asteroidmoons.html")
-                    f_occ = ui.label().classes("text-sm text-slate-600").tooltip(
-                        "Earlier occultations of this asteroid in NASA's archive of observed occultations (PDS Small "
-                        "Bodies Node; Herald, Dunham et al.; doi:10.26033/ehqs-jp27). Reference only: the prediction "
-                        "uses the size above. Event quality: astrometry only < limits on size < reliable size < "
-                        "better than shape models")
-                    with ui.row().classes("items-end gap-4"):
-                        f_status = ui.select(list(favorites.STATUSES), label="Status").classes("w-40")
-                        f_kml = ui.link("KML (ground track)", "#")
-                        f_globe = ui.link("Globe (Occult-style plot)", "#", new_tab=True)
-                    f_note = ui.textarea("Note").classes("w-full")
-                    with ui.row():
-                        ui.button("Save", on_click=lambda: save_fav()).props("color=primary")
-                        ui.button("Remove from favorites", on_click=lambda: remove_fav()).props(
-                            "outline color=negative")
+                    f_info = ui.grid(columns=4).classes("w-full gap-x-6 gap-y-1")   # OWC-style event summary
+                    with ui.row().classes("w-full no-wrap gap-6 items-start"):
+                        f_err = ui.element("img").style("width: 300px; flex: none").tooltip(
+                            "Uncertainty ellipses (sky plane, 1 sigma) at one scale: the target's (JPL Horizons), the star's "
+                            "(Gaia DR3, carried to the event date; '!' = a typical star of that G when Gaia's errors "
+                            "are not at hand) and the combined one, which moves the path. Only the part across the "
+                            "target's motion (dashed) shifts the path on the ground")
+                        with ui.column().classes("grow"):
+                            f_occ = ui.label().classes("text-sm text-slate-600").tooltip(
+                                "Earlier occultations of this asteroid in NASA's archive of observed occultations (PDS "
+                                "Small Bodies Node; Herald, Dunham et al.; doi:10.26033/ehqs-jp27). Reference only: the "
+                                "prediction uses the size above. Event quality: astrometry only < limits on size < "
+                                "reliable size < better than shape models")
+                            f_added = ui.label().classes("text-xs text-slate-500")
+                            with ui.row().classes("items-end gap-4"):
+                                f_status = ui.select(list(favorites.STATUSES), label="Status").classes("w-40")
+                                f_kml = ui.link("KML (ground track)", "#")
+                                f_globe = ui.link("Globe (Occult-style plot)", "#", new_tab=True)
+                            f_note = ui.textarea("Note").classes("w-full")
+                            with ui.row():
+                                ui.button("Save", on_click=lambda: save_fav()).props("color=primary")
+                                ui.button("Remove from favorites", on_click=lambda: remove_fav()).props(
+                                    "outline color=negative")
             f_detail.set_visibility(False)
 
     with ui.card().classes("w-full") as log_card:
@@ -677,10 +701,12 @@ def index():
         ui.notify(f"sites.py saved (default site: {state.get('default', default_site)})", type="positive")
         unsaved.text = ""
 
-    sel.on_value_change(lambda e: show_site(e.value) if e.value in sites else None)   # None while options change
+    sel.on_value_change(lambda e: (show_site(e.value), save_ui_state(site=e.value, catalog=cat_sel.value))
+                        if e.value in sites else None)
     def catalog_limit(*_):                                        # the catalog's limit caps the star limits
         p_mag.value = s_mag.value = b_mag.value = pick_mag_default(collect())
     cat_sel.on_value_change(catalog_limit)
+    cat_sel.on_value_change(lambda e: save_ui_state(catalog=e.value, site=state["name"]) if e.value else None)
     show_site(state["name"])
 
     # ------------------------------------------------ runs
@@ -910,16 +936,23 @@ def index():
         if e is None:
             return
         r, site, files = e["record"], e.get("site") or {}, e.get("files") or {}
-        f_title.text = f"{(r.get('target_name') or r.get('target_id')).strip()} · {str(r.get('best_utc'))[:19].replace('T', ' ')} UT"
-        f_facts.text = (f"site {site.get('name', '?')} ({site.get('lat', 0):.4f}, {site.get('lon', 0):.4f}) · "
-                        f"Gaia {r.get('star', '')} G {float(r.get('mag') or 0):.2f} · drop {float(r.get('mag_drop') or 0):.2f} "
-                        f"mag · max {float(r.get('max_duration_s') or 0):.2f} s · miss {float(r.get('min_distance') or 0):.1f} km · "
-                        f"added {e.get('added', '')[:16].replace('T', ' ')} UT")
-        f_size.text = "size: " + (favorites.size_text(e) or "not recorded")
-        f_shape.text = "shape and rotation: " + (favorites.shape_text(e) or "not known (no SBDB data for this asteroid)")
-        f_dbl.text = "close or double star: " + (favorites.double_text(e) or "not checked yet")
+        f_title.text = favorites.title_text(e)
+        f_info.clear()
+        with f_info:
+            for group, rows in favorites.event_info(e):
+                with ui.column().classes("gap-0"):
+                    ui.label(group).classes("text-lg font-semibold")
+                    for k, v in rows:
+                        with ui.row().classes("gap-1 no-wrap text-base"):
+                            ui.label(f"{k}:").classes("text-slate-500 whitespace-nowrap")
+                            ui.label(str(v)).classes("text-slate-800 min-w-0 break-words")
+        err = favorites.error_svg(e)
+        f_err.set_visibility(err is not None)
+        if err:
+            import base64
+            f_err.props(f'src="data:image/svg+xml;base64,{base64.b64encode(err.encode()).decode()}" alt="Error ellipses"')
         f_occ.text = occultations.text(e["record"].get("target_id", ""))
-        f_bin.text = binaries.text(e["record"].get("target_id", "")) or "Satellites: none known (Johnston 2019)"
+        f_added.text = f"added {e.get('added', '')[:16].replace('T', ' ')} UT"
         f_status.value, f_note.value = e.get("status", "planned"), e.get("note", "")
         f_img.set_visibility("svg" in files)
         if "svg" in files:
@@ -1083,6 +1116,9 @@ def main():
     favorites.backfill_globes(config.map_dir)                   # globe plots of later searches for older favorites
     favorites.backfill_doubles(local_double_check(config))      # close/double stars for favorites added before
     favorites.backfill_timezones(geo.timezone)                  # site time zones (online, once per site)
+    favorites.backfill_event()                                  # OWC-style event data for older favorites (Horizons)
+    import threading                                            # error ellipses (Horizons, one Gaia job): may be slow
+    threading.Thread(target=favorites.backfill_errors, daemon=True).start()
     favorites.write_csv()
     app.add_static_files("/fav", os.path.join(ROOT, favorites.DIR), max_cache_age=0)
 

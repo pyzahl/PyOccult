@@ -13,6 +13,7 @@ owc_refs/
 /sites.py
 /pyoccult_config.py
 /csv_exports.py
+/gui_state.json
 run.sh
 # run outputs (results database: pyoccult.db, its WAL files; owc_check.db)
 *.db

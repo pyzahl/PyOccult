@@ -232,7 +232,10 @@ LINE_STYLES = (("Centre", "#15803d", 3, None), ("Shadow limit", "#dc2626", 2, No
 
 def kml_to_data(path):
     """Lines and pins of a paths KML as a compact dict ([lat, lon] order, ~1 m precision).
-    Line colours are re-mapped to map-friendly ones (the KML uses neon colours meant for Google Earth)."""
+    Line colours are re-mapped to map-friendly ones (the KML uses neon colours meant for Google Earth).
+    Longitudes along a line are made continuous across the date line (178.8 after -179.8 becomes -181.2), else a
+    web map draws that step the long way round, as a straight line across the whole map; each line is then
+    shifted by 360 deg so that its part nearest the observer pin lies next to it."""
     root = ET.parse(path).getroot()
     lines, pins = [], []
     for pm in root.iter(KML_NS + "Placemark"):
@@ -254,6 +257,24 @@ def kml_to_data(path):
             c = pt.text.strip().split(",")
             pins.append(dict(name=name, desc=(pm.findtext(KML_NS + "description") or "").strip(),
                              lat=round(float(c[1]), 5), lon=round(float(c[0]), 5)))
+    ref = next((p["lon"] for p in pins if p["name"] == "Observer"), 0.0)
+    for ln in lines:
+        pts = ln["pts"]
+        for i in range(1, len(pts)):                              # continuous across the date line
+            while pts[i][1] - pts[i - 1][1] > 180:
+                pts[i][1] -= 360
+            while pts[i][1] - pts[i - 1][1] < -180:
+                pts[i][1] += 360
+        if pts:
+            k = min((-2, -1, 0, 1, 2), key=lambda k: min(abs(p[1] + 360 * k - ref) for p in pts))
+            for p in pts:
+                p[1] = round(p[1] + 360 * k, 5)
+    centre = next((ln["pts"] for ln in lines if ln["name"].startswith("Centre")), [])
+    for p in pins:                                                # minute marks: on their (shifted) line
+        if p["name"] != "Observer" and centre:
+            k = min((-2, -1, 0, 1, 2), key=lambda k: min(abs(q[1] - p["lon"] - 360 * k) + abs(q[0] - p["lat"])
+                                                         for q in centre))
+            p["lon"] = round(p["lon"] + 360 * k, 5)
     return dict(lines=lines, pins=pins)
 
 

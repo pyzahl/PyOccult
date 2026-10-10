@@ -71,6 +71,11 @@ def entry_from_api(js, fetched=None):
     """Cache entry from one sbdb.api reply (with phys-par=1)."""
     phys = {q["name"]: q for q in js.get("phys_par", [])}
     phys["_fullname"] = js.get("object", {}).get("fullname")
+    o = js.get("orbit") or {}
+    if o.get("orbit_id"):                                         # the orbit solution (as OWC's "Orbit Date")
+        phys["orbit"] = dict(name="orbit", value=f"JPL#{o['orbit_id']} of {str(o.get('soln_date', ''))[:10]}",
+                             ref=f"condition code U {o.get('condition_code', '?')}, {o.get('n_obs_used', '?')} observations "
+                                 f"{o.get('first_obs', '?')} to {o.get('last_obs', '?')}")
     return dict(fetched=fetched or time.time(), source="sbdb.api", phys=phys)
 
 
@@ -84,7 +89,7 @@ def get_full(number, cache_path=None, timeout=15):
     if not n.isdigit():                                           # a planet or moon (bodies.py): not in SBDB
         return None
     e, fresh = get(n, cache_path)
-    if e and fresh and e.get("source") == "sbdb.api":
+    if e and fresh and e.get("source") == "sbdb.api" and "orbit" in (e.get("phys") or {}):
         return e
     try:
         url = U.URL_JPL_SBDB_API + "?" + urllib.parse.urlencode({"sstr": n, "phys-par": 1})

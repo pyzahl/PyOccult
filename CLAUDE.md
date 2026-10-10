@@ -154,6 +154,15 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   diameter_sigma, extent, albedo as (value, ref)) copied at add time (/dev/shm cache is volatile); GUI start
   backfills it for older entries. `favorites.csv` is rewritten by every `_save` (flat: key/status/note/added/site,
   all record columns, sbdb_*, file paths).
+  Event summary (0.14.x): `favorites.event_info(entry)` -> [(group, [(label, value)])] like OWC's event page
+  (Prediction/Event/Star/Object; astropy TETE for the apparent place, get_constellation), shown as a 4-column
+  grid in the GUI panel. Record fields from `search.event_context` (end of the record); `backfill_event` (GUI start)
+  fills older favorites from one Horizons OBSERVER query (quantities 3,20,23) + KML minute marks ("~" = approximate).
+  sbdb `entry_from_api` keeps the orbit solution as phys "orbit" (PHYS_KEYS); get_full refetches entries without it.
+  Error ellipses: `pyoccult/ellipses.py` (x east, y north, mas; PA north->east; cov/ellipse/add/star_ellipse/
+  across_track/svg). Target: `paths.path_error` (Horizons q37: PA = 90 - Theta, verified = OWC) -> record ast_err_*;
+  star: Gaia online check (doubles ERROR_COLS) -> star_err_*; favorites `backfill_errors` (GUI start, daemon
+  thread: Gaia may hang; `err_checked` once both answered), `error_svg` -> data URI img in the panel.
 - OWC twilight events carry the Sun altitude after the time ("☼ -5°"); `read_owc` parses it (`sun_alt_deg`) and then
   sets MAX_SUN_ALT to the brightest + 1 (fixed 2026-10-04: before, such lines were silently skipped).
 - OWC online computes at sea level (ignores the site elevation); `pyoccult/owc_check.py --sea-level` sets ELE = 0 for
@@ -193,8 +202,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - Gaia bulk files: `https://cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` (note `esac`); the listing is an S3 bucket at
   `https://gaia.eu-1.cdn77-storage.com/?prefix=Gaia/gdr3/gaia_source/&delimiter=/`. Files are `csv.gz` with `#` comment
   lines and `null` for missing values.
-- Gaia archive (windows mode only): never use synchronous `Gaia.launch_job`; it silently truncates at 2000 rows. Use
-  `launch_job_async`. `Gaia.ROW_LIMIT = -1` does not lift the sync cap.
+- Gaia archive: synchronous `Gaia.launch_job` silently truncates at 2000 rows (`Gaia.ROW_LIMIT = -1` does not lift
+  it). Windows mode (cone searches): `launch_job_async`. Online double check and star errors (doubles.py): synchronous
+  in chunks (50 events / 1000 source_ids, far below the cap; a chunk reaching 2000 rows is reported), because the
+  async job's status polling hung for minutes in 2026-10 while sync answered in ~5 s.
 - Standard-library web requests go through `pyoccult.net.urlopen` (SSL context with certifi's CA list): some Pythons
   (macOS) have no CAs for urllib -> CERTIFICATE_VERIFY_FAILED, while requests (own certifi) works. Never call
   `urllib.request.urlopen` directly; test stand-ins must accept `context=`.

@@ -442,7 +442,9 @@ All checks, with their numbers and the discussion of the differences, are in
   `geocentric_star_dir` in pyoccult/search.py did the same and is superseded by `pyoccult.astrometry.parallax_dir`.
 - **`star_test`'s `observable` text column**: `if not observable(...)` tests a tuple (always true), so the text never
   says "no". Harmless today, because `handle_star` rejects unobservable events with `observable(...)[0]`.
-- **Path uncertainty (sigma)**: use the part of the Horizons error ellipse across the track (quantity 37: `SMAA_3sigma`,
+- **Path uncertainty (sigma)** (the ellipse is now logged and drawn, 0.14.x: `ellipses.py`, favorites panel; the error
+  across the track is shown there, e.g. 52 km instead of the RSS-based 80 km for 369152, 0.9 instead of 2.7 km for
+  101716; still to do: use it for the sigma lines and the chance): use the part of the Horizons error ellipse across the track (quantity 37: `SMAA_3sigma`,
   `SMIA_3sigma`, `Theta_3sigma`, projected onto the direction across the shadow's motion) instead of the RSS value, which
   overstates the path width whenever the long axis lies along the track. Also: Horizons gives these values to 0.01"
   only, which is coarse for well-known orbits (0.01" is ~10 km at 1.4 AU), and a value that rounds to 0.00 falls back to

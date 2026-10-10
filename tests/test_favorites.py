@@ -74,7 +74,8 @@ rec2 = dict(rec, target_id="17834", best_utc="2026-10-03T02:53:07")
 F.add(rec2, run, maps, fav)                                                 # added without size data
 assert F.shape_text(e) == "", "bulk rows hold no shape data"
 full = dict(cache, source="sbdb.api", phys=dict(cache["phys"], rot_per={"value": "5.3", "ref": "LCDB"},
-                                                 extent={"value": "18.2x10.5x8.9", "ref": "x"}, spec_B={"value": "S"}))
+                                                 extent={"value": "18.2x10.5x8.9", "ref": "x"}, spec_B={"value": "S"},
+                                                 orbit={"value": "JPL#23 of 2026-03-14", "ref": "U 0"}))
 assert F.backfill_phys(lambda t: full if t == "17834" else None, fav) == 1
 assert F.backfill_phys(lambda t: full, fav) == 1, "21641 came from a bulk row: fetched once more"
 assert F.backfill_phys(lambda t: full, fav) == 0, "once per favorite"
@@ -112,4 +113,26 @@ assert e["record"]["gaia_ruwe"] is None and F.double_text(e).endswith("with its 
 e["record"]["double_hint"] = ""
 assert F.double_text(e) == "none known (local catalog)"
 assert F.backfill_doubles(lambda r: None, fav) == 0
+# OWC-style event summary: from the record (new fields of search.event_context) and, for older favorites, a
+# one-time lookup (Horizons stand-in) plus From/To from the KML's minute marks
+rec2 = dict(target_id="369152", target_name="369152 (2008 SJ52)", best_utc="2026-10-12T04:58:57.081", star="3160985089639151616",
+            mag="8.05", m_ast="22.31", r_km="0.945", r_min_km="0.8", r_max_km="1.1", speed_kms="14.44", max_duration_s="0.13",
+            mag_drop="14.26", moon_illum_pct="2.7", moon_sep_deg="108.8", star_ra="106.75688", star_dec="12.32521",
+            path_sigma1_km="79.7", sigma_source="Horizons", kind="asteroid", double_check="local")
+info = dict(F.event_info(dict(record=dict(rec2, dist_au="3.0826", sun_elong_deg="91.86", shadow_from_utc="2026-10-12T04:58:46",
+                                          shadow_to_utc="2026-10-12T05:13:07"), key="k", version="x")))
+ev, obj = dict(info["Event"]), dict(info["Object"])
+assert ev["From"] == "04:58:46 UT" and ev["Solar elong."] == "92°" and ev["Shadow width"] == "1.9 km"
+assert obj["Distance"] == "3.0826 au" and obj["Diameter (angular)"] == "0.85 mas"
+assert set(info) == {"Prediction", "Event", "Star", "Object"} and "Satellites" in dict(info["Object"])
+open(os.path.join(maps, "369152_20261012T0458.kml"), "w").write("<kml><name>04:59 UTC</name><name>05:13 UTC</name></kml>")
+ok, msg = F.add(rec2, run, maps, fav)
+assert ok, msg
+calls = []
+n = F.backfill_event(lambda tid, utc: calls.append(tid) or dict(dist_au=3.08, motion_ra_ash=20.75, motion_dec_ash=-10.72,
+                                                                sun_elong_deg=91.86), fav)
+e2 = next(x for x in F.load(fav) if x["key"] == "369152_20261012T0458")
+assert e2["record"]["shadow_from_utc"] == "~2026-10-12T04:59" and abs(float(e2["record"]["m_combined"]) - 8.05) < 0.01
+assert dict(dict(F.event_info(e2))["Event"])["From"] == "≈ 04:59 UT"
+assert F.backfill_event(lambda tid, utc: calls.append(tid), fav) == 0 and len(calls) == n, "once per favorite"
 print("FAVORITES TESTS PASSED")

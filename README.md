@@ -423,7 +423,14 @@ pyoccult                 # opens http://127.0.0.1:8080 in your browser (local on
    status (planned / observed / cancelled / clouded) or remove them; **Remove past events** drops every favorite
    whose event is before today (UTC); **times** switches the event times between UT, your computer's time zone (Local)
    and the time zone of each event's site (Site). Click a row to see its star-field preview and shadow path map side by side
-   below the table, with its size (the diameter and range the search used, its source, H and albedo), its shape and
+   below the table, then an event summary laid out like OccultWatcher Cloud's event page (Prediction: computed when
+   and by which version, orbit solution JPL#, path error in path widths and in time; Event: when the shadow is on
+   the Earth (From/To), combined magnitude, duration, drop, shadow width, Moon, solar elongation; Star:
+   constellation, ICRS and apparent position, RUWE, close and double stars; Object: diameter, angular size,
+   distance, magnitude, motion, H, albedo, shape and rotation, satellites), titled "<asteroid> occults <Gaia DR3 star> around <time>
+   UT at <site>", and below it the sky-plane 1-sigma uncertainty ellipses of the target, the star and both combined in one
+   diagram at one scale, with the error across the track (the part that shifts the path) in km (without Gaia's
+   errors for the star, a typical star of its G, marked "!"); then its size (the diameter and range the search used, its source, H and albedo), its shape and
    rotation where SBDB knows them (axes, rotation period, pole, taxonomic type; fetched once per favorite from the
    SBDB API, as the pick tool's bulk data holds only the size), and to edit its note. **CSV** downloads the favorites
    table (`favorites_<date>.csv`; columns: see "CSV downloads" below); `favorites/favorites.csv`, with all fields,
@@ -785,7 +792,7 @@ pyoccult --port 8090 --no-browser
 ```
 
 * **Site for all runs** and **Catalog** (top right, on every tab): the site and the local Gaia catalog the search
-  and the pick tool use (every complete catalog in the project folder is offered). The Search and Pick tabs repeat
+  and the pick tool use (every complete catalog in the project folder is offered); the GUI remembers both for the next start (`gui_state.json` in the data folder). The Search and Pick tabs repeat
   the site.
 * **Site**: edit the selected site or add one: set its position by clicking the map (the elevation is looked up), by
   searching a place or from your IP address, and edit its view and equipment (the **Sensor (cameras)** list fills the sensor size); the derived star limit and camera field

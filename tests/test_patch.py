@@ -38,7 +38,7 @@ ns.update(star_test=star_test,
           event_metrics=lambda et, sd, geo, t, r, ms, ma: dict(speed_kms=12.0, chord_km=20.0, duration_s=1.5, mag_drop=0.8),
           moon_info=lambda et, sd, geo: dict(moon_sep_deg=40.0),
           besselian_offsets=lambda et, sd, geo, t: (1.0, 2.0), get_asteroid_name=lambda t: "Test",
-          path_sigma3_km=lambda t, utc: None)
+          path_sigma3_km=lambda t, utc: None, path_error=lambda t, utc: None)
 exec(funcs, ns)
 ns.update(DB=_con, RUN_ID=pyoccult_db.start_run(_con, "corridor")[0])   # after the excerpt (it resets them)
 # propagation stand-in (astropy is not installed in this sandbox): same output columns as propagate_exact

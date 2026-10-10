@@ -25,7 +25,7 @@ import warnings, erfa
 warnings.filterwarnings("ignore", category=erfa.ErfaWarning)
 
 from pyoccult import config
-from pyoccult.paths import shadow_path, path_sigma3_km, write_shadow_kml, site_probability
+from pyoccult.paths import shadow_path, path_sigma3_km, path_error, write_shadow_kml, site_probability
 from pyoccult import corridor
 from pyoccult import doubles          # close and double stars at an event
 from pyoccult import db               # results database
@@ -278,6 +278,21 @@ def get_asteroid_name(spk_id):
 
 _loaded = {}    # asteroid number -> NAIF id
 
+def load_orbit(target_id, epochs):
+    """fetch_target_orbit for the run loop: True when the orbit is loaded; False, with a one-line reason, when JPL
+    Horizons has no such object (e.g. a mistyped number) or cannot be reached, so the run goes on with the others."""
+    try:
+        fetch_target_orbit(target_id, epochs)
+        return True
+    except (RuntimeError, requests.RequestException, ValueError) as ex:
+        print(f"{target_id}: no orbit from JPL Horizons ({str(ex).strip()[:200]}), skipping")
+        SKIPPED.append(str(target_id))
+        return False
+
+
+SKIPPED = []                                             # targets without an orbit (run summary)
+
+
 def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
     target_id = str(target_id)
     fn = Path(cache_dir) / f"PyOccult_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
@@ -291,7 +306,10 @@ def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
         resp.raise_for_status()
         data = resp.json()
         if 'spk' not in data:
-            raise RuntimeError(f"Horizons gave no SPK for {target_id}: {str(data.get('result', data))[:300]}")
+            text = " ".join(str(data.get('result', data)).split())
+            if "out of bounds" in text or "No matches found" in text:
+                raise RuntimeError(f"no such object in Horizons: {text[:160]}")
+            raise RuntimeError(f"Horizons gave no SPK: {text[:200]}")
         fn.write_bytes(base64.b64decode(data['spk']))
     if target_id not in _loaded:
         spice.furnsh(str(fn))
@@ -470,6 +488,48 @@ def besselian_offsets(et, star_vector, observer_geo, asteroid_target):
 
 def get_besselian_miss_distance(*args):
     return np.hypot(*besselian_offsets(*args))
+
+def event_context(et, star_dir, target, r_km, m_star, m_ast):
+    """Event data as OWC's event page shows it (favorites panel): the target's distance (au) and its motion on the sky
+    ("/h, RA x cos Dec and Dec, geocentric), the star's elongation from the Sun, the combined magnitude before the
+    event, and the times the shadow is on the Earth (shadow_from_utc / shadow_to_utc: the shadow's centre within one
+    Earth radius + the body's radius of the Earth's centre, i.e. any part of the shadow touching the Earth)."""
+    from scipy.optimize import brentq
+    def geo(t):
+        return np.asarray(spice.spkpos(target, t, 'J2000', 'CN', '399')[0])
+    a = geo(et)
+    dist = float(np.linalg.norm(a))
+    rd = [spice.recrad(geo(t))[1:] for t in (et - 60.0, et + 60.0)]
+    dra = (rd[1][0] - rd[0][0] + math.pi) % (2 * math.pi) - math.pi
+    dec = (rd[0][1] + rd[1][1]) / 2
+    sun = np.asarray(spice.spkpos('SUN', et, 'J2000', 'LT+S', '399')[0])
+    out = dict(dist_au=dist / AU_KM,
+               motion_ra_ash=math.degrees(dra * math.cos(dec)) * 3600 * 30.0,      # per 120 s -> per hour
+               motion_dec_ash=math.degrees(rd[1][1] - rd[0][1]) * 3600 * 30.0,
+               sun_elong_deg=math.degrees(math.acos(float(np.clip(star_dir @ sun / np.linalg.norm(sun), -1, 1)))),
+               m_combined=(-2.5 * math.log10(10 ** (-0.4 * m_star) + 10 ** (-0.4 * m_ast))
+                           if m_ast is not None and np.isfinite(m_ast) else m_star),
+               shadow_from_utc="", shadow_to_utc="")
+    lim = corridor.EARTH_R_KM + r_km
+    axis = lambda t: float(np.linalg.norm(np.cross(geo(t), star_dir)))   # shadow axis to the Earth's centre, km
+    t0 = et + minimize_scalar(lambda dt: axis(et + dt), bounds=(-7200.0, 7200.0), method="bounded",
+                              options={"xatol": 0.5}).x                    # offset from et: sub-second tolerance
+    if axis(t0) < lim:
+        times = []
+        for sign in (-1, 1):
+            step, far = 600.0, t0
+            for _ in range(144):                                  # 10 min steps, up to a day each side
+                far += sign * step
+                if axis(far) > lim:
+                    break
+            else:
+                break
+            a_, b_ = (far, t0) if sign < 0 else (t0, far)
+            times.append(brentq(lambda t: axis(t) - lim, a_, b_, xtol=0.1))
+        if len(times) == 2:
+            out.update(shadow_from_utc=spice.et2utc(times[0], "ISOC", 0), shadow_to_utc=spice.et2utc(times[1], "ISOC", 0))
+    return out
+
 
 def contact_times(et_ca, miss_km, r_km, speed_kms, star_dir, obs_geo, target):
     """(et_D, et_R): disappearance and reappearance at the site, where the distance from the shadow axis equals r_km,
@@ -854,7 +914,8 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     if bodies.is_body(target_id):                        # planet or moon: no Horizons RSS; rough per-body value
         sigma3_h, src = bodies.sigma3_km(target_id), "ephemeris estimate"
     else:
-        sigma3_h, src = path_sigma3_km(target_id, res['best_utc']), "Horizons"
+        perr = path_error(target_id, res['best_utc'])
+        sigma3_h, src = (perr or {}).get("sigma3_km"), "Horizons"
     sigma3 = sigma3_h or config.default_sigma3_km
     record.update(path_sigma1_km=sigma3 / 3.0, sigma_source=src if sigma3_h else "default",
                   p_site=site_probability(res['min_distance'], size['r_km'], sigma3 / 3.0))
@@ -867,6 +928,12 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
                       duration_s=(ct[1] - ct[0]) if ct else 0.0)
         if ct:
             contacts = [("D", record["d_utc"], ct[0], None), ("R", record["r_utc"], ct[1], None)]
+    if not bodies.is_body(target_id) and perr and perr.get("smaa_mas") is not None:   # error ellipse (1 sigma)
+        record.update(ast_err_smaa_mas=perr["smaa_mas"], ast_err_smia_mas=perr["smia_mas"], ast_err_pa_deg=perr["pa_deg"])
+    try:                                                 # OWC-style event data (favorites panel); never fatal
+        record.update(event_context(res['best_et'], star_dir, target_id, size['r_km'], row.phot_g_mean_mag, m_ast))
+    except Exception as ex:
+        print(f"(event data skipped: {ex})")
     RUN_RECORDS.append(record)
     print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT")
     db.add_event(DB, RUN_ID, record, kind=record["kind"], contacts=contacts)   # hits_log.csv: exported after the run
@@ -926,6 +993,9 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
     print(f"  per asteroid {s['per_asteroid_s']:.2f} s (search {s['search_per_asteroid_s']:.2f} s); search time per "
           f"exact solve {s['per_solve_s'] * 1000:.0f} ms (with star lookup and scan); calculation per hit "
           f"{s['calc_per_hit_s'] * 1000:.0f} ms")
+    if SKIPPED:
+        s["skipped_targets"] = list(SKIPPED)
+        print(f"  skipped (no orbit from JPL Horizons, e.g. a mistyped number): {', '.join(SKIPPED)}")
     db.finish_run(DB, RUN_ID, s)                         # results database; then the exports of the current series
     n = db.export(DB, config.hits_output_cvs_file, lst=getattr(config, "results_list", "main"))
     print(f"  results: {getattr(config, 'results_db', db.DEFAULT)}, current series {n} event(s) -> "
@@ -1023,12 +1093,13 @@ if __name__ == "__main__":
             if bodies.is_body(t):
                 print(f"{t}: planets and moons need the corridor search mode, skipping")
                 continue
+            if not load_orbit(t, epochs):                           # once per target; unknown numbers: skipped
+                continue
             size = get_asteroid_size(t)
             if size is None:
                 print(f"No size data for {t}, skipping")
                 continue
             print(f"Estimated/known target {t} size: {size['r_max_km']:.1f} km (H={size.get('H')}, G={size.get('G')})")
-            fetch_target_orbit(t, epochs)                          # once per target
             for ctp in periods:
                 target_test(obs_loc, ctp, config.spn + 600, t, size, mag_min)   # +10 min so windows overlap
         run_summary("windows", t_main, 0.0, time.time() - t_w, len(config.targets))
@@ -1071,12 +1142,13 @@ if __name__ == "__main__":
             size = bodies.size(spice, t)
             print(f"Major body {t}: radius {size['r_km']:.0f} km, stars G <= {mag_lim:g}")
         else:
+            if not load_orbit(t, epochs):                           # once per target; unknown numbers: skipped
+                continue
             size = get_asteroid_size(t)
             if size is None:
                 print(f"No size data for {t}, skipping")
                 continue
             print(f"Estimated/known target {t} size: {size['r_max_km']:.1f} km (H={size.get('H')}, G={size.get('G')})")
-            fetch_target_orbit(t, epochs)                          # once per target
         plans[t] = (size, corridor.plan_corridor(t, et0, et1, size, mag_lim, config.max_shadow_dist,
                                                  min_drop=getattr(config, "min_mag_drop", 0.1),
                                                  step_s=getattr(config, "corridor_step_s", 600.0)))

@@ -90,8 +90,10 @@ def fields(comps, m_star, m_ast, source="local", flags=None):
 
 
 # ---------------------------------------------------------------- online check (Gaia archive, network only)
+ERROR_COLS = "ra_error, dec_error, pmra_error, pmdec_error, ra_dec_corr, pmra_pmdec_corr, ra_pmra_corr, ra_pmdec_corr, " \
+             "dec_pmra_corr, dec_pmdec_corr"                     # the star's error ellipse (ellipses.star_ellipse)
 ARCHIVE_COLS = "source_id, ra, dec, pmra, pmdec, phot_g_mean_mag, ruwe, non_single_star, ipd_frac_multi_peak, " \
-               "duplicated_source"
+               "duplicated_source, " + ERROR_COLS
 
 
 def query_text(points, radius_arcsec):
@@ -103,25 +105,66 @@ def query_text(points, radius_arcsec):
 
 
 def fetch_online(points, radius_arcsec, timeout_s=120):
-    """DataFrame of archive stars around the points, or None (offline, slow, failed). Asynchronous job (the
-    synchronous one silently truncates at 2000 rows); waited for at most timeout_s in a daemon thread."""
-    box = {}
+    """DataFrame of archive stars around the points, or None (offline, slow, failed); waited for at most timeout_s
+    in a daemon thread. Synchronous queries of CHUNK points each: a few stars per circle stay far below the
+    synchronous 2000-row cap (checked: a chunk that reaches it is reported); the asynchronous job's status polling
+    hung for minutes in 2026-10 while the synchronous query answered in seconds."""
+    import pandas as pd
+    box = {"parts": []}
 
     def work():
         try:
             from astroquery.gaia import Gaia
-            box["t"] = Gaia.launch_job_async(query_text(points, radius_arcsec), verbose=False).get_results()
+            for i in range(0, len(points), CHUNK):
+                t = Gaia.launch_job(query_text(points[i:i + CHUNK], radius_arcsec), verbose=False).get_results()
+                if len(t) >= 2000:
+                    print(f"* Gaia online check: {len(t)} rows for {len(points[i:i + CHUNK])} events, may be cut")
+                box["parts"].append(t.to_pandas())
+            box["done"] = True
         except Exception as ex:                                   # network, archive or astroquery trouble
             box["err"] = ex
     th = threading.Thread(target=work, daemon=True)
     th.start()
     th.join(timeout_s)
-    if "t" not in box:
+    if not box.get("done"):
         print(f"* Gaia online check skipped: {box.get('err', f'no answer within {timeout_s} s')}")
         return None
-    df = box["t"].to_pandas()
+    df = pd.concat(box["parts"], ignore_index=True) if box["parts"] else pd.DataFrame()
     df.columns = [c.lower() for c in df.columns]
     return df
+
+
+CHUNK = 50                # events per synchronous archive query (fetch_online)
+
+
+def fetch_star_errors(source_ids, timeout_s=120):
+    """{source_id: Gaia DR3 row (dict) with the error columns} for these stars; None when the archive cannot be
+    reached (favorites.backfill_errors). Synchronous queries of at most 1000 ids each: a lookup by source_id returns
+    at most one row per id, so the synchronous 2000-row cap cannot cut it (the asynchronous job's status polling
+    hung for minutes in 2026-10 while the synchronous query answered in seconds)."""
+    ids = sorted({int(s) for s in source_ids})
+    if not ids:
+        return {}
+    box = {"rows": []}
+
+    def work():
+        try:
+            from astroquery.gaia import Gaia
+            for i in range(0, len(ids), 1000):
+                q = (f"SELECT source_id, {ERROR_COLS} FROM gaiadr3.gaia_source "
+                     f"WHERE source_id IN ({', '.join(map(str, ids[i:i + 1000]))})")
+                df = Gaia.launch_job(q, verbose=False).get_results().to_pandas()
+                df.columns = [c.lower() for c in df.columns]
+                box["rows"] += df.to_dict("records")
+            box["done"] = True
+        except Exception as ex:
+            box["err"] = ex
+    th = threading.Thread(target=work, daemon=True)
+    th.start()
+    th.join(timeout_s)
+    if not box.get("done"):
+        return None
+    return {int(r["source_id"]): r for r in box["rows"]}
 
 
 def online_fields(records, radius_arcsec, archive):
@@ -137,6 +180,10 @@ def online_fields(records, radius_arcsec, archive):
             g = lambda k: None if m[k] is None or (isinstance(m[k], float) and not np.isfinite(m[k])) else m[k]
             flags = dict(gaia_ruwe=g("ruwe"), gaia_nss=int(g("non_single_star") or 0),
                          gaia_multi_peak=int(g("ipd_frac_multi_peak") or 0), gaia_dup=bool(g("duplicated_source")))
+            from pyoccult import ellipses
+            se = ellipses.star_ellipse(m, years) if "ra_error" in m else None
+            if se:                                                # the star's 1-sigma ellipse at the event date
+                flags.update(star_err_smaa_mas=se[0], star_err_smia_mas=se[1], star_err_pa_deg=se[2])
         comps = companions(archive, sid, float(r["star_ra"]), float(r["star_dec"]), float(r["mag"]), years,
                            radius_arcsec)
         out.append(fields(comps, float(r["mag"]), r.get("m_ast"), "gaia online", flags))

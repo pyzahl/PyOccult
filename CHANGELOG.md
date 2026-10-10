@@ -7,15 +7,57 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 ## [Unreleased]
 
 ### Added
+- GUI: the site and catalog chosen at the top right are remembered across restarts (`gui_state.json` in the
+  data folder, private); a site or catalog that no longer exists falls back to the default.
 - **VERIFICATION.md**: all checks in one place (OWC search results, Occult's star positions, internal and geometric
   checks, what the differences mean), moved out of ABOUT.md Part 5 (now a summary with a link), with a new OWC set
   (Oct 8-11 2026, 50 events: 44 match; two events on Gaia 2-parameter stars the local catalog leaves out, one small
   asteroid's orbit, three drops by the asteroid's brightness) and the full lists of both 50-event sets (matches,
   misses, extras, time differences over 1.5 s marked). ABOUT.md has a table of contents.
+- Favorites panel: an **event summary laid out like OccultWatcher Cloud's event page** (Prediction, Event, Target
+  star, Object): orbit solution (JPL# and date, from SBDB), path error in path widths and in time, the times the
+  shadow is on the Earth (From/To), combined magnitude, solar and Moon elongation, Moon phase, constellation, the
+  star's ICRS and apparent (true equator and equinox of date) position, the target's angular diameter, distance and
+  motion. Checked on 369152 (Oct 12 2026) against OWC: From/To within 1 s, distance, elongations, star positions
+  (apparent within 6 mas) and magnitude as OWC. The search logs the new values with each event (`dist_au`,
+  `motion_ra_ash`, `motion_dec_ash`, `sun_elong_deg`, `m_combined`, `shadow_from_utc`, `shadow_to_utc`); older
+  favorites get them once from JPL Horizons at GUI start (From/To then from the map's minute marks, marked ≈).
+  Not available locally, so not shown: the star's V/R/B magnitudes, its diameter and RUWE (the local catalog keeps
+  RUWE < 1.4), and the error ellipse (Horizons gives its RSS size).
+- Favorites panel layout: title "<asteroid> occults <Gaia DR3 star> around <time> UT at <site> (lat, lon, height)"; the four
+  groups (Prediction, Event, Star, Object) in a larger font, the Object group with H, albedo, shape and rotation and
+  the known satellites, the Star group with RUWE and the close/double-star check; the uncertainty-ellipse diagram at the
+  bottom left next to status and note. The separate lines for site, size, shape, double star and satellites are
+  gone (now in the groups). When Gaia's errors for the star are not at hand (archive not reached, 2-parameter
+  source), the diagram uses a typical Gaia DR3 star of that G (Lindegren et al. 2021), marked "!".
+- Favorites panel: the **sky-plane 1-sigma uncertainty ellipses** of the event in one diagram, titled "Uncertainty
+  ellipses (sky plane, 1σ)", at one scale (as OWC's
+  "Error Ellipses", but overlaid): the target's (JPL Horizons SMAA/SMIA/Theta), the star's (Gaia DR3 position and
+  proper-motion errors with their correlations, carried to the event date; at true scale usually a dot) and the
+  combined one, with the target's motion and the **error across the track** in mas and km (only that part shifts
+  the path). Checked on 369152 against OWC: target 28.00 x 22.33 mas @ 94, star 0.28 x 0.26 mas @ 90, combined
+  28.00 x 22.33 mas @ 94 (OWC 22.30); with Gaia's correlations, which OWC seems to leave out (without them
+  ours equals OWC's), the star's ellipse is 0.30 x 0.22 mas @ 126 (1 % of the target's). The search logs the target's ellipse (`ast_err_*`), the Gaia online check
+  the star's (`star_err_*`); older favorites get them once at GUI start (Horizons, one Gaia job, in the
+  background). New module `pyoccult/ellipses.py`.
+  The diagram also shows the target's disk at its angular size and the star where it stands as seen from the site
+  at closest approach (its ellipse again, dashed, with its track relative to the target): from the logged offsets
+  of the shadow axis, so its distance from the centre is the site's distance from the centre line (in mas and km,
+  "inside" or "outside" the shadow). A star more than 2 shadow widths outside is not drawn (the diagram does not
+  zoom out for it); the legend gives its distance.
 - `pyoccult owc-check --markdown FILE`: the full comparison as a Markdown table, by star magnitude (every OWC event
   and PyOccult's extra events, marked); `--hits FILE` compares a saved hit list (with `--compare-only`).
 
 ### Fixed
+- Maps (report, favorites): a shadow path across the date line showed a false second path, a straight band
+  along one latitude across the whole map (the step from -179.8 to +178.8 deg drawn the long way round). Longitudes
+  are now continuous along each line, placed next to the observer. The KML files themselves were right.
+- Gaia online check (close and double stars, now also the star's errors): synchronous queries in chunks instead of
+  one asynchronous job, whose status polling hung for minutes (October 2026) while the synchronous query answered
+  in seconds.
+- Search: a target JPL Horizons does not know (e.g. a mistyped asteroid number) stopped the whole run with a
+  traceback. It is now skipped with a one-line reason, the others are searched, and the run summary lists it
+  (`skipped_targets`).
 - `owc-check`: OWC tag words in capitals (e.g. "IBEROC") are no longer taken as part of the asteroid's name.
 
 ## [0.14.0] "New Horizons" - 2026-10-08
