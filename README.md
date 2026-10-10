@@ -1,7 +1,7 @@
 # PyOccult <img src="src/pyoccult/pyoccult_logo.svg" alt="" width="96" align="right">
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
 
-Python Occultation Searcher by PyZahl (C) 2026, version 0.14.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.15.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md). How the predictions were verified: [VERIFICATION.md](VERIFICATION.md).
@@ -745,6 +745,51 @@ Output:
 * their size data goes to the shared size cache, so the following `pyoccult/search.py` run needs no SBDB lookups for them
 * a saved copy per site and window in `picks/` (`<site>__<start>_<days>d.py` + `.csv`; `--picks-dir`, config
   `picks_dir`; private, in `.gitignore`). A new pick of the same site and window replaces it.
+
+**Pre-screens: a faster pick (optional).** The full pick screens every asteroid for your site, which takes minutes.
+A pre-screen does the site-independent part once for a region and a window (e.g. a month): it keeps every asteroid
+with at least one possible event there (any star within its reach of the Earth, the shadow's ground track crossing
+the region at night with the star up), and a pick of any site in that region then screens only those:
+
+```bash
+pyoccult prescreen build --start 2026-11-01 --days 30 --around-site 500      # a box 500 km around your site
+pyoccult prescreen build --start 2026-11-01 --days 30 --around-sites 300     # one box around all sites of sites.py
+pyoccult prescreen build --start 2026-11-01 --days 30 --region 35,60,-130,-60  # lat min,max, lon min,max
+pyoccult prescreen list
+pyoccult pick --start 2026-11-03 --days 7 --prescreen auto                     # the newest fitting one, else all
+pyoccult pick --start 2026-11-03 --days 7 --prescreen prescreen/<name>.db      # this one (refused if it does not fit)
+```
+
+In the GUI (Pick tab): **Asteroids** = *auto* (default: the newest pre-screen that fits the site, window and limits,
+else all asteroids), *all* (any place and time, slower, no pre-screen needed) or one fitting pre-screen by name; the
+line next to "Run pick" says which. The **Pre-screens** panel builds one (start, days, region: around this site,
+around all your sites, or the whole Earth; box size in km) and lists the built ones: window, region, the sites inside
+it, limits, asteroids and events, age (older than 30 days: rebuild), and whether it fits the current pick. One
+pre-screen around all your sites serves picks at any of them.
+
+The region is a latitude/longitude box (a rectangle on the map), not a circle. *Around this site*: +-km/111.2 degrees
+of latitude and +-km/(111.2 cos(site latitude)) degrees of longitude, so km in every direction along the site's
+meridian and parallel; the poleward edge is a little narrower in km (meridians converge: 500 km around 41 N gives
+~465 km east-west at the north edge), the equatorward edge a little wider. *Around all my sites*: the box holding all
+sites plus km, with the longitude width taken at the poleward edge, so at least km everywhere; across the date line it
+goes the short way round. *Whole Earth*: no region. An event is kept if its shadow's ground track touches the box
+**plus a margin** of the asteroid's radius + the reach (default 200 km, computed per latitude), so the effective region
+is the box widened by 200+ km on every side. The saved pick's `targets.py` notes which asteroids
+were screened.
+
+The pick then finds the same events as the full one, as long as the pre-screen covers its window and site and was
+built with limits at least as loose (star limit, reach, minimum drop, Sun and altitude limits, H limit; the build's
+defaults are loose: reach 200 km, Sun below 0, star above 0). The pick checks this and refuses a pre-screen that does
+not fit. The orbits are those of the build day: rebuild after a few weeks (new and updated orbits); the search uses
+the current JPL Horizons orbit for the final prediction anyway.
+
+A build takes a while (all ~465k asteroids; about an hour for a week with 4 workers), so it fits itself to the free
+memory and survives interruptions. It prints its plan first (available memory, the numpy memory per asteroid, workers
+x chunk size) and one line per chunk (progress, events, rate, ETA, free memory and swap, worker memory). Each chunk's
+events are saved at once in `<name>.db.partial`; after a crash or Ctrl-C, run the same command again and it resumes
+there (`--fresh` starts over). `--max-mem GB` or `--mem-frac` (default 0.6 of the available memory) set the budget,
+`--chunk N` a fixed chunk size; with a small budget it uses fewer workers, and it shrinks the chunks if the free memory
+runs low during the build.
 
 **Saved picks are reused.** Picking is the slow part, so you only need it once per site and window: `pyoccult/search.py`
 (with `targets_source = "auto"`, the default) takes the newest saved pick of its site whose window covers the search

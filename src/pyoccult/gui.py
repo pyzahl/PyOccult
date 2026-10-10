@@ -353,9 +353,44 @@ def index():
                 p_workers = ui.number("Workers", value=max(1, (os.cpu_count() or 2) // 2), min=1, step=1).classes(
                     "w-28")
                 p_sort = ui.select(["mag", "date", "margin", "drop"], value="mag", label="Rank by").classes("w-28")
-            with ui.row():
+                p_pre = ui.select(dict(PRE_FIXED), value="auto", label="Asteroids").classes("w-80").tooltip(
+                    "auto: if a pre-screen fits (its region holds the site, its window this pick's window, its limits "
+                    "are as loose), only its asteroids are screened: the same events, much faster; else all. "
+                    "all: every asteroid, for any place and time (slower, no pre-screen needed). "
+                    "Or one pre-screen by name (listed if it fits)")
+            with ui.row().classes("items-center"):
                 ui.button("Run pick", on_click=lambda: run_pick()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
+                pre_info = ui.label().classes("text-sm text-slate-600")
+            with ui.expansion("Pre-screens: build once for a region and window, then picks there are fast",
+                              icon="speed").classes("w-full border rounded"):
+                ui.label("A pick screens every asteroid (~465k) against the stars for your site, which takes many "
+                         "minutes for a few weeks. A pre-screen does the site-independent part once for a region and a "
+                         "window (about 1-2 hours for 20 days, 4 workers) and keeps only the asteroids with possible "
+                         "events there; every later pick of a site inside that region and window ('Asteroids: auto') "
+                         "then screens only those. Build it for the next weeks, around all your sites; rebuild after a "
+                         "few weeks (orbits are those of the build day). Uses the H limit and workers above; star limit "
+                         "at least G 16; loose limits (reach 200 km, Sun below 0, star above 0). Stop saves; the same "
+                         "build again resumes.").classes("text-sm text-slate-600")
+                with ui.row().classes("items-end gap-4"):
+                    ps_start = ui.input("Start (UTC date)", value=today_utc()).props("type=date").classes("w-36")
+                    ps_days = ui.number("Days", value=30, min=1, step=1).classes("w-24")
+                    ps_where = ui.select({"site": "around this site", "sites": "around all my sites",
+                                          "global": "whole Earth"}, value="sites", label="Region").classes("w-48")
+                    ps_km = ui.number("Box (km)", value=300, min=50, step=50).classes("w-28").tooltip(
+                        "The region is a latitude/longitude box (a rectangle on the map, not a circle): this many km "
+                        "north, south, east and west of the site (around all sites: of every site, at least this "
+                        "far everywhere). Around one site the poleward edge is a little narrower in km (about 465 of "
+                        "500 km at 41 N). Events count if the shadow path comes within the asteroid's radius + 200 km "
+                        "(reach) of the box, so the effective region is the box widened by 200 km or more")
+                    ui.button("Build pre-screen", on_click=lambda: run_prescreen()).props("outline")
+                    ui.button("Delete selected", on_click=lambda: delete_prescreens()).props(
+                        "flat dense color=negative")
+                ps_cols = [dict(name=k, label=lbl, field=k, sortable=True, align="left") for k, lbl in
+                           (("name", "Name"), ("window", "Window"), ("region", "Region"), ("sites", "Sites inside"),
+                            ("limits", "Limits"), ("found", "Asteroids / events"), ("age", "Built"), ("fits", "This pick"))]
+                ps_table = ui.table(columns=ps_cols, rows=[], row_key="path", selection="multiple").classes(
+                    "w-full").props("flat dense")
             with ui.row().classes("w-full items-center gap-4"):
                 p_saved = ui.select({}, label="Saved picks of this site").classes("w-96")
                 ui.button("Use for search", on_click=lambda: use_saved()).props("outline").tooltip(
@@ -523,6 +558,7 @@ def index():
         site_title.text = f"Site: {name}"
         try:
             load_pick()
+            prescreen_options()
         except NameError:                         # first call, while the page is built: load_pick() runs later
             pass
         for note in (site_note_s, site_note_p, site_note_b):
@@ -856,6 +892,72 @@ def index():
         saved_info()
         return n
 
+    def prescreen_options(*_):
+        """Pick tab: the Asteroids choices (auto, all, the pre-screens that fit this site and window), the line saying
+        what the pick will screen, and the pre-screens table."""
+        from pyoccult import prescreen as PS
+        opts, rows, fit = dict(PRE_FIXED), [], []
+        s = sites.get(state["name"], {})
+        try:
+            t0 = _day_et(p_start.value)
+            t1 = t0 + float(p_days.value or 1) * 86400
+            want = dict(cam_limit=float(p_mag.value or 0), hmax=None if p_all.value else float(p_hmax.value or 17),
+                        hmax_all=bool(p_all.value))
+            files = PS.list_files(os.path.join(ROOT, PS.DIR))
+        except Exception:
+            files, t0, t1, want = [], 0, 0, {}
+        for path, m in files:
+            m = dict(m, et0=_day_et(m["start"]), et1=_day_et(m["start"]) + m["days"] * 86400)
+            bad = PS.check(m, t0, t1, s.get("lat", 0), s.get("lon", 0), want) if s.get("lat") is not None else ["no site"]
+            if not bad:
+                opts[path] = "pre-screen " + PS.describe(path, m)
+                fit.append((m.get("built", ""), path, m))
+            reg = m.get("region")
+            inside = [n for n, v in sites.items() if "lat" in v and PS.contains(m, v["lat"], v["lon"])]
+            try:
+                n_ev, n_ast = PS.counts(path)
+            except Exception:
+                n_ev = n_ast = "?"
+            age = PS.age_days(m)
+            rows.append(dict(path=path, name=m.get("name", "?"),
+                             window=f"{m['start']} + {m['days']:g} d",
+                             region="whole Earth" if not reg else f"lat {reg['lat_min']:.0f}..{reg['lat_max']:.0f}, "
+                                                                  f"lon {reg['lon_min']:.0f}..{reg['lon_max']:.0f}",
+                             sites=", ".join(inside) or "-",
+                             limits=f"G <= {m['cam_limit']:g}, H < {m.get('hmax')}, reach {m['reach_km']:g} km",
+                             found=f"{n_ast} / {n_ev}",
+                             age="?" if age is None else (f"{age:.0f} d ago" + (" (old: rebuild)" if age > 30 else "")),
+                             fits="fits" if not bad else "; ".join(bad)))
+        p_pre.options = opts
+        if p_pre.value not in opts:
+            p_pre.value = "auto"
+        p_pre.update()
+        ps_table.rows = rows
+        ps_table.update()
+        if p_pre.value == "all":
+            pre_info.text = "Screens all asteroids (any place and time; slower)."
+        elif fit:
+            _, path, m = max(fit, key=lambda x: x[0]) if p_pre.value == "auto" else \
+                next(x for x in fit if x[1] == p_pre.value)
+            pre_info.text = f"Screens only the asteroids of pre-screen {os.path.basename(path)} (fast)."
+        else:
+            pre_info.text = ("No pre-screen fits this site and window: screens all asteroids (slower). "
+                             "Build one below for fast picks.")
+
+    async def delete_prescreens():
+        sel = [r["path"] for r in ps_table.selected]
+        if not sel:
+            ui.notify("Select pre-screens in the table first", type="warning")
+            return
+        for p in sel:
+            try:
+                os.remove(p)
+            except OSError as e:
+                ui.notify(f"{os.path.basename(p)}: {e}", type="negative")
+        ps_table.selected = []
+        prescreen_options()
+        ui.notify(f"{len(sel)} pre-screen(s) deleted", type="positive")
+
     def pick_csv():
         p = next((p for p in saved_list if p["py"] == p_saved.value), None)
         if p is None or not os.path.isfile(p["csv"]):
@@ -912,6 +1014,9 @@ def index():
     for el in (s_start, s_days, s_use_file):
         el.on_value_change(saved_info)
     load_pick()
+    for el in (p_start, p_days, p_mag, p_hmax, p_all, p_pre):
+        el.on_value_change(prescreen_options)
+    prescreen_options()
 
     fav_cur = {"key": None}
 
@@ -1050,12 +1155,35 @@ def index():
         args += ["--all"] if p_all.value else ["--hmax", str(p_hmax.value)]
         if p_mag.value:
             args += ["--cam-limit", f"{float(p_mag.value):g}"]
+        if p_pre.value != "all":
+            args += ["--prescreen", p_pre.value]                # "auto" or a file
 
         async def done(rc):
             if rc == 0:
                 n = load_pick(select=picks.paths(state["name"], p_start.value, int(p_days.value), picks_dir)[0])
                 s_use_file.value = True
                 ui.notify(f"{n} events; saved for site {state['name']}", type="positive")
+        await run_process(args, log, env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
+
+
+    async def run_prescreen():
+        if not catalog_ok():
+            return
+        ensure_saved()
+        where = {"site": ["--around-site", f"{float(ps_km.value or 300):g}"],
+                 "sites": ["--around-sites", f"{float(ps_km.value or 300):g}"], "global": ["--global"]}[ps_where.value]
+        args = PYOCCULT + ["prescreen", "build", "--start", ps_start.value, "--days", str(int(ps_days.value)),
+                           *where, "--workers", str(int(p_workers.value))]
+        args += ["--all"] if p_all.value else ["--hmax", str(p_hmax.value)]
+        args += ["--cam-limit", f"{max(16.0, float(p_mag.value or 0)):g}"]
+
+        async def done(rc):
+            prescreen_options()
+            if rc == 0:
+                ui.notify("Pre-screen built; picks inside its region and window use it ('Asteroids: auto')",
+                          type="positive")
+            else:
+                ui.notify("Pre-screen not finished; the same build again resumes it", type="warning")
         await run_process(args, log, env_site=state["name"], on_done=done, env_catalog=cat_sel.value)
 
 
@@ -1085,6 +1213,16 @@ def local_double_check(config):
                                    years, rad)
         return doubles.fields(comps, g, m_ast, "local")
     return check
+
+
+PRE_FIXED = {"auto": "auto: a fitting pre-screen, else all", "all": "all asteroids (any place and time; slower)"}
+
+
+def _day_et(date):
+    """Seconds of 00:00 UTC of a YYYY-MM-DD date on one scale (for comparing pick and pre-screen windows in the GUI,
+    which has no SPICE; both start at 00:00 UTC, so the offset to ET cancels)."""
+    import calendar
+    return float(calendar.timegm(time.strptime(str(date)[:10], "%Y-%m-%d")))
 
 
 KSTARS_OPT = dict(set_location=True)                   # Results tab option, read by /api/kstars/show

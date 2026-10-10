@@ -8,6 +8,7 @@
     pyoccult owc-check               compare with an OWC search result (owc_reference.txt)
     pyoccult gaia build|status|...   the local Gaia catalog
     pyoccult picks list|import       saved picks
+    pyoccult prescreen build|list    pre-screened target lists per region and window (pick --prescreen)
     pyoccult favorites ...           favorites list (page, CSV)
     pyoccult kstars ...              point KStars (Linux)
     pyoccult stellarium ...          point Stellarium (Remote Control plugin)
@@ -21,7 +22,7 @@ Every command runs in the data folder: a checkout's project folder, else the fol
 import importlib, os, runpy, sys
 
 COMMANDS = {"gui": "gui", "setup": "setup", "pick": "pick", "search": "search", "report": "report",
-            "owc-check": "owc_check", "gaia": "gaia_local", "picks": "picks", "favorites": "favorites",
+            "owc-check": "owc_check", "gaia": "gaia_local", "picks": "picks", "prescreen": "prescreen", "favorites": "favorites",
             "kstars": "kstars", "stellarium": "stellarium", "run": "runner"}
 SCRIPTS = {"search"}            # not import-safe (sets up SPICE at import): executed as a script
 

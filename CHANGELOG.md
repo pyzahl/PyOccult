@@ -6,6 +6,41 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Fixed
+- Pick and pre-screen workers use one numpy (OpenBLAS) thread each: before, every worker started one thread per
+  CPU (4 workers on 8 cores: 32 busy threads, each worker at ~40 % of a CPU).
+
+### Added
+- **Pre-screens** (`pyoccult/prescreen.py`, `pyoccult prescreen build|list|show`): the asteroids with possible
+  occultations in a region (a lat/lon box, or a box around the site) or anywhere on the Earth during a window, built
+  once and stored in SQLite (`prescreen/`), using the pick's own parts (SBDB elements, orbits, bright-star index,
+  candidate scan) for the whole Earth plus each candidate's ground track (region, darkness, star altitude). New pick
+  option `--prescreen FILE` (GUI Pick tab: "Asteroids"): screens only those asteroids, otherwise unchanged; it checks
+  that the pre-screen covers the window and the site and that its limits are at least as loose, and refuses
+  otherwise. The full pick stays the default.
+- Pre-screen builds fit the free memory and resume: chunk size and workers are planned from the available memory and
+  a measured model of the numpy arrays (~12 x 3 x 8 bytes per asteroid and 10-min step), chunks shrink when memory
+  runs low, every chunk is saved at once in `<name>.db.partial` and the same command resumes after a crash or Ctrl-C
+  (`--fresh`, `--chunk`, `--max-mem`, `--mem-frac`). Verbose progress: the plan, then per chunk the rate, ETA, free
+  memory, swap and worker memory. The candidate scan and ground tracks run in bounded blocks (the 30-day peak per
+  chunk of 400 asteroids fell from 1.1 GB to 0.5 GB; same events).
+- Using pre-screens: pick `--prescreen auto` takes the newest pre-screen that fits the site, window and limits, else
+  screens all asteroids (and says why none fits); `targets.py` notes which asteroids were screened. Pre-screens
+  around all sites of sites.py (`--around-sites KM`: one box, the short way round across the date line), so one
+  build serves every site. `pyoccult prescreen list` shows asteroids, events and age.
+- GUI Pick tab: "Asteroids" = auto (default) / all (any place and time) / a fitting pre-screen, with a line saying
+  what the pick will screen; a "Pre-screens" panel to build one (start, days, region: this site, all my sites, whole
+  Earth; box km) with its progress in the log (Stop saves, the same build resumes), and a table of the built ones
+  (window, region, sites inside, limits, asteroids/events, age, fits this pick or why not) with delete.
+
+## [0.15.0] "New Horizons" - 2026-10-10
+
+The favorites panel now summarises each event like OccultWatcher Cloud's event page (prediction, event, star,
+object; checked against OWC), with the sky-plane uncertainty ellipses of the target, the star and both combined in one
+diagram. All verification is in the new VERIFICATION.md, with the full lists of two 50-event OWC comparisons. Also:
+the GUI remembers its site and catalog, a target unknown to JPL Horizons no longer stops a search, and maps no
+longer show a false second path for tracks across the date line.
+
 ### Added
 - GUI: the site and catalog chosen at the top right are remembered across restarts (`gui_state.json` in the
   data folder, private); a site or catalog that no longer exists falls back to the default.
@@ -381,6 +416,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[0.15.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.14.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.13.0]: https://github.com/pyzahl/PyOccult/commits/main
 [0.12.0]: https://github.com/pyzahl/PyOccult/commits/main

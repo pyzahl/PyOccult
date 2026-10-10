@@ -11,7 +11,7 @@ authors:
     alias: pyzahl
 license: GPL-3.0-or-later
 doi: 10.5281/zenodo.23149371
-version: "0.14.0"
+version: "0.15.0"
 repository-code: "https://github.com/pyzahl/PyOccult"
 abstract: >-
   Portable Python replacement for the Occult occultation predictor: finds asteroid

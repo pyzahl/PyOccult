@@ -110,6 +110,18 @@ def _screen_chunk(args):
     return _W["SC"].screen(_W["spice"], rows, et0, et1, _W["site"], _W["index"], opt, chunk=max(len(rows), 1)), len(rows)
 
 
+BLAS_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS", "VECLIB_MAXIMUM_THREADS",
+             "NUMEXPR_NUM_THREADS")
+
+
+def single_thread_workers():
+    """One BLAS thread per worker process: numpy's OpenBLAS otherwise starts one thread per CPU in every worker (4
+    workers on 8 cores: 32 threads, each worker's own thread got ~40 % of a CPU). Set in the parent's environment
+    before the pool starts, so the spawned workers read it when they import numpy; a value the user set is kept."""
+    for k in BLAS_VARS:
+        os.environ.setdefault(k, "1")
+
+
 def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000, mp_start="spawn"):
     """Screen rows in worker processes. Workers are started with "spawn": each loads its own SPICE kernels with its
     own file handles. With "fork" (the Linux default before Python 3.14) they would inherit the parent's open kernel
@@ -123,6 +135,7 @@ def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000, mp_start="sp
     L.BrightIndex(site_args[0], L.index_gmax(site_args[1]))
     jobs = [(rows[i:i + chunk], et0, et1, opt) for i in range(0, len(rows), chunk)]
     events, done, t0 = [], 0, time.time()
+    single_thread_workers()
     with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context(mp_start),
                              initializer=_init, initargs=(folder, *site_args)) as ex:
         for ev, n in ex.map(_screen_chunk, jobs):
@@ -143,6 +156,7 @@ def write_targets(path, best, a):
         f.write(f"# events {a.start} + {a.days:g} d, site {a.site or a.lat}, reach {a.reach:g} km, G <= {a.cam_limit:g}, "
                 f"{a.aperture:g} cm aperture, {a.frames} frames, MagAdjust {a.mag_adjust:+g}, extinction {a.extinction:g}, "
                 f"min duration {a.min_dur:g} s, min drop {a.min_drop:g}\n")
+        f.write(f"# asteroids screened: {getattr(a, 'screened', '') or 'all'}\n")
         f.write(f"# order: best event first (sorted by {a.sort}); comment = that event\n\n")
         f.write("targets = [\n")
         for e in best:
@@ -204,6 +218,10 @@ def main(argv=None):
                          "and breaks parallel reads, for diagnosis only)")
     ap.add_argument("--catalog", default=c("catalog", "gaia_dr3_g16"), help="local Gaia catalog folder")
     ap.add_argument("--sbdb-cache", help="SBDB download cache (default: <config cache_path>/PyOccult_sbdb_cache.json)")
+    ap.add_argument("--prescreen", metavar="FILE|auto",
+                    help="screen only the asteroids of this pre-screen (pyoccult prescreen build): faster, the same "
+                         "events if the pre-screen covers the window and the site and its limits are as loose; "
+                         "'auto': the newest fitting one in prescreen/, else all asteroids")
     ap.add_argument("-o", "--output", default="pick_events.csv")
     ap.add_argument("--targets-file", default="targets.py", help="importable targets list ('' to skip)")
     ap.add_argument("--picks-dir", default=c("picks_dir", "picks"),
@@ -226,6 +244,27 @@ def main(argv=None):
     opt = dict(reach_km=a.reach, min_alt=a.min_alt, max_sun_alt=a.max_sun_alt, min_drop=a.min_drop,
                min_dur=a.min_dur, cam_limit=a.cam_limit, aperture=a.aperture, frames=a.frames,
                mag_adjust=a.mag_adjust, extinction=a.extinction)
+    if a.prescreen == "auto":                           # the newest fitting pre-screen, else the full screen
+        from pyoccult import prescreen as PS
+        path, _, other = PS.best_fit(et0, et1, a.lat, a.lon, dict(opt, hmax=hmax, hmax_all=a.all))
+        if path is None:
+            print("pre-screen: none fits this pick" + "".join(f"\n  {os.path.basename(p)}: {'; '.join(bad)}"
+                                                            for p, _, bad in other)
+                  + "\n  -> screening all asteroids", file=sys.stderr)
+        a.prescreen = path
+    if a.prescreen:                                     # only the asteroids with events in the pre-screen
+        from pyoccult import prescreen as PS
+        meta = PS.read_meta(a.prescreen)
+        bad = PS.check(meta, et0, et1, a.lat, a.lon, dict(opt, hmax=hmax, hmax_all=a.all))
+        if bad:
+            print(f"pre-screen {a.prescreen} does not fit this pick: " + "; ".join(bad) +
+                  ". Build a fitting one (pyoccult prescreen build) or pick without --prescreen.", file=sys.stderr)
+            return 2
+        keep = PS.numbers(a.prescreen, et0, et1)
+        n_all = len(rows)
+        rows = [r for r in rows if int(r["number"]) in keep]
+        print(f"pre-screen {PS.describe(a.prescreen, meta)}: {len(rows)} of {n_all} asteroids", file=sys.stderr)
+        a.screened = f"{len(rows)} of {n_all} (pre-screen {os.path.basename(a.prescreen)})"
     a.site = c("site") if (a.lat, a.lon) == (c("lat"), c("lon")) else None
     print(f"{len(rows)} asteroids, {a.start} + {a.days:g} d, site {a.site or ''} {a.lat:.4f} {a.lon:.4f}, reach {a.reach:g} km, "
           f"G <= {a.cam_limit:g}, {a.workers} workers", file=sys.stderr)

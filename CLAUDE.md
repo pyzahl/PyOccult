@@ -45,6 +45,28 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `targets` override sets `"list"`). Engine `pyoccult/screen.py` (site solve, OWC observability formula), orbits `pyoccult/orbits.py` (SBDB full-precision
   elements + planets, RK4, ~0.01" vs Horizons), stars `BrightIndex` (G <= index_gmax(cam_limit) = max(15, ceil(limit)), cells sorted by G; a missing one is
   built by `run_screen` in the parent before the workers start, low-memory via a memmap). Worker processes.
+- `pyoccult/prescreen.py` (0.16 dev): pre-screens = per region/window the asteroids with possible events (build:
+  pick.fetch_sbdb/build_rows, orbits.propagate, BrightIndex.near_path with Earth radius + r_max + reach, corridor
+  find_candidates, then a vectorized ground track per candidate: shadow axis in the fundamental plane -> surface
+  point (sphere), J2000->ITRF from pxform on the 10-min grid + spin OMEGA*dt, region box (+ r_max + reach margin,
+  lon wrap), Sun and star altitude there). SQLite `prescreen/<name>.db`: events + meta (build limits). pick
+  `--prescreen`: PS.check (window, region, limits as loose) else exit 2; rows filtered by PS.numbers(et0, et1).
+  GUI Pick "Asteroids" select (prescreen_options: files covering window and site). A superset by design: same
+  events as the full pick when it fits. Build memory (2026-10-10): `plan_chunks` from `mem_status()` (/proc/meminfo MemAvailable; else
+  half of physical) x mem_frac or --max-mem, model `chunk_bytes` = n x steps x BYTES_PER_STEP (12x3x8, measured ~10)
+  + CHUNK_FIXED; workers reduced if MIN_CHUNK does not fit; w+1 chunks in flight, halved when free < 2 chunks.
+  find_candidates gets block_cells=SCAN_CELLS (4e6; the corridor default 2.5e7 made a ~730 MB transient for 30-day
+  paths), ground tracks in CAND_BLOCK blocks (`_ground_track`; identical events). Checkpoint `<out>.partial` (events
+  + `done` numbers + meta 'settings'; resumed only with equal settings, `--fresh` discards), finished -> meta,
+  DROP done, VACUUM, os.replace. Worker RSS peak includes the memory-mapped bright index pages (reclaimable); the
+  progress line also shows RssAnon after the chunk. SIGTERM (GUI Stop) is handled like Ctrl-C. Use: pick `--prescreen auto`
+  -> `best_fit` (newest by meta 'built' among check()==[]; else full screen + reasons); `box_around_all` (CLI
+  `--around-sites`, all sites.py sites, widest longitude gap outside; lon width at the poleward edge, so >= km
+  everywhere; `box_around` (single site) uses cos(site lat): ~7 % narrower at the north edge for 500 km at 41 N,
+  documented, change only between builds: resume compares the stored region); targets.py line "# asteroids screened:".
+  GUI Pick tab: p_pre "auto"/"all"/path (PRE_FIXED), `pre_info` line, expansion "Pre-screens" (ps_start, ps_days,
+  ps_where site/sites/global, ps_km, `run_prescreen`, ps_table with fit reasons, `delete_prescreens`);
+  prescreen_options() mirrors PS.check without SPICE (`_day_et`: both windows start 00:00 UTC).
 - `pyoccult/corridor.py`: per-asteroid path, magnitude cap and vectorized candidate scan; `corridor_candidates(plan, local)`
   takes the stars from `LocalGaia`. No archive access (removed 2026-10-01: archive too slow).
 - `linux_install.sh` (user's quick install, Linux/macOS): creates `.venv` with python3, installs the project via
@@ -219,6 +241,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
 - Earth PCK coverage: `pck_comment_dates` reads "Creation date" and "UTC Epoch of last datum" (end of measured EOP)
   from the file's comment block; `pckcov` gives the end of the prediction. Run summary key `earth_pck`; a search window
   past the end exits at start-up.
+- Worker pools call `pick.single_thread_workers()` before starting (OPENBLAS/OMP/MKL_NUM_THREADS=1 via setdefault,
+  inherited by spawn): OpenBLAS otherwise starts a thread per CPU in every worker (4 workers on 8 cores: load 24,
+  each worker ~40 % CPU; found 2026-10-10 in a pre-screen build).
 - SpiceyPy `surfpt` returns only the point and raises `NotFoundError` on a miss.
 - Tests use stand-ins for spiceypy/astropy/astroquery that follow the real call contracts; keep them honest when changing
   signatures.
