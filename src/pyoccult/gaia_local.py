@@ -10,6 +10,7 @@ Afterwards a corridor lookup reads only the few files its strip touches, in abou
     pyoccult gaia status
     pyoccult gaia zenodo --gmax 16    # ready-made copy (G <= 16 or 18) from Zenodo instead of building
     pyoccult gaia supplement --dir gaia_dr3_g18 --gmax 16   # <dir>/supplement: high-RUWE and 2-parameter stars
+                                                            #   (from Zenodo, or --source esa to build it)
 
 Layout of the catalog folder:
     catalog.json                      gmax, cuts and the list of source files (written first)
@@ -289,12 +290,16 @@ def build(out_dir, gmax=18.0, workers=6, supplement=False):
 ZENODO_DOI = "10.5281/zenodo.23113337"                               # concept DOI: always the newest version
 ZENODO_API = U.URL_ZENODO_CATALOG_RECORD
 ZENODO_GMAX = (16.0, 18.0)                                            # limits published there (gaia_dr3_g16, gaia_dr3_g18)
+# the high-RUWE supplement there (since version 2, 2026-10-11): independent of the main catalog's limit (the same
+# RUWE / astrometry cut), so it serves any catalog folder; top folder 'supplement/'
+ZENODO_SUPPLEMENT = {16.0: "gaia_dr3_g18_supplement_g16.tar.xz"}
 
 
-def zenodo_files(gmax):
-    """{name: (size, url)} of the archive for this limit and its .sha256 in the newest Zenodo version."""
+def zenodo_files(gmax, stem=None):
+    """{name: (size, url)} of the archive for this limit (or the file stem) and its .sha256 in the newest Zenodo
+    version."""
     import requests
-    stem = f"gaia_dr3_g{gmax:g}.tar.xz"
+    stem = stem or f"gaia_dr3_g{gmax:g}.tar.xz"
     r = requests.get(ZENODO_API, timeout=60)
     r.raise_for_status()
     files = {f["key"]: (f["size"], f["links"]["self"]) for f in r.json()["files"]}
@@ -378,15 +383,23 @@ def unpack_archive(archive, out_dir):
     os.rmdir(stage)
 
 
-def fetch_zenodo(out_dir, gmax=18.0, keep_archive=False):
+def fetch_zenodo(out_dir, gmax=18.0, keep_archive=False, supplement=False):
     """Install the ready-made catalog for G <= gmax (16 or 18) from Zenodo instead of building it: download (resumable),
     check the SHA-256, unpack into out_dir. The archive goes next to out_dir and is deleted afterwards unless
-    keep_archive. No bright-star index inside: BrightIndex(out_dir) builds it."""
+    keep_archive. No bright-star index inside: BrightIndex(out_dir) builds it. supplement: the high-RUWE supplement
+    (G <= gmax, see ZENODO_SUPPLEMENT) into out_dir/supplement, out_dir being the catalog's folder."""
     import requests
-    if float(gmax) not in ZENODO_GMAX:
+    if supplement:
+        if float(gmax) not in ZENODO_SUPPLEMENT:
+            sys.exit(f"Zenodo has the supplement for G <= {', '.join(f'{g:g}' for g in ZENODO_SUPPLEMENT)} only, "
+                     f"not {gmax:g}; build it from ESA instead")
+        files = zenodo_files(gmax, ZENODO_SUPPLEMENT[float(gmax)])
+        out_dir = supplement_dir(out_dir)
+    elif float(gmax) not in ZENODO_GMAX:
         sys.exit(f"Zenodo has catalogs for G <= {', '.join(f'{g:g}' for g in ZENODO_GMAX)} only, not {gmax:g}; "
                  f"build from ESA instead")
-    files = zenodo_files(gmax)
+    else:
+        files = zenodo_files(gmax)
     (name, (size, url)), (sha_name, (_, sha_url)) = files.items()
     archive = os.path.join(os.path.dirname(os.path.abspath(out_dir)), name)
     need = (0 if os.path.isfile(archive) else size - (os.path.getsize(archive + ".part")
@@ -396,7 +409,7 @@ def fetch_zenodo(out_dir, gmax=18.0, keep_archive=False):
         sys.exit(f"not enough disk space next to {out_dir}: {need / 1e9:.1f} GB needed (archive + unpacked), "
                  f"{free / 1e9:.1f} GB free")
     want = requests.get(sha_url, timeout=60).text.split()[0].lower()
-    print(f"   Zenodo {ZENODO_DOI}: {name}, {size / 1e9:.1f} GB", flush=True)
+    print(f"   Zenodo {ZENODO_DOI}: {name}, {size / 1e9:.2f} GB", flush=True)
     if not os.path.isfile(archive):
         _fetch_resume(url, size, archive + ".part")
         if _sha256(archive + ".part") != want:
@@ -713,11 +726,17 @@ def main():
     ap.add_argument("--gmax", type=float, default=g0, help="faintest G kept (default: config gaia_local_gmax or 16)")
     ap.add_argument("--workers", type=int, default=6, help="parallel download/parse processes")
     ap.add_argument("--keep-archive", action="store_true", help="zenodo: keep the downloaded .tar.xz")
+    ap.add_argument("--source", choices=["zenodo", "esa"], default="zenodo",
+                    help="supplement: ready-made from Zenodo (G 16, minutes; default) or built from ESA's files (~2 h)")
     a = ap.parse_args()
     if a.cmd == "build":
         build(a.dir, a.gmax, a.workers)
     elif a.cmd == "supplement":
-        build(a.dir, a.gmax, a.workers, supplement=True)
+        if a.source == "zenodo" and float(a.gmax) in ZENODO_SUPPLEMENT:
+            if fetch_zenodo(a.dir, a.gmax, a.keep_archive, supplement=True)["complete"]:
+                BrightIndex(supplement_dir(a.dir), 15.0)
+        else:
+            build(a.dir, a.gmax, a.workers, supplement=True)
     elif a.cmd == "zenodo":
         if fetch_zenodo(a.dir, a.gmax, a.keep_archive)["complete"]:
             BrightIndex(a.dir, 15.0)                                         # for pick.py

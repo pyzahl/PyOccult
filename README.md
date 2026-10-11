@@ -721,8 +721,11 @@ pyoccult setup --supplement                                # for the configured 
 pyoccult gaia supplement --dir gaia_dr3_g18 --gmax 16     # the same for a given catalog folder
 ```
 
-Either way: 8.0 M stars to G 16, 0.4 GB, one pass over ESA's files (106 min at ~1.4 Gbit/s), resumable;
-`pyoccult setup --status` shows whether it is there.
+Both download the ready-made supplement from Zenodo (with the catalogs, concept DOI 10.5281/zenodo.23113337, since
+version 2, [10.5281/zenodo.23298192](https://doi.org/10.5281/zenodo.23298192)): 0.35 GB, checked by SHA-256, resumable,
+8.0 M stars to G 16, the same for any catalog folder (G 16 or 18). `--source esa` builds it from ESA's files instead
+(106 min at ~1.4 Gbit/s; other limits with `--supplement-gmax` / `--gmax`). `pyoccult setup --status` shows whether it
+is there.
 
 It is then used by picks, searches and pre-screens (switch: GUI header **+ high-RUWE stars**, config
 `gaia_supplement`), and every event on such a star is flagged **⚑ RUWE 1.65** or **⚑ 2-param** in the results,

@@ -106,7 +106,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   prescreen meta/settings `supplement`, check() refuses a pre-screen without it when the pick uses it. Exec-excerpt
   tests need `gaia_local` in their ns (test_patch). Built 2026-10-10: 8.0 M stars G <= 16, 0.42 GB, 106 min.
   setup.py `supplement_step` (step 3b): `--supplement` builds/resumes, asked on a first-time setup (tty), status line.
-  Not on Zenodo yet (planned: pack <catalog>/supplement like the catalogs, fetch_zenodo + setup --source for it).
+  On Zenodo since 2026-10-11 (catalog record version 2, doi 10.5281/zenodo.23298192; concept DOI unchanged):
+  `gaia_dr3_g18_supplement_g16.tar.xz` (+ .sha256), `ZENODO_SUPPLEMENT`, `fetch_zenodo(dir, 16, supplement=True)`
+  unpacks into dir/supplement (works for any catalog folder); setup/`gaia supplement` default to Zenodo, `--source esa`
+  builds. Download verified identical to the local build. release/pack.sh packs it separately (`pack.sh supplement`)
+  and excludes <catalog>/supplement from the catalog archives.
 - `pyoccult/sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
   `pyoccult.search.sbdb_phys()` (per-object API) and by `pyoccult/pick.py` for its top targets (bulk rows: size fields only); `get_full()` fetches the per-object
   record (rotation, pole, extent, type) for favorites; standard library only.

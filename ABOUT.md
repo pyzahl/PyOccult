@@ -128,7 +128,11 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   bright-star index (`MergedIndex`, `COMMON_DTYPE`) for picks and pre-screens; `use_supplement()` = env
   `PYOCCULT_SUPPLEMENT` (GUI switch) else config `gaia_supplement` (default on). Events on such stars carry
   `star_kind`, `star_ruwe`, `star_flag` ("RUWE 1.65", "2-param") at the end of the record and the pick's events, shown
-  as ⚑ after the star magnitude. Found with (86288) 1999 UC45, 2026-09-30: its G 11.73 target (RUWE 1.65), observed by
+  as ⚑ after the star magnitude. On Zenodo with the catalogs since version 2 (2026-10-11,
+  [doi:10.5281/zenodo.23298192](https://doi.org/10.5281/zenodo.23298192)): `gaia_dr3_g18_supplement_g16.tar.xz`
+  (0.35 GB, `.sha256`; top folder `supplement/`), fetched by `fetch_zenodo(..., supplement=True)` into any catalog
+  folder (the cut does not depend on the catalog's limit); built here in 106 min, the download is identical. Found
+  with (86288) 1999 UC45, 2026-09-30: its G 11.73 target (RUWE 1.65), observed by
   three stations, was not in the local catalog, so the event was not predictable.
 
 ### 2.5 Candidate scan: `find_candidates`
@@ -555,8 +559,8 @@ All checks, with their numbers and the discussion of the differences, are in
      motion) and poorly measured stars (RUWE >= 1.4, often unresolved doubles). OWC lists them. Seen in the OWC set of
      Oct 8-11 2026: 2 of 50 events, both on 2-parameter stars of G 11.6 and 12.0 (VERIFICATION.md, 1.5), and an
      observed event of (86288) 1999 UC45 on 2026-09-30 (target RUWE 1.65). **Addressed by the supplement (2.4,
-     2026-10-10)**; open: a 2-parameter star's position error (grows with the years since 2016) in the path
-     uncertainty, and the supplement on Zenodo next to the catalogs.
+     2026-10-10, on Zenodo since 2026-10-11)**; open: a 2-parameter star's position error (grows with the years
+     since 2016) in the path uncertainty.
   3. Step events: for a known pair, the two shadows (offset by separation x distance) and the drop of each step.
 
 - **218001**: OWC lists a 1.56 mag drop and 0.51 s, PyOccult 12.97 mag and 0.25 s. The duration difference is the

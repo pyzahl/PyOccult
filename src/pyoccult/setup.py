@@ -251,9 +251,10 @@ def show_status(d=None):
             print(f"    {f:18s} G <= {g:g}, {gb:.1f} GB" + ("" if ok else ", INCOMPLETE") + ("   <- in use" if f == d else ""))
 
 
-def supplement_step(d, gmax, want, sup_gmax, workers, ask):
-    """3b. The high-RUWE supplement of catalog d (gaia_local.build(..., supplement=True)): built or resumed with
-    --supplement, offered on a first-time setup in a terminal, else only mentioned."""
+def supplement_step(d, gmax, want, sup_gmax, workers, ask, source="auto"):
+    """3b. The high-RUWE supplement of catalog d: with --supplement, or offered on a first-time setup in a terminal,
+    from Zenodo (G 16, ~0.35 GB, minutes; source auto/zenodo) or built from ESA's files (source esa, other limits, or
+    to resume a partial ESA build); else only mentioned."""
     sd = gaia.supplement_dir(d)
     st = gaia.status(sd)
     if st["complete"]:
@@ -261,18 +262,26 @@ def supplement_step(d, gmax, want, sup_gmax, workers, ask):
         return
     partial = st["total"] and st["done"]
     if not want and ask:
+        zen = source in ("auto", "zenodo") and float(sup_gmax) in gaia.ZENODO_SUPPLEMENT and not partial
+        how = ("resume the build from ESA's files" if partial else
+               f"G <= {sup_gmax:g}: ~8 M stars, 0.4 GB, " + ("a 0.35 GB download from Zenodo" if zen
+                                                             else "about 2 h from ESA's files"))
         k = input(f"3b. high-RUWE supplement: the stars the catalog leaves out (Gaia RUWE >= 1.4, often unresolved "
                   f"doubles, and 2-parameter sources); OWC predicts events on them, PyOccult flags them.\n"
-                  f"   {'resume it' if partial else f'G <= {sup_gmax:g}: ~8 M stars, 0.4 GB, about 2 h from ESA'}"
-                  f"'s files; [Enter] build it (recommended), or [s]kip: ").strip().lower()
+                  f"   {how}; [Enter] install it (recommended), or [s]kip: ").strip().lower()
         want = k != "s"
     if not want:
         print(f"3b. high-RUWE supplement: {'incomplete ' + str(st['done']) + '/' + str(st['total']) if partial else 'not built'}"
               f" (optional: pyoccult setup --supplement)")
         return
-    print(f"3b. high-RUWE supplement G <= {sup_gmax:g} in {sd}" + (" (resuming)" if partial else ""))
+    zen = source in ("auto", "zenodo") and float(sup_gmax) in gaia.ZENODO_SUPPLEMENT and not partial
+    print(f"3b. high-RUWE supplement G <= {sup_gmax:g} in {sd}" + (" (resuming)" if partial else "")
+          + (" from Zenodo" if zen else " from ESA's files"))
     try:
-        gaia.build(d, sup_gmax, workers, supplement=True)
+        if zen:
+            gaia.fetch_zenodo(d, sup_gmax, supplement=True)
+        else:
+            gaia.build(d, sup_gmax, workers, supplement=True)
     except (OSError, RuntimeError, ValueError, KeyError) as e:
         print(f"   supplement not finished: {str(e)[:200]}\n   rerun: pyoccult setup --supplement (it resumes)")
         return
@@ -432,7 +441,7 @@ def main():
         except (OSError, RuntimeError, ValueError, KeyError) as e:  # network (requests' errors are OSErrors), disk
             sys.exit(network_failure(e, d, src if gmax in gaia.ZENODO_GMAX else None))
         supplement_step(d, gmax, a.supplement, min(a.supplement_gmax, gmax), a.workers,
-                        ask=sys.stdin.isatty() and new_install)
+                        ask=sys.stdin.isatty() and new_install, source=a.source)
         if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 16.0)):
             print(f"\n   To search with this catalog, set in pyoccult_config.py:\n"
                   f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")
