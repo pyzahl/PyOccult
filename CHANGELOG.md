@@ -7,6 +7,10 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 ## [Unreleased]
 
 ### Added
+- `pyoccult cleanup`: remove what PyOccult downloaded and generated (kernels, its cache files, bright-star indexes,
+  the supplement, run outputs), keeping the large Gaia catalogs, `owc_refs/`, `private-docs/`, `release/` and `.venv`;
+  a dry run with sizes unless `--yes`; `--keep-results`, `--all` (also settings and favorites). For testing a fresh
+  install.
 - **High-RUWE supplement** of the local catalog (`pyoccult gaia supplement --dir <catalog> --gmax 16`, into
   `<catalog>/supplement/`): the stars the main catalog leaves out, Gaia RUWE >= 1.4 (often unresolved doubles) and
   2-parameter sources (no parallax or proper motion), about 8 M stars / 0.3 GB to G 16. Picks, searches and

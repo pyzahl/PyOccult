@@ -236,6 +236,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   unnamed: "the observer's site", "a second site") and the details to `owc_refs/README.md` Full lists:
   `pyoccult owc-check --markdown <set>.list.md` (`--compare-only --hits <saved csv>` for a stored run); markers ✅ 🟠
   (|dt| > WARN_T 1.5 s) 🔴 🔵.
+- `pyoccult/cleanup.py` (`pyoccult cleanup`, 2026-10-11): deletes downloads, PyOccult's own cache files
+  (CACHE_PATTERNS in cache_path only), catalog extras (bright_*, supplement/, tmp) and run outputs (OUTPUTS), with
+  --all also SETTINGS + home.POINTER; NEVER: owc_refs/, owc_reference.*, private-docs/, release/, run.sh, .venv, git,
+  catalog star files. Dry run unless --yes. Reads cache_path from the config only if pyoccult_config.py exists (loading
+  it would create one). Keep its lists in step when new downloads/outputs are added. `tests/test_cleanup.py`.
 - `CONTRIBUTING.md`: fork/branch workflow, setup, tests, working with Claude Code, private files, pull requests,
   GPL-3.0-or-later for contributions. `LICENSE` (GPL-3.0 text), `CITATION.cff` (validated with cffconvert).
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).

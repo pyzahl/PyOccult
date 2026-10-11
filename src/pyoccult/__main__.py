@@ -13,6 +13,7 @@
     pyoccult kstars ...              point KStars (Linux)
     pyoccult stellarium ...          point Stellarium (Remote Control plugin)
     pyoccult run <command> '<json>'  a search or pick with settings overridden for this run (used by the GUI)
+    pyoccult cleanup [--yes]         remove downloads and generated files (keeps the Gaia catalogs; lists first)
 
 `pyoccult <command> --help` shows a command's options. Also: python -m pyoccult <command> ...
 Every command runs in the data folder: a checkout's project folder, else the folder chosen at the first
@@ -23,7 +24,7 @@ import importlib, os, runpy, sys
 
 COMMANDS = {"gui": "gui", "setup": "setup", "pick": "pick", "search": "search", "report": "report",
             "owc-check": "owc_check", "gaia": "gaia_local", "picks": "picks", "prescreen": "prescreen", "favorites": "favorites",
-            "kstars": "kstars", "stellarium": "stellarium", "run": "runner"}
+            "kstars": "kstars", "stellarium": "stellarium", "run": "runner", "cleanup": "cleanup"}
 SCRIPTS = {"search"}            # not import-safe (sets up SPICE at import): executed as a script
 
 

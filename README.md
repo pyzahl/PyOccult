@@ -473,6 +473,7 @@ commands" at the top of Install). The site is
 | planets | `pyoccult run search '{"targets": ["P:Jupiter", "M:Io"], "results_list": "bodies", "hits_output_cvs_file": "bodies_log.csv"}'` then `pyoccult report bodies_log.csv -o bodies_report.html --layout bodies` | planets and moons as the Planets & Moons tab runs them |
 | point | `pyoccult stellarium <ra> <dec> <utc> [fov]`, `pyoccult kstars ...` | point Stellarium or KStars at a position and time |
 | check | `pyoccult owc-check --ref owc_reference.txt` | rerun an OWC search result you saved as text and compare event by event (`--sea-level`: compute at elevation 0, as OWC online does) |
+| start over | `pyoccult cleanup` (then `--yes`) | remove what PyOccult downloaded and generated, keeping the large Gaia catalogs; see below |
 
 `pyoccult run <command> '<JSON>'` runs a command with settings changed for that run only (`pyoccult_config.py`
 stays as it is), e.g. `pyoccult run search '{"ct": "2026-10-01T00:00:00", "days": 8, "MAG_MIN": 15}'`; the GUI starts
@@ -481,6 +482,15 @@ every run this way.
 Useful options: `pyoccult pick --hmax 18 --reach 30 --frames 4 --top 40 --workers 4` (see "Pick tool: choose
 targets" below), `pyoccult picks list` (saved picks), `PYOCCULT_CATALOG=gaia_dr3_g16 pyoccult search`
 (another catalog for one run), `pyoccult setup --status` (what is installed).
+
+**Starting over** (e.g. to test a fresh install): `pyoccult cleanup` lists, with sizes, what it would delete in the
+data folder: downloads (SPICE and planet kernels, the MPC list), PyOccult's own cache files in `cache_path` (nothing
+else there), the catalogs' bright-star indexes and high-RUWE supplement, and the run outputs (results database,
+reports, maps, picks, pre-screens, logs). Nothing is deleted until you add `--yes`. The catalogs' star files (the
+large Zenodo downloads) stay, and so do `owc_refs/`, `private-docs/`, `release/`, `run.sh` and `.venv`.
+`--keep-results` keeps the run outputs; `--all` also removes your settings (`sites.py`, `pyoccult_config.py`,
+`csv_exports.py`, GUI state, favorites) and the data-folder setting, so `pyoccult setup` starts like a first install.
+Close the GUI first.
 
 A small script does a fresh run and publishes the report on a local web server (here nginx; the map tiles need a
 web server, see the report section). Save it as `run.sh` (it is in `.gitignore`, adjust the paths) and make it
