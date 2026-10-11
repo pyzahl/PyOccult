@@ -294,6 +294,10 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   from `file://`. Map dialog reopen bug fixed 2026-10-02 (the box was cleared on every open, removing Leaflet's panes).
 
 ## Ideas not built yet
+- Live search engine (ABOUT.md 3.8, timings of 2026-10-10): resident process with kernels, catalog, global
+  pre-screen + index, SBDB list and orbits in memory; site test + exact solves in ~1-2 s; maps on demand; rolling
+  nightly pre-screen builds. Locally: one combined pick + search run (saves a ~5 s start-up), SBDB rows only for
+  the pre-screen's asteroids, per-segment index boxes.
 - Star angular-diameter model for the drop and duration.
 - Astrometric corrections in the pick screen (built for the search in 0.10.0; pick screen still without).
 - Process-level parallelism by target (`ProcessPoolExecutor`; parent does kernel checks, Horizons SPKs and opens the local Gaia catalog;

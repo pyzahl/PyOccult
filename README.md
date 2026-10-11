@@ -859,6 +859,31 @@ with a small budget it uses fewer workers, and it shrinks the chunks if the free
 Pre-screens built before 2026-10-10 (format 1 and 2) missed events (track sampling gaps, reach taken as ground km):
 rebuild them.
 
+**Files, copying and sharing.** Pre-screens live in `prescreen/` in your data folder (private, in `.gitignore`; the
+data folder is shown by `python -c "from pyoccult.home import HOME; print(HOME)"`):
+
+| Kind | Files | Size |
+|---|---|---|
+| Region (around a site, all sites, a named region or box; also `extract`) | one SQLite file `<name>__<start>_<days>d_G<limit>.db` | a few to tens of MB |
+| Whole Earth (`--global`) | `<name>.global.npy` (shadow elements) + `<name>.global.json` (settings: window, limits, build date) + `<name>.global.idx.npy` (index) | ~1 GB + ~0.3 GB per month at G 16 |
+
+To use one on another computer, copy the file(s) into the `prescreen/` folder of that computer's data folder,
+keeping the names: one `.db` file for a region; all three files for whole Earth (`rsync -av
+prescreen/<name>.global.* otherhost:PyOccult/prescreen/`). Without the `.json` the whole-Earth file is not found;
+without the `.idx.npy` it works but its site test is ~5x slower (`pyoccult prescreen index FILE` rebuilds it there in
+minutes). It is found at once: `pyoccult prescreen list`, the GUI's Pre-screens table and **Asteroids: auto** use it
+(no GUI restart needed). The other computer needs PyOccult 0.16.0 or later and its own setup (local Gaia catalog, a
+G 16 one is enough, SPICE kernels): a pre-screen only says *which* asteroids to screen; the pick there computes them
+with its own catalog and orbits. A copy carries the orbits of its build day, so share fresh ones (the table flags
+pre-screens older than 30 days). To share a smaller part of a whole-Earth file, cut a region from it:
+`pyoccult prescreen extract FILE --region usa --cam-limit 14 --start ... --days ...` gives one `.db` file.
+
+Why two formats: a whole-Earth file holds millions of events that a pick processes as whole columns, so it is a
+NumPy array of fixed 80-byte records, sorted by time and memory-mapped: a window is a binary search and a slice, the
+site test runs directly on the columns, and it is about half the size SQLite would need (8 bytes per number plus row
+overhead). A region file is small and a pick asks it one question (which asteroids have an event in the window with
+a star at most this bright), a single SQL query; one portable file is handy for sharing.
+
 **Saved picks are reused.** Picking is the slow part, so you only need it once per site and window: `pyoccult/search.py`
 (with `targets_source = "auto"`, the default) takes the newest saved pick of its site whose window covers the search
 window, e.g. a pick for Oct 1 + 30 d serves any search from Oct 1 to Oct 31 at that site. It prints which one it

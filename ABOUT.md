@@ -34,6 +34,7 @@ Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one
   - [3.5 Speed and output](#35-speed-and-output)
   - [3.6 Saved picks: pyoccult/picks.py](#36-saved-picks-pyoccultpickspy)
   - [3.7 Pre-screens: pyoccult/prescreen.py, pyoccult/shadowtrack.py (0.16.0)](#37-pre-screens-pyoccultprescreenpy-pyoccultshadowtrackpy-0160)
+  - [3.8 Notes: where a prediction's time goes, and a live search engine](#38-notes-where-a-predictions-time-goes-and-a-live-search-engine)
 - [Part 4: Data sources](#part-4-data-sources)
   - [4.1 Sizes: what Horizons/SBDB has, and what occultations measured](#41-sizes-what-horizonssbdb-has-and-what-occultations-measured)
   - [4.2 Asteroid satellites](#42-asteroid-satellites)
@@ -386,6 +387,17 @@ test kept 40 of 2039 asteroids including all 39 with events; the index and the r
 exact site test keeps (the observer's site at three settings, 20 random sites in a 500 km box, sites in Iceland,
 Sydney, Svalbard and Tierra del Fuego).
 
+**Storage.** Region pre-screens: one SQLite file (`events`: number, star, Earth-centre time, G, asteroid magnitude,
+geocentric miss, a ground point with its Sun and star altitude; `meta`: the settings as JSON; indexes on number and
+time); a pick runs one `SELECT DISTINCT number ... WHERE et BETWEEN ... AND g <= ...`. Whole Earth: `<name>.global.npy`
+(NumPy structured array of `shadowtrack.DTYPE`, 80 bytes per event, sorted by time), `<name>.global.json` (the
+settings, `kind: global`, counts; required: a file is listed only with it) and `<name>.global.idx.npy` (IDX_DTYPE, 24
+bytes per event, same order; optional). NumPy rather than SQLite because a query reads all events of a window and
+computes on whole columns: memory-mapped, a window is `searchsorted` + a slice with no parsing or row conversion, and
+it is about half the size (SQLite stores every number as an 8-byte REAL plus row overhead: ~150-200 bytes per event).
+Both kinds are found by `list_files` in `prescreen/` of the data folder; copying them (all three files of a global
+one, names unchanged) to another installation is all it takes to use them there.
+
 **Build memory and progress.** Chunk size and workers follow the free memory: a chunk's arrays take ~12 x 3 x 8
 bytes per asteroid and 10-min step (measured ~10), plus a fixed part; the candidate scan runs in blocks of 4 M
 stars x steps (the corridor's default 25 M made a ~730 MB transient for 30-day paths) and the ground tracks in blocks
@@ -393,6 +405,46 @@ of 1024 candidates. After every chunk the results are committed to `<out>.partia
 elements as blobs, plus the done asteroid numbers and the settings); a rerun with the same settings resumes, a
 different format version is refused. A global build's chunks become one time-sorted file through memory maps, then
 the index is computed in worker processes.
+
+### 3.8 Notes: where a prediction's time goes, and a live search engine
+
+Measured 2026-10-10 on the author's desktop (8 cores, 4 workers; a solid but not new machine), one site, H < 17:
+
+| Step | Time | Depends on |
+|---|---|---|
+| Full pick, all 465k asteroids | ~5 min for 8 days (318 s), 210 s for 4 days | window length, H limit |
+| Whole-Earth pre-screen build (once per window) | ~14 min for 4 days, ~1-2 h for a month; ~1 GB per month at G 16 | window length, star limit |
+| Pick with a whole-Earth pre-screen, 7 days | ~12 s (less on a second run) | mostly fixed costs, see below |
+| Search of the picked targets (7 asteroids, 7 events) | 19.2 s = start-up 5.4 + asteroid data 4.7 + search 3.2 (of it maps 1.9) | targets, network |
+
+So a complete 7-day prediction for a site takes about 30 s once a pre-screen exists, of which the actual
+calculation (site test on the stored paths, exact screen of a few hundred asteroids, exact solves of the few
+candidates) is only a few seconds. The rest is preparation that a permanently running service would have done
+already:
+
+1. **Process start-up, twice** (pick and search are separate runs): imports, SPICE kernels, config, opening the local
+   Gaia catalog and the results database, ~5 s each. *Live:* one resident process with the kernels loaded and the
+   catalog, the pre-screen and its index memory-mapped: 0 s. (Even locally, a combined pick + search run would save
+   one start-up.)
+2. **The SBDB list of all asteroids** (465k rows from the JSON cache) read in every pick, although a pre-screen
+   already names the few hundred that matter. *Live:* kept in memory (or as a NumPy table), refreshed daily.
+3. **The site-independent screen**: done by the pre-screen. *Live:* rolling builds (e.g. nightly for the coming
+   weeks, ~1 GB per month), shared by all users; with new orbits the affected asteroids could be rebuilt alone.
+4. **Site test** on the stored shadow paths: seconds with the index (14-26 % of the events tested). *Live:* the same,
+   in memory; a finer index (a box per track segment instead of per track) would cut it further.
+5. **Asteroid data for the search**: per target the JPL Horizons orbit file (network, the first time) and the size
+   from SBDB. *Live:* a shared, prefetched orbit cache for the asteroids with events in the pre-screen's bright part,
+   or the integrated SBDB orbits (good to ~0.01", 3.1) for the list and Horizons only for the final prediction of an
+   event someone opens.
+6. **Maps, previews and globes**: ~0.3 s per event, made for every event up front. *Live:* made on demand, when an
+   event is opened.
+7. **Online Gaia double-star check**: already asynchronous, after the search (not in the times above).
+
+A live engine would thus answer "events at this site in the next weeks" in about a second or two: a resident process
+holding the global shadow elements and index, the asteroid list and the orbits, testing the site against the stored
+paths, solving the surviving candidates exactly, and drawing maps only for the events looked at. That is about the
+setup of OccultWatcher Cloud, whose server keeps its predictions ready; locally, the pre-screen gives the same split of
+"once per window" and "per site" work.
 
 ---
 
