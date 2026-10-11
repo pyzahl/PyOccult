@@ -215,10 +215,10 @@ def index():
                 ui.label(f"by {__author__}").classes("text-sm text-slate-600")
         ui.label("Asteroid occultation prediction for your observing sites: picks the events at your site from all "
                  "numbered asteroids, computes them exactly (JPL Horizons orbits, NAIF SPICE, a local Gaia DR3 "
-                 "catalog), and shows shadow paths, star-field previews and whole-Earth plots. A portable Python "
-                 "successor to the Windows predictor Occult, validated against Occult Watcher Cloud. Every observed "
+                 "catalog), and shows shadow paths, star-field previews and whole-Earth plots. Every observed "
                  "event, positive or negative, adds to what we know about the sizes, shapes and orbits of the small "
                  "bodies of the Solar System.").classes("text-sm")
+        ui.label("PyOccult is an independent development, written from scratch. It has no roots in Occult (occult.exe) by David Herald: it is not a port, translation or derivative of it, shares no code with it, and is not affiliated with or endorsed by its author or by Occult Watcher Cloud. Occult and OWC served only as independent references to compare results with.").classes("text-sm font-medium mt-2")
         ui.label("Credits").classes("font-semibold mt-2")
         ui.label("Stars: ESA Gaia DR3 (Gaia/DPAC) \u00b7 orbits and sizes: JPL Horizons and Small-Body Database \u00b7 "
                  "planets and Earth orientation: NAIF SPICE (SpiceyPy), DE440 \u00b7 coastlines: Natural Earth \u00b7 "

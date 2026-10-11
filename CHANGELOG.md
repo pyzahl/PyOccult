@@ -6,6 +6,15 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.17.0] "New Horizons" - 2026-10-11
+
+Events on the stars Gaia measured less well are now predicted, flagged: a high-RUWE supplement of the local catalog
+(8.0 M stars with RUWE >= 1.4 or without proper motions, 0.35 GB, ready-made on Zenodo) is merged into picks, searches
+and pre-screens, so an event like (86288) 1999 UC45 on 2026-09-30, observed from three sites and missed before, is
+found (1.17 s predicted, 1.17 s observed). Also: `pyoccult cleanup` to start over, coordinates pasted in any usual
+format in the Site tab, named regions in the GUI, and clearer documentation, including that PyOccult is an independent
+development with no roots in Occult.
+
 ### Added
 - `pyoccult cleanup`: remove what PyOccult downloaded and generated (kernels, its cache files, bright-star indexes,
   the supplement, run outputs), keeping the large Gaia catalogs, `owc_refs/`, `private-docs/`, `release/` and `.venv`;
@@ -25,6 +34,15 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   labels in any order (lat/latitude, lon/lng/long/longitude, alt/elevation/height, also German), degrees-minutes-
   seconds, decimal minutes or decimal degrees, N/S/E/W or signs, heights in m/ft/km; without labels latitude first
   (as Google Maps copies them). All three fields are filled, the map marker moves, a missing elevation is looked up.
+- GUI Pick tab, Pre-screens panel: the named regions (USA, North/Central/South America, Europe, Africa, Middle East,
+  East Asia, Japan, Australia, New Zealand) in the Region selector, with their lat/lon boxes.
+
+### Changed
+- Documentation: a note at the top of the README, in the GUI's About box, ABOUT.md and CITATION.cff that PyOccult is
+  an independent development written from scratch, with no roots in Occult (occult.exe, D. Herald), not affiliated
+  with it or with OWC (both only independent references); README sections "If something goes wrong: start over" and
+  "Files, copying and sharing" (pre-screens); ABOUT.md 3.8, where a prediction's time goes and what a live search
+  engine would keep ready.
 
 ## [0.16.0] "New Horizons" - 2026-10-10
 

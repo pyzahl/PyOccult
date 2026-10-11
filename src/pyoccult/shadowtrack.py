@@ -7,7 +7,7 @@ minutes to hours it takes to cross the Earth. Stored: the star direction and a q
     x(t) = x0 + vx dt + ax dt^2,   y(t) = y0 + vy dt + ay dt^2,   dt = t - tc,   |dt| <= half
 
 (km, km/s, km/s^2), fitted to the integrated orbit at -half, 0, +half, with the largest misfit at 9 points (err, km).
-This is the idea of Besselian elements (Occult), enough to decide which events can be seen from a site or a region:
+This is the classical idea of Besselian elements (eclipse and occultation geometry), enough to decide which events can be seen from a site or a region:
 
 - site test: the site's position in the plane at the same times (the Earth's rotation from SPICE on a 1-min grid);
   kept if the shadow line passes within radius + reach + err of it with the star up and the Sun down there;

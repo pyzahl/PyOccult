@@ -5,8 +5,11 @@ Data comes from Gaia DR3 (stars), JPL Horizons and SBDB (asteroid orbits and siz
 (planets, Earth orientation); see Part 4. Usage is in `README.md`; to contribute, see `CONTRIBUTING.md`.
 Updated 2026-10-08.
 
-PyOccult is intended as a future and portable Python replacement for the Windows occultation predictor Occult (occult.exe, the engine behind
-Occult Watcher Cloud, OWC). It finds asteroid occultations of Gaia stars for one observer site.
+PyOccult is a portable occultation predictor in Python. It finds asteroid occultations of Gaia stars for one
+observer site. It is an independent development, written from scratch: it has no roots in Occult (occult.exe) by David
+Herald, is not a port, translation or derivative of it, shares no code with it, and is not affiliated with or endorsed
+by its author or by Occult Watcher Cloud (OWC). Occult and OWC served only as independent references to compare
+results with (VERIFICATION.md).
 
 ---
 
@@ -119,7 +122,7 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   (2.1 GB) and `gaia_dr3_g18.tar.xz` (8.2 GB), each with a `.sha256`. `fetch_zenodo` downloads one (resumable), checks
   the SHA-256 and unpacks it into any folder name; `pyoccult/setup.py` offers it before the ESA build.
 
-- **Supplement** (`<catalog>/supplement/`, `pyoccult gaia supplement --dir <catalog> --gmax 16`, 0.16.x): the stars
+- **Supplement** (`<catalog>/supplement/`, `pyoccult gaia supplement --dir <catalog> --gmax 16`, 0.17.0): the stars
   the main catalog leaves out, from the same pass over ESA's files with the opposite filter: RUWE >= 1.4 (kind 1)
   and 2-parameter sources without parallax or proper motion (kind 2; stored as 0, so their position is that of 2016),
   with `ruwe`, `ra_error`, `dec_error` (`SUPP_DTYPE`). From a 1 % archive sample: G < 12 ~0.6 M stars, G < 16 ~8 M

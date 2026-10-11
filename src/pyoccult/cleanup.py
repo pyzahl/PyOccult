@@ -5,7 +5,8 @@ large local Gaia catalogs (their star files, as from Zenodo or a build).
     pyoccult cleanup --yes              delete it
     pyoccult cleanup --keep-results     ... but keep the run outputs (results database, picks, pre-screens, maps, ...)
     pyoccult cleanup --all --yes        also your settings: sites.py, pyoccult_config.py, csv_exports.py, GUI state,
-                                        favorites, and the data-folder setting of `pyoccult setup --home`
+                                        favorites, and the data-folder setting of `pyoccult setup --home`: a start like
+                                        a first install (setup asks for your site again; without --all it keeps it)
 
 Deleted (in the data folder, see `pyoccult setup --status`):
   downloads      SPICE kernels, NAIF planet kernels, the MPC observatory list, old caches
@@ -122,7 +123,9 @@ def main(argv=None):
     items = plan(a.keep_results, a.everything)
     print(f"data folder: {os.getcwd()}")
     if not items:
-        print("nothing to clean")
+        mine = [f for f in SETTINGS if os.path.exists(f)]
+        print("nothing to clean" + (f"; your settings stay ({', '.join(mine)}): --all removes them too"
+                                     if mine and not a.everything else ""))
         return 0
     sizes = {p: _size(p) for _, p in items}
     by_cat = {}
@@ -145,6 +148,12 @@ def main(argv=None):
     kept = [d for d in sorted(glob.glob("gaia_dr3_*")) if os.path.isfile(os.path.join(d, "catalog.json"))]
     print(f"\ntotal {_gb(total)} in {len(items)} items; kept: " + (", ".join(f"{d}/ (star files)" for d in kept) or "-")
           + ", owc_refs/, private-docs/, release/, .venv")
+    mine = [f for f in SETTINGS if os.path.exists(f)]
+    settings_note = ""
+    if not a.everything and mine:
+        settings_note = (f"Your settings stay ({', '.join(mine)}): setup keeps your site. For a start like a first "
+                         f"install (setup asks for the site again), use: pyoccult cleanup --all --yes")
+        print(settings_note)
     if not a.yes:
         print("nothing deleted (a dry run): add --yes to delete. Close the GUI and any runs first.")
         return 0
@@ -159,7 +168,7 @@ def main(argv=None):
             failed += 1
             print(f"  could not delete {p}: {e}")
     print(f"deleted {len(items) - failed} items ({_gb(total)})." + (f" {failed} failed." if failed else "")
-          + " Run `pyoccult setup` to set PyOccult up again.")
+          + " Run `pyoccult setup` to set PyOccult up again." + (f"\n{settings_note}" if settings_note else ""))
     return 1 if failed else 0
 
 

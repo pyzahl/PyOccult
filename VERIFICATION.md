@@ -2,7 +2,7 @@
 
 How PyOccult's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
 event plots, against its own older code paths, and with independent geometry. What is computed and how: `ABOUT.md`;
-open items: `ABOUT.md`, Part 6. Updated 2026-10-10 (PyOccult 0.16.0).
+open items: `ABOUT.md`, Part 6. Updated 2026-10-11 (PyOccult 0.17.0).
 
 Contents:
 

@@ -1,7 +1,9 @@
 # PyOccult: project notes for Claude Code
 
-Portable Python replacement for the old Windows occultation predictor (Occult / occult.exe, behind OWC). Finds asteroid
-occultations of Gaia stars for one observer site. Read `ABOUT.md` for the computations and sources, `README.md` for usage.
+Portable occultation predictor in Python, an independent development written from scratch. Finds asteroid
+occultations of Gaia stars for one observer site. It has NO roots in Occult (occult.exe, David Herald): never describe it
+as a replacement, successor, port or derivative of Occult or OWC in docs, GUI, CITATION or Zenodo text; they are only
+independent references for comparing results (note at the top of README, GUI About box, ABOUT.md intro). Read `ABOUT.md` for the computations and sources, `README.md` for usage.
 
 ## Files
 - Layout (since 2026-10-06): PEP 621 package, src layout like PyMovie/PyOTE. `pyproject.toml` (setuptools, version

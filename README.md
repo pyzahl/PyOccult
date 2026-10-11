@@ -1,7 +1,12 @@
 # PyOccult <img src="src/pyoccult/pyoccult_logo.svg" alt="" width="96" align="right">
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23149371.svg)](https://doi.org/10.5281/zenodo.23149371)
 
-Python Occultation Searcher by PyZahl (C) 2026, version 0.16.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
+> **Note:** PyOccult is an independent development, written from scratch. It has **no roots in Occult (occult.exe) by
+> David Herald**: it is not a port, translation or derivative of it, shares no code with it, and is not affiliated with
+> or endorsed by its author or by Occult Watcher Cloud. Occult and OWC served only as independent references to compare
+> results with.
+
+Python Occultation Searcher by PyZahl (C) 2026, version 0.17.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md). How the predictions were verified: [VERIFICATION.md](VERIFICATION.md).
@@ -28,6 +33,7 @@ NiceGUI: a local web interface to plan and run all tasks for easy event explorat
   - [5. Run it: the web interface](#5-run-it-the-web-interface)
     - [The core command-line tools](#the-core-command-line-tools)
   - [Quick Tips](#quick-tips)
+- [If something goes wrong: start over](#if-something-goes-wrong-start-over)
 - [Where your data and settings live](#where-your-data-and-settings-live)
 - [Site Configuration and Run Setup](#site-configuration-and-run-setup)
 - [Local Gaia catalog (required)](#local-gaia-catalog-required)
@@ -490,7 +496,8 @@ reports, maps, picks, pre-screens, logs). Nothing is deleted until you add `--ye
 large Zenodo downloads) stay, and so do `owc_refs/`, `private-docs/`, `release/`, `run.sh` and `.venv`.
 `--keep-results` keeps the run outputs; `--all` also removes your settings (`sites.py`, `pyoccult_config.py`,
 `csv_exports.py`, GUI state, favorites) and the data-folder setting, so `pyoccult setup` starts like a first install.
-Close the GUI first.
+Without `--all` your site stays and setup does not ask for it again: **for a from-scratch test use
+`pyoccult cleanup --all --yes`**. Close the GUI first.
 
 A small script does a fresh run and publishes the report on a local web server (here nginx; the map tiles need a
 web server, see the report section). Save it as `run.sh` (it is in `.gitignore`, adjust the paths) and make it
@@ -525,6 +532,32 @@ To include the maps' KML links in the published page, also copy the `maps` folde
   ```
 
 
+
+## If something goes wrong: start over
+
+A download stopped halfway, setup or a run fails with odd errors, or you just want a clean slate: PyOccult can remove
+what it downloaded and generated and set it up again. Your large Gaia catalog (the Zenodo download) is kept, so
+starting over takes minutes, not hours. Go step by step, from the gentlest:
+
+1. **Run setup again**: `uv run pyoccult setup` (or `pyoccult setup`). It checks everything, resumes unfinished
+   downloads and builds, and fixes most problems on its own.
+2. **Fresh downloads and caches, keep your results**: `uv run pyoccult cleanup --keep-results --yes`, then
+   `uv run pyoccult setup`. Removes the SPICE kernels, cached orbit and size data, the bright-star indexes and the
+   high-RUWE supplement; keeps your site, settings, results, picks, pre-screens and favorites.
+3. **Everything generated, keep your site**: `uv run pyoccult cleanup --yes`, then `uv run pyoccult setup`. As 2,
+   plus the run outputs (results database, reports, maps, picks, pre-screens, logs).
+4. **Like a first install**: `uv run pyoccult cleanup --all --yes`, then `uv run pyoccult setup`. As 3, plus your
+   settings (`sites.py`, `pyoccult_config.py`, `csv_exports.py`, the GUI's remembered choices, favorites) and the
+   data-folder setting: setup asks for your site again, as on the very first run.
+
+Good to know:
+* **Look before you delete**: without `--yes`, `pyoccult cleanup` only lists what it would delete, with sizes.
+* **Close the GUI** (and let running searches or builds finish) before cleaning up.
+* **Never deleted**: the Gaia catalogs' star files, `owc_refs/`, `owc_reference.*`, `private-docs/`, `release/`,
+  `run.sh`, `.venv` and the program itself.
+* **Keep a copy first** of what you want to keep: `favorites/` and `pyoccult.db` (your results), `sites.py` (your
+  sites), and any pre-screens in `prescreen/` (they take an hour or more to build).
+* Everything happens in the data folder; `pyoccult setup --status` shows which one.
 
 ## Where your data and settings live
 
@@ -848,7 +881,7 @@ typically a few hundred asteroids.
 testing a region is cheap. So a whole-Earth build costs about the same as a region build, and instead of testing a
 region it stores, per event, the shadow's motion across the fundamental plane (the plane through the Earth's centre
 facing the star): the star direction and a quadratic in time fitted to the integrated orbit (its misfit is stored too:
-at most 0.3 km in tests). That is the idea of Occult's Besselian elements, ~80 bytes per event, sorted by time in
+at most 0.3 km in tests). That is the classical idea of Besselian elements (eclipse and occultation geometry), ~80 bytes per event, sorted by time in
 `prescreen/<name>.global.npy` (+ `.json`, and an index `.idx.npy`). About 29 events per asteroid per 20 days at G 16,
 roughly 1 GB per month for all 465k asteroids; a brighter `--cam-limit` makes it much smaller (~1/13 at G 13.2).
 From one such file:

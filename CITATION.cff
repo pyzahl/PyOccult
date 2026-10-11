@@ -11,15 +11,15 @@ authors:
     alias: pyzahl
 license: GPL-3.0-or-later
 doi: 10.5281/zenodo.23149371
-version: "0.16.0"
+version: "0.17.0"
 repository-code: "https://github.com/pyzahl/PyOccult"
 abstract: >-
-  Portable Python replacement for the Occult occultation predictor: finds asteroid
-  occultations of Gaia DR3 stars for an observer site (JPL Horizons orbits, NAIF SPICE,
+  Independent occultation predictor in Python, written from scratch (not derived from
+  Occult): finds asteroid occultations of Gaia DR3 stars for an observer site (JPL Horizons orbits, NAIF SPICE,
   a local magnitude-limited Gaia catalog), with an all-asteroid target pick, shadow paths
   with 1- and 3-sigma limits, event previews and a local web interface; also occultations
   by planets and their moons with disappearance and reappearance times. Validated against
-  Occult Watcher Cloud.
+  Occult Watcher Cloud and Occult as independent references.
 keywords:
   - asteroid occultation
   - Gaia DR3
