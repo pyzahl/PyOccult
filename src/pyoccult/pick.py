@@ -234,11 +234,14 @@ def main(argv=None):
         a.sbdb_cache = os.path.join(c("cache") or tempfile.gettempdir(), "PyOccult_sbdb_cache.json")
 
     hmax = None if a.all else a.hmax
+    T = {"start": time.time()}                          # phase timings (printed at the end)
     fields, data, fetched = fetch_sbdb(hmax, a.sbdb_cache)
     rows = build_rows(fields, data, hmax)
+    T["list"] = time.time()
     import spiceypy as spice
     from pyoccult import screen as SC
     SC.load_kernels(spice, HOME)
+    T["kernels"] = time.time()
     et0 = spice.str2et(a.start + "T00:00:00")
     et1 = et0 + a.days * 86400.0
     opt = dict(reach_km=a.reach, min_alt=a.min_alt, max_sun_alt=a.max_sun_alt, min_drop=a.min_drop,
@@ -275,16 +278,19 @@ def main(argv=None):
         rows = [r for r in rows if int(r["number"]) in keep]
         print(f"pre-screen {PS.describe(a.prescreen, meta)}: {len(rows)} of {n_all} asteroids ({how})", file=sys.stderr)
         a.screened = f"{len(rows)} of {n_all} (pre-screen {os.path.basename(a.prescreen)})"
+    T["select"] = time.time()
     a.site = c("site") if (a.lat, a.lon) == (c("lat"), c("lon")) else None
     print(f"{len(rows)} asteroids, {a.start} + {a.days:g} d, site {a.site or ''} {a.lat:.4f} {a.lon:.4f}, reach {a.reach:g} km, "
           f"G <= {a.cam_limit:g}, {a.workers} workers", file=sys.stderr)
     t0 = time.time()
     ev = run_screen(rows, et0, et1, opt, (a.catalog, a.cam_limit, a.lat, a.lon, a.ele), a.workers, mp_start=a.mp_start)
     print(f"screened in {time.time() - t0:.0f} s: {len(ev)} events", file=sys.stderr)
+    T["screen"] = time.time()
 
     E = pd.DataFrame(ev)
     if E.empty:
         print("no events found")
+        print_timing(T, a.prescreen)
         return 0
     E["utc"] = [spice.et2utc(x, "ISOC", 0) for x in E.et]
     E = E.sort_values(SORT_KEYS[a.sort], ascending=SORT_ASC[a.sort]).reset_index(drop=True)
@@ -319,7 +325,19 @@ def main(argv=None):
     if saved:
         print(f"saved for site {a.site}, {a.start} + {a.days:g} d: {saved} (+ .csv); searches of this site and window use it")
     print(f"size data of {n_put} targets -> {sbdb.cache_file(c('cache'))}", file=sys.stderr)
+    print_timing(T, a.prescreen)
     return 0
+
+
+def print_timing(T, prescreen):
+    """One line: where the pick's time went (start-up = Python and imports, from when the command started)."""
+    T["output"] = time.time()
+    t0 = float(os.environ.get("PYOCCULT_T0") or T["start"])
+    d = lambda a, b: T[b] - T[a]
+    print(f"timing: total {T['output'] - t0:.1f} s = start-up {T['start'] - t0:.1f} + asteroid list "
+          f"{d('start', 'list'):.1f} + kernels {d('list', 'kernels'):.1f} + "
+          f"{'pre-screen' if prescreen else 'asteroid choice'} {d('kernels', 'select'):.1f} + screen (workers incl.) "
+          f"{d('select', 'screen'):.1f} + output {d('screen', 'output'):.1f} s", file=sys.stderr)
 
 
 if __name__ == "__main__":

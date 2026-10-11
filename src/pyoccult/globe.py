@@ -15,7 +15,7 @@ import numpy as np
 
 W, H = 1024, 800                    # canvas, px
 CX, CY, RPX = 512, 470, 300         # Earth disk centre and radius on the canvas
-A_KM, C_KM = 6378.1366, 6356.7519   # Earth radii (as pck00010)
+from pyoccult.earth import A_KM, C_KM   # WGS84 ellipsoid (as the shadow paths)
 AU_KM = 1.495978707e8
 RAD2MAS = math.degrees(1.0) * 3.6e6
 LINES = (("center", "#111827", 2.4, None), ("edge_plus", "#dc2626", 1.4, None), ("edge_minus", "#dc2626", 1.4, None),

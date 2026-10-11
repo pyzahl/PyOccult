@@ -20,7 +20,8 @@ Every command runs in the data folder: a checkout's project folder, else the fol
 `pyoccult setup` (default ~/PyOccult; change it with `pyoccult setup --home <folder>`), or PYOCCULT_HOME for one run.
 `pyoccult setup --status` shows which one is used.
 """
-import importlib, os, runpy, sys
+import importlib, os, runpy, sys, time
+os.environ.setdefault("PYOCCULT_T0", repr(time.time()))   # when the command started (run timings, e.g. the pick's)
 
 COMMANDS = {"gui": "gui", "setup": "setup", "pick": "pick", "search": "search", "report": "report",
             "owc-check": "owc_check", "gaia": "gaia_local", "picks": "picks", "prescreen": "prescreen", "favorites": "favorites",

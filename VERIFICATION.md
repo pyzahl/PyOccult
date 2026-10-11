@@ -297,6 +297,12 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
     Iceland, Sydney, Svalbard and Tierra del Fuego; the index passes 14-26 % of the events to the exact test. A first
     index that took the reach as ground km dropped 1 % at the loosest limits (low-altitude events seen off the track):
     found and fixed with `ground_reach`.
+- **Whole-Earth pre-screen on another computer** (2026-10-11, Apple M4, 32 GB, macOS, 8 workers): a 30-day
+  whole-Earth pre-screen with the supplement (Oct 11 + 30 d, G <= 16: 14,867,681 events of 458,051 asteroids,
+  1.1 GB + 0.34 GB index, built in 77 min). Picks for two sites (one in the US, one in Europe), Oct 11 + 20 d, with
+  it and without it (the full pick over all 464,740 asteroids): the pre-screen picks screened 3,050 and 2,417
+  asteroids and gave the same 260 and 259 events, identical in every field (time, star, drop, duration, miss
+  distance, supplement flags: 37 and 30 events on supplement stars), and the same 80 targets each.
 - **High-RUWE supplement** (2026-10-10; `ABOUT.md` 2.4): (86288) 1999 UC45 occulted Gaia DR3 2846821043820040832
   (G 11.73, RUWE 1.65) on 2026-09-30 at 05:28:2x UT, observed from three California sites (1.17 s at one,
   https://www.dr-ricknolthenius.com/events/20260930-1999UC45/index.html). The star was not in the local catalog

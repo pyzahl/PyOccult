@@ -181,6 +181,10 @@ independent references for comparing results (note at the top of README, GUI Abo
   pure `render_svg(d)`. Data `data/ne_110m_earth.json` (Natural Earth 110m coast/borders/land, public domain).
   Report "Globe" button (prevbtn with data-wide); favorites copy it as files["globe"] (+ `backfill_globes` from maps/
   at GUI start). Preview lookups exclude `*_globe.svg`.
+- Debug `debug_save_paths` (2026-10-11, default False): search.py `save_path_debug` after `shadow_path` writes
+  `<map_dir>/<stem>_path.npz` (np.savez, no pickle): one (n,4) array per path line [et, lon, lat, dur(NaN)], `line_names`,
+  `columns`, and the event (target_id/name, star, star_ra/dec/dir, mag, best_utc/et, r_km, sigma3_km,
+  min_distance_km, site, version, ellipsoid "WGS84 …", height_m 0). Not in globe.py (its `_land_path` draws coastlines, not the shadow path).
 - MPC observatories: `pyoccult.geo.mpc_observatories()` downloads https://minorplanetcenter.net/iau/lists/ObsCodes.html
   once to `data/ObsCodes.html` (gitignored) and parses the fixed columns (code [0:3], east lon [4:13], rho cos phi'
   [13:21], rho sin phi' [21:30], name [30:]); `mpc_geodetic` turns the parallax constants into WGS84 lat/lon/height
@@ -255,6 +259,9 @@ independent references for comparing results (note at the top of README, GUI Abo
   corrected direction; `corr_parallax_mas`, `corr_deflection_mas`. Not in the pick screen yet.
 - Fundamental plane: z toward the star, x east = (0,0,1) x z, y north. Miss distance = hypot(dx, dy) in km.
 - Observer longitude is east-positive, geodetic, radians inside the solver.
+- Geodetic <-> ITRF conversions use WGS84 from `pyoccult/earth.py` (A_KM, F, C_KM), never `bodvrd('EARTH','RADII')`
+  (pck00010 is ~0.4 m off): paths.shadow_path (surfpt/recgeo: height 0 on WGS84, Occult's default), screen.Site,
+  search.observer_j2000 / plane offsets, globe. Changed 2026-10-11: paths moved 0.3 m median, <= 3.6 m.
 - Target ids are strings of the asteroid number ('218001'); the SPK is aliased with `boddef` in `fetch_target_orbit`.
 - `observable()` returns a tuple `(ok, star_alt, sun_alt)`; always index it. `if not observable(...)` is always False.
 - `mag_drop` is the change in combined brightness (`m_ast - m_before`), never smaller than `m_ast - m_star`.

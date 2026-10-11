@@ -42,8 +42,9 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
     half_span / step (s) default to values derived from the shadow speed: the span covers about
     1.3 Earth radii of along-track motion on each side, the step about 100 km of along-track motion.
     """
-    a, b, c = spice.bodvrd('EARTH', 'RADII', 3)[1]
-    flat = (a - c) / a
+    from pyoccult import earth                          # WGS84: points on its surface, height 0 (as Occult)
+    a, b, c = earth.A_KM, earth.A_KM, earth.C_KM
+    flat = earth.F
     x_ax, y_ax, z_ax = plane_basis(star_dir)
     M = np.vstack((x_ax, y_ax, z_ax))
     tid = str(target_id)

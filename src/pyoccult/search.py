@@ -113,9 +113,8 @@ def geocentric_star_dir(ra_deg, dec_deg, plx_mas, et):
 
 
 def observer_j2000(et, obs_geo):
-    radii = spice.bodvrd('EARTH', 'RADII', 3)[1]
-    f = (radii[0] - radii[2]) / radii[0]
-    itrf = spice.georec(obs_geo['lon'], obs_geo['lat'], obs_geo['alt'], radii[0], f)
+    from pyoccult import earth                           # WGS84 (GPS) geodetic coordinates
+    itrf = spice.georec(obs_geo['lon'], obs_geo['lat'], obs_geo['alt'], earth.A_KM, earth.F)
     return spice.pxform('ITRF93', 'J2000', et) @ itrf
 
 def moon_info(et, star_dir, obs_geo):
@@ -476,10 +475,9 @@ def besselian_offsets(et, star_vector, observer_geo, asteroid_target):
     ast_pos, _ = spice.spkpos(str(asteroid_target), et, 'J2000', 'CN', '399')
 
     # Observer, geocentric J2000 (lon/lat in radians, alt in km)
-    radii = spice.bodvrd('EARTH', 'RADII', 3)[1]
-    flat = (radii[0] - radii[2]) / radii[0]
+    from pyoccult import earth                           # WGS84 (GPS) geodetic coordinates
     obs_itrf = spice.georec(observer_geo['lon'], observer_geo['lat'],
-                            observer_geo['alt'], radii[0], flat)
+                            observer_geo['alt'], earth.A_KM, earth.F)
     obs_j2000 = spice.pxform('ITRF93', 'J2000', et) @ obs_itrf
 
     d = M @ (ast_pos - obs_j2000)
@@ -833,6 +831,26 @@ def write_globe(record, target_id, stem, star_dir, paths, sigma3, size, corr):
         f.write(globe.render_svg(d))
 
 
+def save_path_debug(fname, paths, record, target_id, star_dir, sigma3):
+    """Debug (config debug_save_paths): the event's geodetic shadow path as NumPy .npz, for later verification.
+    Arrays: one per line of paths.shadow_path ('center', 'edge_plus', 'edge_minus', 'sigma1_plus', ...), each (n, 4)
+    float64: ET (s, TDB), longitude (deg, east +), latitude (deg, geodetic on the WGS84 ellipsoid at height 0 m, as
+    Occult's default output; Earth orientation ITRF93), centre-line duration (s,
+    NaN where none); and the event: target_id, target_name, star (Gaia DR3 source_id), star_ra / star_dec (deg, the
+    corrected direction the path uses), star_dir (J2000 unit vector), mag, best_utc, best_et, r_km, sigma3_km,
+    min_distance_km, site (lon, lat, ele m), version. Read: d = np.load(fname); d['center'][:, 1:3]; str(d['best_utc'])."""
+    lines = {name: np.array([(et, lon, lat, np.nan if dur is None else dur) for et, lon, lat, dur in pts], float)
+             .reshape(-1, 4) for name, pts in paths.items()}
+    np.savez(fname, **lines, line_names=np.array(list(paths)), columns=np.array(["et", "lon_deg", "lat_deg", "dur_s"]),
+             target_id=np.array(str(target_id)), target_name=np.array(str(record.get("target_name", ""))),
+             star=np.array(int(record["star"]), dtype=np.int64), star_ra=float(record["star_ra"]),
+             star_dec=float(record["star_dec"]), star_dir=np.asarray(star_dir, float), mag=float(record["mag"]),
+             best_utc=np.array(str(record["best_utc"])), best_et=float(record["best_et"]), r_km=float(record["r_km"]),
+             sigma3_km=float(sigma3), min_distance_km=float(record["min_distance"]),
+             site=np.array([config.LON, config.LAT, config.ELE], float), version=np.array(__version__),
+             ellipsoid=np.array("WGS84 a=6378.137 km f=1/298.257223563"), height_m=0.0)
+
+
 def owc_opt():
     """The chosen site's equipment for screen.owc_limit / extinction_loss (from pyoccult_config, i.e. sites.py)."""
     return dict(aperture=config.pick_aperture_cm, frames=config.pick_frames, mag_adjust=config.pick_mag_adjust,
@@ -954,6 +972,11 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
                             sat_km=binaries.zone_km(target_id))    # known satellite: its zone on the map
         write_shadow_kml(paths, f"{config.map_dir}/{stem}.kml",
                          f"{record['target_name']} / Gaia {row.source_id}", observer=(config.LON, config.LAT))
+        if getattr(config, "debug_save_paths", False):               # debug: the geodetic path for later checks
+            try:
+                save_path_debug(f"{config.map_dir}/{stem}_path.npz", paths, record, target_id, star_dir, sigma3)
+            except Exception as ex:                                   # never stops the search
+                print(f" --- no path debug file: {ex}")
         if getattr(config, "write_globes", True):
             try:
                 write_globe(record, target_id, stem, star_dir, paths, sigma3, size, corr)

@@ -89,9 +89,16 @@ comparison; it shares the per-star solve and checks (`handle_star`).
 ### 2.2 Fundamental (Besselian) plane: `besselian_offsets`
 
 - Axes in J2000: **z** = unit vector to the star; **x** = (0,0,1) × z, normalised (east); **y** = z × x (north).
+- **Reference frame: ICRS/ICRF throughout.** "J2000" is SPICE's name for its inertial frame, which NAIF treats as the
+  ICRF (the ~20 mas frame bias of the old FK5 J2000 is not applied anywhere). JPL's ephemerides (DE440, Horizons SPK
+  files) are ICRF-aligned, and Gaia DR3 positions are ICRS (Gaia-CRF3) at the reference epoch J2016.0: stars are moved
+  by their proper motion from 2016.0 to the event date (plus parallax and light deflection, see "Gravitational light
+  deflection and stellar parallax" in Part 6), so star and asteroid
+  directions share one frame. "J2000.0" as a time is only the origin of ET (2000-01-01 12:00 TDB). Apparent positions
+  (TETE, true equator and equinox of date) appear only in displays (favorites, globe).
 - Asteroid: `spkpos(target, et, 'J2000', 'CN', '399')`. 399 is the Earth's centre (3 would be the Earth-Moon
   barycentre). `CN` is converged light time without stellar aberration: astrometric, like Gaia positions.
-- Observer: `georec(lon, lat, alt_km, a, f)` with the Earth radii from the kernel, rotated ITRF93 to J2000 with
+- Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pyoccult/earth.py`), rotated ITRF93 to J2000 with
   `pxform('ITRF93', 'J2000', et)`. Longitude east-positive, geodetic, radians.
 - Offsets `(dx, dy)` = the first two components of `M @ (r_asteroid - r_observer)`, km east and north. Miss distance =
   `hypot(dx, dy)`.
@@ -204,6 +211,12 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
 - About 1.3 Earth radii of track on each side of the event, ~100 km per step. Seven lines: centre, the shadow limits
   (+/-r), the 1-sigma limits (+/-(r + sigma)) and the 3-sigma limits (+/-(r + 3 sigma)); each plane point is projected onto the Earth ellipsoid
   (`surfpt`; a miss raises `NotFoundError` and the point is skipped), with the centre-line duration at each point.
+- **The path is geodetic at height 0 m on the WGS84 ellipsoid** (a = 6378.137 km, f = 1/298.257223563;
+  `pyoccult/earth.py`), as Occult's default output and GPS positions, so it can be compared exactly. All geodetic
+  conversions (sites, observer, globe plot) use WGS84 too; until 2026-10-11 they used the SPICE kernel's Earth radii
+  (pck00010: 6378.1366 / 6356.7519 km, ~0.4 m off), which moved the path by 0.3 m (median), 1.2 m (95 %), up to
+  3.6 m near the limb (checked on the 1999 UC45 event), the event time by 0.01 ms. Earth orientation: ITRF93
+  (`earth_latest_high_prec.bpc`). `debug_save_paths` keeps every event's path as `<map_dir>/<event>_path.npz`.
 - The 1- and 3-sigma lines describe the uncertainty of the asteroid's **position** (orbit), not of its size: the
   size enters only through r (the red shadow limits use the best radius); its uncertainty (r_min .. r_max) sets the
   search range and is not drawn.
@@ -435,6 +448,28 @@ Measured 2026-10-10 on the author's desktop (8 cores, 4 workers; a solid but not
 | Whole-Earth pre-screen build (once per window) | ~14 min for 4 days, ~1-2 h for a month; ~1 GB per month at G 16 | window length, star limit |
 | Pick with a whole-Earth pre-screen, 7 days | ~12 s (less on a second run) | mostly fixed costs, see below |
 | Search of the picked targets (7 asteroids, 7 events) | 19.2 s = start-up 5.4 + asteroid data 4.7 + search 3.2 (of it maps 1.9) | targets, network |
+
+On an Apple M4 (32 GB, macOS, 8 workers), 2026-10-11: the full pick for 20 days (all asteroids, G <= 16, with the
+supplement) took at most ~5 min; a 30-day whole-Earth pre-screen with the supplement 77 min (14.9 M events, 1.1 GB +
+0.34 GB index); picks for 20 days with it (2,400-3,000 asteroids screened) under ~2 min each, same events; the search
+of 40 targets for 20 days 94.5 s (start-up 13.5 + asteroid data 38.5 + search 24.7 s).
+
+Split into phases (the pick prints `timing: total … = start-up + asteroid list + kernels + pre-screen + screen +
+output`), on the author's desktop, Camp, 6 days, G <= 13, 4 workers, warm caches (cold in brackets):
+
+| Phase | Full pick | Pick with a whole-Earth pre-screen |
+|---|---|---|
+| start-up (Python, imports) | 0.3 s | 0.5 s |
+| asteroid list (465k rows from the SBDB cache) | 6.1 s (10.0) | 6.3 s (6.7) |
+| kernels | 0.1 s | 0.1 s |
+| choosing the asteroids | - | 2.4 s (4.6): site test of 29,180 of 200,240 events -> 203 asteroids |
+| screen (worker processes included) | 247.8 s (256.5): 464,740 asteroids | 0.8 s: 203 asteroids |
+| output | 1.1 s | 0.9 s |
+| total | 255.4 s (268.1) | 11.1 s (13.4) |
+
+Same 6 events. Overall ~23x faster; without the fixed loading (~7.5-8 s in both) the work itself goes from 247.8 s to
+3.2 s, ~77x (cold ~47x). With a pre-screen the full asteroid list is now the largest part (~60 %): reading only the
+pre-screen's asteroids from it would bring a pick to ~4-5 s.
 
 So a complete 7-day prediction for a site takes about 30 s once a pre-screen exists, of which the actual
 calculation (site test on the stored paths, exact screen of a few hundred asteroids, exact solves of the few

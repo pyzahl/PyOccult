@@ -100,6 +100,8 @@ write_maps = True
 map_dir = "maps"
 write_globes = True         # Occult-style whole-Earth plot per event (<stem>_globe.svg in map_dir; needs write_maps)
 globe_style = "color"       # "color" (sea, land, night side, like OWC) or "lines" (black on white, like Occult)
+debug_save_paths = False    # debug: also save each event's geodetic shadow path (all lines, with ET, lon, lat) and the
+                            # event (target, star, time, size) as <map_dir>/<event>_path.npz, for later verification
 write_previews = True       # event preview image (star field, camera frame, asteroid track) per hit, as SVG in map_dir
 preview_mag_limit = 16.0    # faintest star drawn (Gaia G)
 preview_field_factor = 3.0  # preview field = this x the camera field (at least 10 arcmin)

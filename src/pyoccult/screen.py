@@ -71,10 +71,9 @@ def hg_mag(H, G, r_au, delta_au, cos_phase):
 class Site:
     def __init__(self, spice, lat_deg, lon_deg, alt_m):
         self.spice = spice
-        radii = spice.bodvrd("EARTH", "RADII", 3)[1]
-        f = (radii[0] - radii[2]) / radii[0]
+        from pyoccult import earth                       # WGS84 (GPS) geodetic coordinates
         lat, lon = math.radians(lat_deg), math.radians(lon_deg)
-        self.itrf = np.asarray(spice.georec(lon, lat, alt_m / 1000.0, radii[0], f))
+        self.itrf = np.asarray(spice.georec(lon, lat, alt_m / 1000.0, earth.A_KM, earth.F))
         self.up_itrf = np.array([math.cos(lat) * math.cos(lon), math.cos(lat) * math.sin(lon), math.sin(lat)])
         self.lat, self.lon = lat_deg, lon_deg
 
