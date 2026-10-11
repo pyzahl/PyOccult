@@ -3,7 +3,7 @@ message: >-
   If you use PyOccult, please cite it as below. Parts of the code and documentation were
   developed with the help of Claude (Anthropic), an AI model, using Claude Code; all results
   were reviewed and validated by the author.
-title: "PyOccult: asteroid occultation search for one observer site"
+title: "PyOccult: predicting stellar occultations by asteroids, planets and moons for observer sites"
 type: software
 authors:
   - family-names: Zahl
@@ -25,9 +25,12 @@ keywords:
   - Gaia DR3
   - SPICE
   - IOTA
+  - occultation prediction
+  - JPL Horizons
+  - Python
 references:
   - type: data
-    title: "PyOccult local Gaia DR3 catalog (G <= 16, G <= 18)"
+    title: "Gaia DR3 star catalogs for PyOccult: G <= 16 and G <= 18 subsets and a high-RUWE supplement (NumPy format)"
     authors:
       - family-names: Zahl
         given-names: Percy
