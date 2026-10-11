@@ -149,6 +149,11 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   `Asteroid_*.psv` (separation in mas). `short()` "+moon"/"+moon?" (report label, Markdown), `text()` (favorites
   panel, hover), `zone_km()` = max(a + d2/2) -> `shadow_path(sat_km=)` adds 'satellite_plus/minus' -> KML
   "Satellite zone A/B", report LINE_STYLES, globe LINES. Reference only; moon positions not predicted.
+- `geo.parse_coords(text, field)` (2026-10-10): pasted site coordinates (labels incl. German, DMS / decimal minutes /
+  decimal, N/S/E/W, m/ft/km; unlabeled: hemisphere letters, else lat, lon, ele; lat > 90 with lon <= 90 swapped;
+  lon > 180 -> -360). GUI Site tab: number fields drop text, so a `paste` js_handler (PASTE_JS) emits non-numeric
+  clipboard text to `on_paste` (fills lat/lon/ele, moves marker, looks up elevation). Verified in headless Chrome
+  over CDP (scratch script; no Playwright installed). `tests/test_geo_parse.py`.
 - `pyoccult/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
   list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
 - `pyoccult/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi

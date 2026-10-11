@@ -389,7 +389,9 @@ Start the GUI and work through its tabs from left to right:
 pyoccult                 # opens http://127.0.0.1:8080 in your browser (local only)
 ```
 
-1. **Site**: set your observing site on the map (or by place name / IP address, or from the Minor Planet Center's list of
+1. **Site**: set your observing site on the map (or by place name / IP address, by pasting coordinates in any usual
+   format into Latitude, Longitude or Elevation, e.g. `Lng: -121° 57' 19", Lat: +37° 01' 27", Alt: 132 m`,
+   `37.02417, -121.95528` or `37°01'27"N 121°57'19"W`, which fills all three and looks up a missing elevation, or from the Minor Planet Center's list of
    ~2700 observatories with their official MPC codes: type a code or name in **MPC observatory**; the **MPC code**
    field holds your site's code, if it has one) and enter its equipment (**Sensor (cameras)**: pick your camera's sensor, e.g.
    type "174" or your camera's name, to fill the sensor width and height; MM / MC, M / C are a camera's mono and

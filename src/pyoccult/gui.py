@@ -285,9 +285,13 @@ def index():
                             "The site's official Minor Planet Center observatory code, if it has one (kept in sites.py "
                             "as mpc_code; filled in when you pick an observatory below)")
                     with ui.row():
-                        lat = ui.number("Latitude (°)", format="%.5f", step=0.0001)
-                        lon = ui.number("Longitude (°, east +)", format="%.5f", step=0.0001)
-                        ele = ui.number("Elevation (m)", format="%.0f", step=1)
+                        paste_tip = ("Paste coordinates in any usual format into Latitude, Longitude or Elevation, "
+                                     "e.g. Lng: -121° 57' 19\", Lat: +37° 01' 27\", Alt: 132 m  or  37.02417, "
+                                     "-121.95528  or  37°01'27\"N 121°57'19\"W: all three fields are filled (the "
+                                     "elevation is looked up if not given)")
+                        lat = ui.number("Latitude (°)", format="%.5f", step=0.0001).tooltip(paste_tip)
+                        lon = ui.number("Longitude (°, east +)", format="%.5f", step=0.0001).tooltip(paste_tip)
+                        ele = ui.number("Elevation (m)", format="%.0f", step=1).tooltip(paste_tip)
                     fields = {}
                     with ui.grid(columns=3).classes("w-full"):
                         for key, label, default, step in SITE_KEYS:
@@ -619,6 +623,42 @@ def index():
             ele.value = round(el)
 
     m.on("map-click", on_click)
+
+    # pasted coordinates: a number field drops text, so text that is not a plain number is taken from the paste
+    # event in the browser and parsed here (geo.parse_coords: DMS, decimal, N/S/E/W, labels, heights)
+    PASTE_JS = ("(e) => { const t = (e.clipboardData || window.clipboardData).getData('text'); "
+                "if (!/^\\s*[+-]?\\d*[.,]?\\d+\\s*$/.test(t)) { e.preventDefault(); emit(t); } }")
+
+    async def on_paste(field, e):
+        text = e.args if isinstance(e.args, str) else (e.args[0] if e.args else "")
+        try:
+            c = geo.parse_coords(text, field)
+        except ValueError as ex:
+            ui.notify(f"Coordinates not understood: {ex}", type="warning")
+            return
+        la = c["lat"] if c["lat"] is not None else lat.value
+        lo = c["lon"] if c["lon"] is not None else lon.value
+        if c["ele"] is not None:
+            ele.value = round(c["ele"])
+        if la is None or lo is None:
+            if c["lat"] is not None:
+                lat.value = round(c["lat"], 5)
+            if c["lon"] is not None:
+                lon.value = round(c["lon"], 5)
+            return
+        set_position(float(la), float(lo))
+        m.set_center((float(la), float(lo)))
+        got = ", ".join(k for k in ("lat", "lon", "ele") if c[k] is not None)
+        if c["ele"] is None and c["lat"] is not None and c["lon"] is not None:
+            el = await run.io_bound(geo.elevation, float(la), float(lo))
+            if el is not None:
+                ele.value = round(el)
+                got += " (elevation looked up)"
+        ui.notify(f"Pasted coordinates: {got}: {float(la):.5f}, {float(lo):.5f}"
+                  + (f", {ele.value:.0f} m" if ele.value is not None else ""), type="positive")
+
+    for f_, el_ in (("lat", lat), ("lon", lon), ("ele", ele)):
+        el_.on("paste", lambda e, f_=f_: on_paste(f_, e), js_handler=PASTE_JS)
 
     async def pick_occult(e):
         if e.value is None:

@@ -1,6 +1,6 @@
 """geo.py - approximate observer positions: from the IP address (ipinfo.io), a place name (Open-Meteo geocoding),
 observatories with their MPC codes (Minor Planet Center), ground elevation and time zone (Open-Meteo). Used by setup.py and
-gui.py. Standard library only.
+gui.py. Standard library only. parse_coords(): site coordinates pasted as text in the usual formats.
 
 All results are approximate: IP positions are city level (10-100 km off, wrong behind a VPN), place names give the town
 centre. Use an exact position (GPS, map) for observing.
@@ -8,7 +8,7 @@ centre. Use an exact position (GPS, map) for observing.
 from pyoccult.version import __version__
 from pyoccult import net                      # https with certifi's certificate authorities
 from pyoccult import urls as U
-import json, urllib.parse, urllib.request
+import json, re, urllib.parse, urllib.request
 
 
 def get_json(url, timeout=10):
@@ -118,3 +118,113 @@ def places(name, count=5):
         return []
     return [(r["latitude"], r["longitude"], r.get("elevation"),
              ", ".join(x for x in (r["name"], r.get("admin1"), r.get("country")) if x)) for r in res]
+
+
+# ---------------------------------------------------------------- coordinates pasted as text
+_NORM = [("\u2032", "'"), ("\u2019", "'"), ("\u2018", "'"), ("\u00b4", "'"), ("`", "'"), ("\u2033", '"'),
+         ("\u201d", '"'), ("\u201c", '"'), ("''", '"'), ("\u00ba", "\u00b0"), ("\u02da", "\u00b0"),
+         ("\u2212", "-"), ("\u2013", "-"), ("\u2014", "-"), ("\u00a0", " ")]
+_LABEL = re.compile(r"(?<![a-z])(latitude|lat|longitude|long|lng|lon|altitude|alt|elevation|elev|ele|height|"
+                    r"breite|l\u00e4nge|laenge|h\u00f6he|hoehe|h(?=\s*[:=]))(?![a-z])\s*[:=]?", re.I)
+_KIND = {"latitude": "lat", "lat": "lat", "breite": "lat", "longitude": "lon", "long": "lon", "lng": "lon",
+         "lon": "lon", "l\u00e4nge": "lon", "laenge": "lon"}
+_NUM = re.compile(r"[+-]?\d+(?:\.\d+)?")
+_HEMI = re.compile(r"(?<![a-z])([nsew])(?![a-z])", re.I)
+
+
+def _angle(seg):
+    """(degrees, hemisphere letter or None) from one coordinate: decimal degrees, degrees + decimal minutes, or
+    degrees, minutes, seconds (any of the symbols ° ' " d m s : or spaces), signed or with N/S/E/W."""
+    hemi = _HEMI.findall(seg)
+    nums = _NUM.findall(_HEMI.sub(" ", seg))
+    if not nums or len(nums) > 3:
+        raise ValueError(f"not a coordinate: {seg.strip()!r}")
+    neg = nums[0].startswith("-")
+    d, m, s = (abs(float(x)) for x in nums + ["0"] * (3 - len(nums)))
+    if m >= 60 or s >= 60:
+        raise ValueError(f"minutes or seconds >= 60 in {seg.strip()!r}")
+    h = hemi[-1].upper() if hemi else None
+    v = d + m / 60.0 + s / 3600.0
+    return (-v if neg or h in ("S", "W") else v), h
+
+
+def _height(seg):
+    """Metres from '132 m', '433 ft', '0.13 km', '132'."""
+    m = re.search(r"([+-]?\d+(?:\.\d+)?)\s*(km|m|ft|feet|foot|')?", seg, re.I)
+    if not m:
+        raise ValueError(f"not a height: {seg.strip()!r}")
+    unit = (m.group(2) or "m").lower()
+    return float(m.group(1)) * {"km": 1000.0, "m": 1.0, "ft": 0.3048, "feet": 0.3048, "foot": 0.3048, "'": 0.3048}[unit]
+
+
+def _split_unlabeled(text):
+    """Coordinate segments of text without labels."""
+    parts = [p for p in re.split(r"[,;\n\t/|]+", text) if p.strip()]
+    if len(parts) > 1:
+        return parts
+    letters = list(_HEMI.finditer(text))
+    if len(letters) >= 2:                                           # N 37 01 27 W 121 57 19  or  37 01 27 N 121 ... W
+        lead = text.strip()[:1].upper() in "NSEW"
+        cuts = [m.start() for m in letters[1:]] if lead else [m.end() for m in letters[:-1]]
+        bounds = [0] + cuts + [len(text)]
+        return [text[a:b] for a, b in zip(bounds, bounds[1:]) if text[a:b].strip()]
+    degs = list(re.finditer(r"[+-]?\d+(?:\.\d+)?\s*\u00b0", text))
+    if len(degs) >= 2:                                              # 37°01'27" -121°57'19"
+        bounds = [0] + [m.start() for m in degs[1:]] + [len(text)]
+        return [text[a:b] for a, b in zip(bounds, bounds[1:]) if text[a:b].strip()]
+    nums = _NUM.findall(text)
+    if 2 <= len(nums) <= 3 and not re.search(r"[\u00b0'\":]", text):   # 37.0242 -121.9553 [132]
+        return nums
+    toks = text.split()
+    if ":" in text and len(toks) >= 2 and all(re.fullmatch(r"[+-]?[\d.:]+(km|m|ft)?", x, re.I) for x in toks):
+        return toks                                                 # 37:01:27 -121:57:19 132m
+    return [text]
+
+
+def parse_coords(text, field=None):
+    """Site coordinates from pasted text, e.g. 'Lng: -121° 57' 19", Lat: +37° 01' 27", Alt: 132 m',
+    '37.02417, -121.95528', '37°01'27"N 121°57'19"W', 'N 37 01.45 W 121 57.32', '37:01:27 -121:57:19 132m'.
+    Labels (lat/latitude, lon/lng/long/longitude, alt/elevation/height) in any order; without labels N/S and E/W
+    decide, else latitude first (as Google Maps copies them), then longitude, then the height. Heights in m, ft or km.
+    field ('lat', 'lon', 'ele'): where a single unlabeled value was pasted. Returns dict(lat, lon, ele) with None for
+    what the text does not give; longitudes east-positive in -180..180. Raises ValueError if nothing usable."""
+    t = str(text or "")
+    for a, b in _NORM:
+        t = t.replace(a, b)
+    out = dict(lat=None, lon=None, ele=None)
+    labels = list(_LABEL.finditer(t))
+    if labels:
+        for m, end in zip(labels, [x.start() for x in labels[1:]] + [len(t)]):
+            seg = t[m.end():end].strip(" ,;\t\n")
+            kind = _KIND.get(m.group(1).lower(), "ele")
+            if seg:
+                out[kind] = _height(seg) if kind == "ele" else _angle(seg)[0]
+    else:
+        order = []
+        for seg in _split_unlabeled(t):
+            if re.search(r"\d\s*(km|m|ft|feet)\b", seg, re.I) and not re.search(r"[\u00b0'\"]", seg):
+                out["ele"] = _height(seg)
+                continue
+            v, h = _angle(seg)
+            if h in ("N", "S"):
+                out["lat"] = v
+            elif h in ("E", "W"):
+                out["lon"] = v
+            else:
+                order.append(v)
+        if len(order) == 1 and field in ("lat", "lon", "ele") and out["lat"] is None and out["lon"] is None:
+            out[field] = order.pop()
+        for k in ("lat", "lon", "ele"):
+            if order and out[k] is None:
+                out[k] = order.pop(0)
+        if out["lat"] is not None and abs(out["lat"]) > 90 and out["lon"] is not None and abs(out["lon"]) <= 90:
+            out["lat"], out["lon"] = out["lon"], out["lat"]           # longitude given first
+    if out["lon"] is not None and out["lon"] > 180:
+        out["lon"] -= 360.0
+    if out["lat"] is not None and abs(out["lat"]) > 90:
+        raise ValueError(f"latitude {out['lat']:g} beyond +-90")
+    if out["lon"] is not None and abs(out["lon"]) > 180:
+        raise ValueError(f"longitude {out['lon']:g} beyond +-180")
+    if all(v is None for v in out.values()):
+        raise ValueError("no coordinates found")
+    return out

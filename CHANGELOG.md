@@ -6,6 +6,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+- GUI Site tab: coordinates pasted as text into Latitude, Longitude or Elevation are parsed (`geo.parse_coords`):
+  labels in any order (lat/latitude, lon/lng/long/longitude, alt/elevation/height, also German), degrees-minutes-
+  seconds, decimal minutes or decimal degrees, N/S/E/W or signs, heights in m/ft/km; without labels latitude first
+  (as Google Maps copies them). All three fields are filled, the map marker moves, a missing elevation is looked up.
+
 ## [0.16.0] "New Horizons" - 2026-10-10
 
 Picks in seconds instead of minutes: a pre-screen does the site-independent part of a pick (which asteroids can put
