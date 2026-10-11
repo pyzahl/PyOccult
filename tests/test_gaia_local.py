@@ -32,7 +32,8 @@ ruwe = np.where(rng.random(M) < 0.05, 2.0, 1.0)
 nopm = rng.random(M) < 0.03
 ruwe[-2:] = 1.0; nopm[-2:] = False
 src = pd.DataFrame(dict(solution_id=1, source_id=np.arange(M) + 10**15, ra=ra, dec=dec, parallax=rng.uniform(0.1, 5, M),
-                        pmra=pmra, pmdec=pmdec, ruwe=ruwe, phot_g_mean_mag=g, other="x"))
+                        pmra=pmra, pmdec=pmdec, ruwe=ruwe, phot_g_mean_mag=g, ra_error=0.05, dec_error=0.04,
+                        other="x"))
 src.loc[nopm, ["pmra", "pmdec", "parallax"]] = np.nan
 
 cdn = tempfile.mkdtemp(); out = tempfile.mkdtemp()
@@ -81,7 +82,7 @@ print("strip stars (brute force)", len(need), " returned", len(got))
 assert need <= set(got.source_id), f"missed {len(need - set(got.source_id))}"
 assert len(got) < 3 * len(need) + 10
 assert {10**15 + M - 2, 10**15 + M - 1} <= set(got.source_id), "high-pm stars missing"
-assert (got.phot_g_mean_mag <= cap).all() and list(got.columns) == L.COLS
+assert (got.phot_g_mean_mag <= cap).all() and list(got.columns) == L.COLS + ["star_kind", "ruwe"]
 
 # ---------- 4. the candidate scan works on the local stars, cap above gmax is clipped
 cands = C.corridor_candidates(plan, local=lg, verbose=True)[1]
@@ -91,12 +92,47 @@ plan["mag_cap"] = 19.0; assert (lg.corridor_stars(plan).phot_g_mean_mag <= 18.0)
 # ---------- 5. cells near the pole take the whole band
 c = L.cells_near([10.0], [89.7], [0.5]); assert len(c) >= 360, len(c)
 c = L.cells_near([359.99], [0.0], [0.05]); assert L.cell_of(0.01, 0.0).item() in c
+# ---------- supplement: the stars the main catalog leaves out (RUWE >= 1.4, no parallax/pm), flagged by kind
+L.build(out, 18.0, workers=0, supplement=True)
+sup_dir = os.path.join(out, L.SUPPLEMENT)
+assert L.status(sup_dir)["complete"] and json.load(open(os.path.join(sup_dir, "catalog.json")))["kind"] == "supplement"
+sup = np.concatenate([np.load(os.path.join(sup_dir, n[:-len(".csv.gz")] + ".npy")) for n in names])
+mainc = np.concatenate([np.load(os.path.join(out, n[:-len(".csv.gz")] + ".npy")) for n in names])
+bright = src[src.phot_g_mean_mag <= 18.0]
+assert len(sup) + len(mainc) == len(bright), "main + supplement = every star"
+assert not set(sup["source_id"].tolist()) & set(mainc["source_id"].tolist())
+exp2p = bright[bright.pmra.isna()]
+exp_ruwe = bright[bright.pmra.notna() & (bright.ruwe >= L.RUWE_MAX)]
+assert (sup["kind"] == L.KIND_2P).sum() == len(exp2p) and (sup["kind"] == L.KIND_RUWE).sum() == len(exp_ruwe)
+assert np.all(sup["pmra"][sup["kind"] == L.KIND_2P] == 0) and np.all(sup["ruwe"][sup["kind"] == L.KIND_RUWE] >= 1.4)
+assert np.allclose(sup["ra_error"], 0.05)
+print("supplement:", len(sup), "stars,", int((sup["kind"] == L.KIND_2P).sum()), "2-parameter")
+# merged lookup: with the supplement (default) its stars come too, flagged; without, the main catalog only
+assert L.has_supplement(out)
+lg_main, lg_all = L.LocalGaia(out, supplement=False), L.LocalGaia(out, supplement=True)
+c0 = lg_main.cone(104.0, 22.0, 3.0)
+c1 = lg_all.cone(104.0, 22.0, 3.0)
+assert (c0.star_kind == 0).all() and c0.ruwe.isna().all() and len(c1) > len(c0)
+extra = c1[c1.star_kind > 0]
+assert len(c1) == len(c0) + len(extra) and set(extra.star_kind) <= {L.KIND_RUWE, L.KIND_2P}
+assert (extra[extra.star_kind == L.KIND_RUWE].ruwe >= 1.4).all()
+s_all = lg_all.corridor_stars(plan)
+assert (s_all.star_kind > 0).any() and len(s_all) > len(lg_main.corridor_stars(plan))
+assert L.star_flag(L.KIND_RUWE, 1.654) == "RUWE 1.65" and L.star_flag(L.KIND_2P) == "2-param" and L.star_flag(0) == ""
+# merged bright index: the same stars along the path, plus the supplement's, with kind and ruwe
+mi = L.open_index(out, 16.0, supplement=True)
+assert isinstance(mi, L.MergedIndex)
+ww = np.full(len(U), 0.3)
+a_m, a_all = L.BrightIndex(out, 16.0).near_path(U, ww, 14.0), mi.near_path(U, ww, 14.0)
+assert a_all.dtype == L.COMMON_DTYPE and (a_all["kind"] > 0).any() and (a_all["kind"] == 0).sum() == len(a_m)
+assert not isinstance(L.open_index(out, 16.0, supplement=False), L.MergedIndex)
+
 # network failures in the ESA build: blocked downloads stop early with a message, a single failure is skipped
 import types
 real_list, real_proc = L.list_files, L.process_file
 fail_dir = tempfile.mkdtemp()
 L.list_files = lambda timeout=90: [(f"GaiaSource_{i}.csv.gz", 1) for i in range(6)]
-def blocked(name, out_dir, gmax, ruwe_max=None):
+def blocked(name, out_dir, gmax, ruwe_max=None, supplement=False):
     raise OSError("403 Forbidden (proxy)")
 L.process_file = blocked
 try:
@@ -104,7 +140,7 @@ try:
     raise AssertionError("a fully blocked build must stop")
 except RuntimeError as e:
     assert "the first 3 Gaia files all failed" in str(e) and "proxy" in str(e), e
-def one_bad(name, out_dir, gmax, ruwe_max=None):
+def one_bad(name, out_dir, gmax, ruwe_max=None, supplement=False):
     if name.endswith("_2.csv.gz"):
         raise OSError("timeout")
     open(os.path.join(out_dir, name[:-len(".csv.gz")] + ".npy"), "wb").close()

@@ -138,7 +138,7 @@ def _init(folder, catalog_dir, cam_limit):
     from pyoccult import screen as SC, gaia_local as L
     os.chdir(folder)
     SC.load_kernels(spice, folder)
-    _W.update(spice=spice, index=L.BrightIndex(catalog_dir, L.index_gmax(cam_limit)))
+    _W.update(spice=spice, index=L.open_index(catalog_dir, L.index_gmax(cam_limit)))
 
 
 def build_chunk(spice, rows, et0, et1, index, opt, step_s=600.0, n_track=ST.N_TRACK):
@@ -394,13 +394,15 @@ def build(start, days, region, cam_limit=16.0, hmax=17.0, min_drop=0.1, reach_km
     et1 = et0 + days * 86400.0
     opt = dict(cam_limit=cam_limit, min_drop=min_drop, reach_km=reach_km, max_sun_alt=max_sun_alt, min_alt=min_alt,
                region=region)
-    L.BrightIndex(catalog, L.index_gmax(cam_limit))                 # build a missing index here, once
+    L.open_index(catalog, L.index_gmax(cam_limit))                  # build missing indexes here, once
+    supplement = bool(L.use_supplement() and L.has_supplement(catalog))
     name = name or ("global" if region is None else "region")
     out = out or os.path.join(DIR, f"{name}__{start}_{days:g}d_G{cam_limit:g}" + (".global.npy" if region is None
                                                                                   else ".db"))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     partial = out + ".partial"
-    settings = _settings(start, days, region, cam_limit, hmax, min_drop, reach_km, max_sun_alt, min_alt, catalog)
+    settings = dict(_settings(start, days, region, cam_limit, hmax, min_drop, reach_km, max_sun_alt, min_alt, catalog),
+                    supplement=supplement)
     con = open_partial(partial, settings, fresh)
     done_nums = {r[0] for r in con.execute("SELECT number FROM done")}
     n_events = con.execute("SELECT COUNT(*) FROM events").fetchone()[0] + \
@@ -495,7 +497,7 @@ def build(start, days, region, cam_limit=16.0, hmax=17.0, min_drop=0.1, reach_km
                 hmax=hmax, min_drop=min_drop, reach_km=reach_km, max_sun_alt=max_sun_alt, min_alt=min_alt,
                 asteroids_screened=len(rows), sbdb_fetched=fetched, built=time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
                 build_s=round(time.time() - t0), catalog=os.path.basename(str(catalog)), version=__version__,
-                resumed=bool(done_nums))
+                resumed=bool(done_nums), supplement=supplement)
     if region is None:
         n_ev, n_ast = _write_global(con, out, meta)
         con.close()
@@ -729,6 +731,8 @@ def check(meta, et0, et1, lat, lon, opt):
                             ("min_alt", "minimum altitude", lambda p, b: p < b - 1e-9)):
         if k in opt and worse(opt[k], meta[k]):
             out.append(f"{label} {opt[k]:g} beyond the pre-screen's {meta[k]:g}")
+    if opt.get("supplement") and not meta.get("supplement"):
+        out.append("built without the high-RUWE supplement")
     if opt.get("hmax_all") or (meta.get("hmax") is not None and opt.get("hmax") is not None and opt["hmax"] > meta["hmax"]):
         out.append(f"H limit beyond the pre-screen's ({meta.get('hmax')})")
     return out

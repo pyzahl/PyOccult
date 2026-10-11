@@ -178,6 +178,9 @@ def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, pr
                 continue
             sdf = pd.DataFrame({c: stars[c].astype(float) for c in ("ra", "dec", "pmra", "pmdec", "phot_g_mean_mag")})
             sdf["source_id"] = stars["source_id"]
+            names = stars.dtype.names or ()
+            kinds = stars["kind"] if "kind" in names else np.zeros(len(stars), np.uint8)       # supplement stars
+            ruwes = stars["ruwe"] if "ruwe" in names else np.full(len(stars), np.nan)
             path = dict(ets=ets, u=U[k], delta_km=delta[k], step_s=step_s)
             cands = find_candidates(sdf, path, margin)
             if len(cands) == 0:
@@ -222,7 +225,8 @@ def screen(spice, rows, et0, et1, site, index, opt, step_s=600.0, chunk=1000, pr
                                    D_km=row["D_km"],
                                    D_est=row.get("D_est", False), speed_kms=float(vrel[q]), miss_km=float(miss[q]),
                                    inside=bool(miss[q] <= row["D_km"] / 2), star_alt=star_alt, sun_alt=sun_alt,
-                                   mag_margin=margin, cc=row.get("cc")))
+                                   mag_margin=margin, cc=row.get("cc"),
+                                   star_kind=int(kinds[cands.star.iloc[q]]), star_ruwe=float(ruwes[cands.star.iloc[q]])))
         if progress:
             progress(min(c0 + chunk, len(rows)), len(rows), len(events), n_searched)
     return events

@@ -7,6 +7,14 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 ## [Unreleased]
 
 ### Added
+- **High-RUWE supplement** of the local catalog (`pyoccult gaia supplement --dir <catalog> --gmax 16`, into
+  `<catalog>/supplement/`): the stars the main catalog leaves out, Gaia RUWE >= 1.4 (often unresolved doubles) and
+  2-parameter sources (no parallax or proper motion), about 8 M stars / 0.3 GB to G 16. Picks, searches and
+  pre-screens use it when present (GUI header "+ high-RUWE stars", config `gaia_supplement`, env
+  `PYOCCULT_SUPPLEMENT`); events on such stars are flagged ⚑ ("RUWE 1.65", "2-param") in the results, report,
+  favorites, Pick table and CSV (`star_kind`, `star_ruwe`, `star_flag` at the end of the record). Pre-screens record
+  whether they were built with it. Motivation: (86288) 1999 UC45 on 2026-09-30, observed by three stations, was not
+  predictable (its G 11.7 target has RUWE 1.65); OWC lists such events.
 - GUI Site tab: coordinates pasted as text into Latitude, Longitude or Elevation are parsed (`geo.parse_coords`):
   labels in any order (lat/latitude, lon/lng/long/longitude, alt/elevation/height, also German), degrees-minutes-
   seconds, decimal minutes or decimal degrees, N/S/E/W or signs, heights in m/ft/km; without labels latitude first

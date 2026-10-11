@@ -97,6 +97,14 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   Ready-made copies (G <= 16, 18; no bright index) on Zenodo, concept DOI 10.5281/zenodo.23113337 (first version
   ...338, packed by `release/pack.sh`, untracked): `fetch_zenodo` (resumable, SHA-256, unpacks into any folder name);
   setup `--source auto|zenodo|esa` (auto: ask, Enter = zenodo; resumes a partial ESA build; esa for other limits).
+- Supplement (2026-10-10): `gaia_local` `build(..., supplement=True)` / `pyoccult gaia supplement --dir D --gmax 16`
+  -> `D/supplement/` (catalog.json kind "supplement"; SUPP_DTYPE = DTYPE + ruwe, ra_error, dec_error, kind 1 RUWE /
+  2 two-parameter, missing pm/parallax stored 0). `LocalGaia(dir, supplement=None)` merges it (columns star_kind, ruwe
+  always present), `open_index` -> `MergedIndex` (COMMON_DTYPE) for pick/prescreen workers; `use_supplement()`: env
+  PYOCCULT_SUPPLEMENT (GUI header checkbox, every run via run_process) else config gaia_supplement. Records/pick events:
+  star_kind, star_ruwe, star_flag (end of record); report `star_mark` (⚑, keep exports.event_shown/pick_shown in step);
+  prescreen meta/settings `supplement`, check() refuses a pre-screen without it when the pick uses it. Exec-excerpt
+  tests need `gaia_local` in their ns (test_patch). Size from a 1 % archive sample: G16 ~8 M stars.
 - `pyoccult/sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
   `pyoccult.search.sbdb_phys()` (per-object API) and by `pyoccult/pick.py` for its top targets (bulk rows: size fields only); `get_full()` fetches the per-object
   record (rotation, pole, extent, type) for favorites; standard library only.

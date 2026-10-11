@@ -96,6 +96,9 @@ class Job:
     proc = None
 
 
+SUPPLEMENT = dict(on=True)          # header "+ high-RUWE stars": every run gets PYOCCULT_SUPPLEMENT (gaia_local)
+
+
 async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
     if Job.proc and Job.proc.returncode is None:
         ui.notify("A run is already in progress", type="warning")
@@ -106,6 +109,7 @@ async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
         env["PYOCCULT_SITE"] = env_site
     if env_catalog:
         env["PYOCCULT_CATALOG"] = env_catalog
+    env["PYOCCULT_SUPPLEMENT"] = "1" if SUPPLEMENT["on"] else "0"
     def push(text):
         # the page can be gone (browser closed, reloaded or stalled past the reconnect timeout): keep going without it,
         # and keep reading the output, or the process blocks on a full pipe and stays "in progress" forever
@@ -198,6 +202,9 @@ def index():
                             (min(complete) if complete else (next(iter(cats)) if cats else None))
                             ).props("dark dense options-dense standout").classes("w-64").tooltip(
             "Local Gaia catalogs in the project folder. Install or add one with: pyoccult setup [--gmax 16]")
+        SUPPLEMENT["on"] = bool(last.get("supplement", True))
+        sup_chk = ui.checkbox("+ high-RUWE stars", value=SUPPLEMENT["on"]).props("dark dense").classes(
+            "text-slate-300")
         ui.button("About", on_click=lambda: about.open()).props("flat dense color=white no-caps")
     with ui.dialog() as about, ui.card().classes("max-w-xl"):
         with ui.row().classes("items-center gap-4 no-wrap"):
@@ -792,6 +799,26 @@ def index():
         p_mag.value = s_mag.value = b_mag.value = pick_mag_default(collect())
     cat_sel.on_value_change(catalog_limit)
     cat_sel.on_value_change(lambda e: save_ui_state(catalog=e.value, site=state["name"]) if e.value else None)
+
+    def supplement_state(*_):
+        """The header switch: enabled when the selected catalog has a complete supplement (gaia_local)."""
+        d = os.path.join(ROOT, cat_sel.value) if cat_sel.value else None
+        have = bool(d and gaia_local.has_supplement(d))
+        sup_chk.set_enabled(have)
+        sup_chk.tooltip("Also search the stars the main catalog leaves out: Gaia RUWE >= 1.4 (often unresolved "
+                        "doubles) and 2-parameter sources (no proper motion). OWC predicts events on them; here they "
+                        "are flagged \u2691 in the results (position, and so the path, less certain). "
+                        + ("" if have else f"Not built for this catalog yet: pyoccult gaia supplement --dir "
+                                           f"{cat_sel.value} --gmax 16 (about 2 h, ~0.3 GB)"))
+
+    def supplement_change(e):
+        SUPPLEMENT["on"] = bool(e.value)
+        save_ui_state(supplement=bool(e.value), catalog=cat_sel.value, site=state["name"])
+        prescreen_options()
+
+    sup_chk.on_value_change(supplement_change)
+    cat_sel.on_value_change(supplement_state)
+    supplement_state()
     show_site(state["name"])
 
     # ------------------------------------------------ runs
@@ -951,7 +978,9 @@ def index():
             t0 = _day_et(p_start.value)
             t1 = t0 + float(p_days.value or 1) * 86400
             want = dict(cam_limit=float(p_mag.value or 0), hmax=None if p_all.value else float(p_hmax.value or 17),
-                        hmax_all=bool(p_all.value))
+                        hmax_all=bool(p_all.value),
+                        supplement=bool(SUPPLEMENT["on"] and cat_sel.value
+                                        and gaia_local.has_supplement(os.path.join(ROOT, cat_sel.value))))
             files = PS.list_files(os.path.join(ROOT, PS.DIR))
         except Exception:
             files, t0, t1, want = [], 0, 0, {}

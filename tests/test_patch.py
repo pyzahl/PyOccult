@@ -26,6 +26,8 @@ from pyoccult import db as pyoccult_db                                  # result
 _con = pyoccult_db.connect(os.path.join(os.path.dirname(out_csv), "test.db"))
 from pyoccult import bodies as pyoccult_bodies
 ns.update(db=pyoccult_db, bodies=pyoccult_bodies)             # asteroid targets here: bodies.* answers 'not a body'
+from pyoccult import gaia_local as pyoccult_gaia_local
+ns.update(gaia_local=pyoccult_gaia_local)                       # star_flag for supplement stars
 ns['spice'] = types.SimpleNamespace(et2utc=lambda et, f, p: "ET:%r" % float(et))
 def star_test(loc, utc, span, ra, dec, tid, r, reach):
     calls['star_test'] += 1

@@ -710,6 +710,21 @@ have. The GUI's **Catalog** selector (top right) lists every catalog folder it f
 is shown as "incomplete n/3386" and runs refuse it until setup has finished it (rerun the same command, it resumes).
 If a folder already holds a catalog with another limit (e.g. an interrupted build), setup asks before deleting it.
 
+**High-RUWE supplement (optional, recommended).** The catalog keeps only stars with good single-star astrometry
+(Gaia RUWE < 1.4, with parallax and proper motion). The others, about 1 star in 10 (1 in 5 brighter than G 12), are
+often unresolved doubles or lack proper motions, and OWC predicts events on them, so without them PyOccult misses
+such events: for example (86288) 1999 UC45 on 2026-09-30 05:28 UT, a G 11.7 star with RUWE 1.65, observed from three
+California sites. Build the supplement once, into the catalog's folder:
+
+```bash
+pyoccult gaia supplement --dir gaia_dr3_g18 --gmax 16     # ~8 M stars, ~0.3 GB; one pass over ESA's files, ~2 h, resumable
+```
+
+It is then used by picks, searches and pre-screens (switch: GUI header **+ high-RUWE stars**, config
+`gaia_supplement`), and every event on such a star is flagged **⚑ RUWE 1.65** or **⚑ 2-param** in the results,
+report, favorites and CSV: its position, and so the shadow path, is less certain than usual. Pre-screens remember
+whether they were built with it; a pick with the supplement only uses one that was (auto falls back otherwise).
+
 **Other catalog sources.** The search does not care where a catalog comes from: any folder with a `catalog.json`
 (`gmax`, `files`) and, per listed file, the three `.npy` files described at the top of `pyoccult/gaia_local.py`
 (stars with the 7 Gaia columns, sky cells, fast movers) is found and can be selected. A converter for another source

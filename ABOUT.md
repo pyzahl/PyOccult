@@ -119,6 +119,18 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   (2.1 GB) and `gaia_dr3_g18.tar.xz` (8.2 GB), each with a `.sha256`. `fetch_zenodo` downloads one (resumable), checks
   the SHA-256 and unpacks it into any folder name; `pyoccult/setup.py` offers it before the ESA build.
 
+- **Supplement** (`<catalog>/supplement/`, `pyoccult gaia supplement --dir <catalog> --gmax 16`, 0.16.x): the stars
+  the main catalog leaves out, from the same pass over ESA's files with the opposite filter: RUWE >= 1.4 (kind 1)
+  and 2-parameter sources without parallax or proper motion (kind 2; stored as 0, so their position is that of 2016),
+  with `ruwe`, `ra_error`, `dec_error` (`SUPP_DTYPE`). From a 1 % archive sample: G < 12 ~0.6 M stars, G < 16 ~8 M
+  (~0.3 GB), G < 18 ~25 M (~1 GB), about 9-10 % of the main catalog at each limit, mostly high RUWE (at G < 12 one star
+  in five). `LocalGaia` merges it into `cone` and `corridor_stars` (columns `star_kind`, `ruwe`), `open_index` merges its
+  bright-star index (`MergedIndex`, `COMMON_DTYPE`) for picks and pre-screens; `use_supplement()` = env
+  `PYOCCULT_SUPPLEMENT` (GUI switch) else config `gaia_supplement` (default on). Events on such stars carry
+  `star_kind`, `star_ruwe`, `star_flag` ("RUWE 1.65", "2-param") at the end of the record and the pick's events, shown
+  as ⚑ after the star magnitude. Found with (86288) 1999 UC45, 2026-09-30: its G 11.73 target (RUWE 1.65), observed by
+  three stations, was not in the local catalog, so the event was not predictable.
+
 ### 2.5 Candidate scan: `find_candidates`
 
 - Stars are moved linearly by proper motion to the middle of the run. The plane distance of every star to every path
@@ -540,10 +552,11 @@ All checks, with their numbers and the discussion of the differences, are in
   1. Known doubles: match the event stars with the occultation-discovered doubles of the PDS archive
      (`DoubleStars` table; 76 discoveries before 2020, 61 closer than 50 mas) and the Washington Double Star Catalog.
   2. Events on stars the local catalogs leave out: Gaia 2-parameter sources (position only, no parallax or proper
-     motion) and poorly measured stars (RUWE >= 1.4, often unresolved doubles). Their events are never predicted;
-     OWC lists them. Seen in the OWC set of Oct 8-11 2026: 2 of 50 events, both on 2-parameter stars of G 11.6 and
-     12.0 (VERIFICATION.md, 1.5). Fix: keep them in the catalogs, flagged (a 2-parameter star's position error grows
-     with the years since 2016), as a catalog rebuild or a small supplementary file (new Zenodo versions).
+     motion) and poorly measured stars (RUWE >= 1.4, often unresolved doubles). OWC lists them. Seen in the OWC set of
+     Oct 8-11 2026: 2 of 50 events, both on 2-parameter stars of G 11.6 and 12.0 (VERIFICATION.md, 1.5), and an
+     observed event of (86288) 1999 UC45 on 2026-09-30 (target RUWE 1.65). **Addressed by the supplement (2.4,
+     2026-10-10)**; open: a 2-parameter star's position error (grows with the years since 2016) in the path
+     uncertainty, and the supplement on Zenodo next to the catalogs.
   3. Step events: for a known pair, the two shadows (offset by separation x distance) and the drop of each step.
 
 - **218001**: OWC lists a 1.56 mag drop and 0.51 s, PyOccult 12.97 mag and 0.25 s. The duration difference is the

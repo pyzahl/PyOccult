@@ -9,6 +9,7 @@ Afterwards a corridor lookup reads only the few files its strip touches, in abou
     pyoccult gaia build --workers 6     # resumable: rerun after an interruption, finished files are skipped
     pyoccult gaia status
     pyoccult gaia zenodo --gmax 16    # ready-made copy (G <= 16 or 18) from Zenodo instead of building
+    pyoccult gaia supplement --dir gaia_dr3_g18 --gmax 16   # <dir>/supplement: high-RUWE and 2-parameter stars
 
 Layout of the catalog folder:
     catalog.json                      gmax, cuts and the list of source files (written first)
@@ -33,6 +34,12 @@ DTYPE = np.dtype([("source_id", "<i8"), ("ra", "<f8"), ("dec", "<f8"), ("paralla
                   ("pmra", "<f4"), ("pmdec", "<f4"), ("phot_g_mean_mag", "<f4")])
 HIGH_PM_MAS = 1500.0                                                  # must match the corridor pm pad (pm_pad_mas)
 RUWE_MAX = 1.4
+# The supplement (<catalog>/supplement/): the stars the main catalog leaves out, flagged: RUWE >= RUWE_MAX (often
+# unresolved doubles: position less certain) and 2-parameter sources (no parallax or proper motion: the position
+# drifts by the unknown motion since 2016). OWC predicts events on both; PyOccult does with the supplement.
+SUPPLEMENT = "supplement"
+KIND_MAIN, KIND_RUWE, KIND_2P = 0, 1, 2
+SUPP_DTYPE = np.dtype(DTYPE.descr + [("ruwe", "<f4"), ("ra_error", "<f4"), ("dec_error", "<f4"), ("kind", "u1")])
 
 
 class Progress:
@@ -170,8 +177,9 @@ def _save_atomic(path, arr):
     os.replace(tmp, path)
 
 
-def process_file(name, out_dir, gmax, ruwe_max=RUWE_MAX):
-    """Download one source file, keep the useful stars, write .cells/.hpm then the .npy (done marker). Returns stats."""
+def process_file(name, out_dir, gmax, ruwe_max=RUWE_MAX, supplement=False):
+    """Download one source file, keep the useful stars, write .cells/.hpm then the .npy (done marker). Returns stats.
+    supplement: keep the opposite (RUWE >= ruwe_max or no parallax/proper motion), as SUPP_DTYPE with the flags."""
     stem = name[:-len(".csv.gz")]
     final = os.path.join(out_dir, stem + ".npy")
     if os.path.isfile(final):
@@ -181,14 +189,24 @@ def process_file(name, out_dir, gmax, ruwe_max=RUWE_MAX):
     os.close(fd)
     try:
         _download(name, gz)
-        df = pd.read_csv(gz, compression="gzip", comment="#", usecols=COLS + ["ruwe"], na_values=["null"])
+        df = pd.read_csv(gz, compression="gzip", comment="#", na_values=["null"],
+                         usecols=COLS + ["ruwe"] + (["ra_error", "dec_error"] if supplement else []))
     finally:
         os.remove(gz)
     n_in = len(df)
-    df = df[(df.phot_g_mean_mag <= gmax) & df.pmra.notna() & df.parallax.notna() & (df.ruwe < ruwe_max)]
-    arr = np.empty(len(df), DTYPE)
-    for c in COLS:
-        arr[c] = df[c].to_numpy()
+    main = df.pmra.notna() & df.parallax.notna() & (df.ruwe < ruwe_max)
+    if not supplement:
+        df = df[(df.phot_g_mean_mag <= gmax) & main]
+        arr = np.empty(len(df), DTYPE)
+        for c in COLS:
+            arr[c] = df[c].to_numpy()
+    else:
+        df = df[(df.phot_g_mean_mag <= gmax) & ~main & df.ra.notna() & df.dec.notna()]
+        two_p = (df.pmra.isna() | df.parallax.isna()).to_numpy()
+        arr = np.zeros(len(df), SUPP_DTYPE)
+        for c in COLS + ["ruwe", "ra_error", "dec_error"]:
+            arr[c] = df[c].fillna(0.0).to_numpy()                     # no parallax/pm: 0 (flagged KIND_2P)
+        arr["kind"] = np.where(two_p, KIND_2P, KIND_RUWE)
     arr.sort(order="source_id")
     _save_atomic(os.path.join(out_dir, stem + ".cells.npy"), np.unique(cell_of(arr["ra"], arr["dec"])))
     pm = np.hypot(arr["pmra"].astype(float), arr["pmdec"].astype(float))
@@ -197,17 +215,28 @@ def process_file(name, out_dir, gmax, ruwe_max=RUWE_MAX):
     return name, n_in, len(arr), time.time() - t0
 
 
-def build(out_dir, gmax=18.0, workers=6):
+def build(out_dir, gmax=18.0, workers=6, supplement=False):
+    """Build (or resume) a local catalog in out_dir; supplement: the supplement of the catalog in out_dir, in
+    out_dir/supplement (kind 'supplement' in its catalog.json)."""
+    if supplement:
+        if not os.path.isfile(os.path.join(out_dir, "catalog.json")):
+            sys.exit(f"{out_dir}: no catalog there to add a supplement to")
+        out_dir = os.path.join(out_dir, SUPPLEMENT)
     os.makedirs(out_dir, exist_ok=True)
     man_path = os.path.join(out_dir, "catalog.json")
     print("listing ESA's Gaia DR3 files ...", flush=True)
     files = list_files()
+    kind = "supplement" if supplement else "main"
     if os.path.isfile(man_path):
         man = json.load(open(man_path))
-        if abs(man["gmax"] - gmax) > 1e-9 or man["ruwe_max"] != RUWE_MAX:
-            sys.exit(f"{out_dir} holds a catalog with gmax {man['gmax']}, ruwe < {man['ruwe_max']}; use another folder")
-    man = dict(gmax=gmax, ruwe_max=RUWE_MAX, high_pm_mas=HIGH_PM_MAS, source=U.URL_GAIA_DR3_FILES,
+        if abs(man["gmax"] - gmax) > 1e-9 or man["ruwe_max"] != RUWE_MAX or man.get("kind", "main") != kind:
+            sys.exit(f"{out_dir} holds a {man.get('kind', 'main')} catalog with gmax {man['gmax']}, ruwe cut "
+                     f"{man['ruwe_max']}; use another folder")
+    man = dict(gmax=gmax, ruwe_max=RUWE_MAX, high_pm_mas=HIGH_PM_MAS, source=U.URL_GAIA_DR3_FILES, kind=kind,
                files=[n for n, _ in files], created=time.strftime("%Y-%m-%d %H:%M:%S"))
+    if supplement:
+        man["contents"] = (f"stars the main catalog leaves out: RUWE >= {RUWE_MAX} (kind {KIND_RUWE}) and 2-parameter "
+                           f"sources without parallax/proper motion (kind {KIND_2P}; stored as 0)")
     fd, tmp = tempfile.mkstemp(dir=out_dir, suffix=".tmp")
     with os.fdopen(fd, "w") as f:
         json.dump(man, f, indent=1)
@@ -221,14 +250,15 @@ def build(out_dir, gmax=18.0, workers=6):
           flush=True)
     t0, done, kept, seen, failed = time.time(), 0, 0, 0, []
     ex = ProcessPoolExecutor(max_workers=workers) if workers > 0 else None       # workers <= 0: serial (tests)
-    futs = {ex.submit(process_file, n, out_dir, gmax): n for n in todo} if ex else {}
+    futs = {ex.submit(process_file, n, out_dir, gmax, RUWE_MAX, supplement): n for n in todo} if ex else {}
     prog = Progress("ESA build", len(todo), fmt=lambda x: f"{x:.0f} files", rate=lambda r: f"{r * 60:.1f} files/min")
     prog(0, " (first files take a minute or two)", force=True)
     stream = ((n, None) for n in todo) if ex is None else ((futs[f], f) for f in as_completed(futs))
     try:
         for name, fut in stream:
             try:
-                _, n_in, n_keep, dt = process_file(name, out_dir, gmax) if fut is None else fut.result()
+                _, n_in, n_keep, dt = process_file(name, out_dir, gmax, RUWE_MAX, supplement) if fut is None \
+                    else fut.result()
             except Exception as e:                  # this file failed after its retries: go on, a rerun resumes it
                 failed.append(name)
                 print(f"\n   failed: {name}: {str(e)[:160]}", flush=True)
@@ -251,7 +281,7 @@ def build(out_dir, gmax=18.0, workers=6):
     print(f"done: {st['done']}/{st['total']} files, {st['gb']:.1f} GB")
     if failed:
         print(f"{len(failed)} files failed (network); rerun setup to fetch just those (it resumes)")
-    if st["complete"]:
+    if st["complete"] and not supplement:
         BrightIndex(out_dir, 15.0)                                           # for pick.py
 
 
@@ -406,12 +436,60 @@ def status(out_dir):
     return dict(total=len(man["files"]), done=done, gb=gb, complete=done == len(man["files"]), gmax=man["gmax"])
 
 
+# ----------------------------------------------------------------------------------------------- supplement use
+def supplement_dir(catalog_dir):
+    return os.path.join(catalog_dir, SUPPLEMENT)
+
+
+def has_supplement(catalog_dir):
+    """Is there a complete supplement in this catalog's folder?"""
+    d = supplement_dir(catalog_dir)
+    return os.path.isfile(os.path.join(d, "catalog.json")) and status(d)["complete"]
+
+
+def use_supplement():
+    """Use the supplement where there is one? Env PYOCCULT_SUPPLEMENT (0/1, set by the GUI per run), else config
+    gaia_supplement (default True)."""
+    v = os.environ.get("PYOCCULT_SUPPLEMENT")
+    if v is not None:
+        return v.strip().lower() not in ("0", "false", "no", "off", "")
+    try:
+        from pyoccult import config as C
+        return bool(getattr(C, "gaia_supplement", True))
+    except Exception:
+        return True
+
+
+def star_flag(kind, ruwe=None):
+    """Short text for a supplement star: 'RUWE 1.65', '2-param', or '' for a main-catalog star."""
+    try:
+        k = int(kind)
+    except (TypeError, ValueError):
+        return ""
+    if k == KIND_RUWE:
+        return f"RUWE {float(ruwe):.2f}" if ruwe is not None and np.isfinite(float(ruwe)) else "RUWE >= 1.4"
+    return "2-param" if k == KIND_2P else ""
+
+
+def _frame(arr):
+    """DataFrame of catalog rows (DTYPE or SUPP_DTYPE): COLS + star_kind (0 main) + ruwe (NaN for main: < 1.4)."""
+    df = pd.DataFrame({k: arr[k].astype(np.float64) if k != "source_id" else arr[k] for k in COLS})
+    names = arr.dtype.names or ()
+    df["star_kind"] = arr["kind"].astype(np.int64) if "kind" in names else 0
+    df["ruwe"] = arr["ruwe"].astype(np.float64) if "ruwe" in names else np.nan
+    return df
+
+
 # ----------------------------------------------------------------------------------------------- lookup
 class LocalGaia:
-    """Read side. LocalGaia(dir).corridor_stars(plan) -> DataFrame like the archive query (epoch 2016.0)."""
+    """Read side. LocalGaia(dir).corridor_stars(plan) -> DataFrame like the archive query (epoch 2016.0), with
+    star_kind / ruwe; with supplement (default use_supplement()) the supplement's stars are merged in, flagged."""
 
-    def __init__(self, out_dir, allow_partial=False):
+    def __init__(self, out_dir, allow_partial=False, supplement=None):
         self.dir = out_dir
+        self.sup = None
+        if (use_supplement() if supplement is None else supplement) and has_supplement(out_dir):
+            self.sup = LocalGaia(supplement_dir(out_dir), supplement=False)
         man = json.load(open(os.path.join(out_dir, "catalog.json")))
         self.gmax = man["gmax"]
         st = status(out_dir)
@@ -429,7 +507,7 @@ class LocalGaia:
     def high_pm(self):
         if self._hpm is None:
             self._hpm = np.concatenate([np.load(os.path.join(self.dir, s + ".hpm.npy")) for s in self.stems] or
-                                       [np.empty(0, DTYPE)])
+                                       [np.empty(0, self._dtype())])
         return self._hpm
 
     def cone(self, ra_deg, dec_deg, radius_deg, mag_cap=None):
@@ -444,8 +522,14 @@ class LocalGaia:
             a = a[a["phot_g_mean_mag"] <= cap]
             if len(a):
                 parts.append(np.asarray(a[_unit(a["ra"], a["dec"]) @ c >= math.cos(math.radians(radius_deg))]))
-        arr = np.concatenate(parts) if parts else np.empty(0, DTYPE)
-        return pd.DataFrame({k: arr[k].astype(np.float64) if k != "source_id" else arr[k] for k in COLS})
+        df = _frame(np.concatenate(parts) if parts else np.empty(0, self._dtype()))
+        if self.sup is not None:
+            df = pd.concat([df, self.sup.cone(ra_deg, dec_deg, radius_deg, mag_cap)], ignore_index=True)
+        return df
+
+    def _dtype(self):
+        return SUPP_DTYPE if json.load(open(os.path.join(self.dir, "catalog.json"))).get("kind") == "supplement" \
+            else DTYPE
 
     def corridor_stars(self, plan, include_high_pm=True, chunk_deg=0.05):
         """Stars (G <= plan mag_cap) within margin_km/distance + pad of the plan's path, plus the high-pm stars."""
@@ -454,7 +538,7 @@ class LocalGaia:
         U, D = path["u"], path["delta_km"]
         w = np.degrees(plan["margin_km"] / D) + plan["pad_arcsec"] / 3600.0              # half-width per sample, deg
         cap = plan["mag_cap"]
-        if cap > self.gmax + 1e-9:
+        if cap > self.gmax + 1e-9 and not self.dir.endswith(SUPPLEMENT):
             print(f"{plan['target']}: magnitude cap {cap:.1f} is fainter than the local catalog (G <= {self.gmax}); using {self.gmax}")
         ra, dec = _radec(U)
         files = sorted({i for c in cells_near(ra, dec, 1.5 * w).tolist() for i in self.by_cell.get(c, ())})
@@ -467,8 +551,10 @@ class LocalGaia:
         if include_high_pm:
             h = self.high_pm()
             parts.append(h[h["phot_g_mean_mag"] <= cap])
-        arr = np.concatenate(parts) if parts else np.empty(0, DTYPE)
-        df = pd.DataFrame({c: arr[c].astype(np.float64) if c != "source_id" else arr[c] for c in COLS})
+        df = _frame(np.concatenate(parts) if parts else np.empty(0, self._dtype()))
+        if self.sup is not None:
+            sp = dict(plan, mag_cap=min(cap, self.sup.gmax))
+            df = pd.concat([df, self.sup.corridor_stars(sp, include_high_pm, chunk_deg)], ignore_index=True)
         return df.drop_duplicates("source_id").reset_index(drop=True)
 
 
@@ -572,6 +658,43 @@ class BrightIndex:
         return a[near_path_mask(_unit(a["ra"], a["dec"]), U, w_deg)]
 
 
+COMMON_DTYPE = np.dtype(DTYPE.descr + [("ruwe", "<f4"), ("kind", "u1")])
+
+
+def _common(a):
+    out = np.zeros(len(a), COMMON_DTYPE)
+    for k in DTYPE.names:
+        out[k] = a[k]
+    names = a.dtype.names or ()
+    out["ruwe"] = a["ruwe"] if "ruwe" in names else np.nan
+    out["kind"] = a["kind"] if "kind" in names else KIND_MAIN
+    return out
+
+
+class MergedIndex:
+    """The bright-star index of a catalog and of its supplement as one: near_path returns COMMON_DTYPE rows (the main
+    catalog's fields + ruwe + kind)."""
+
+    def __init__(self, main, sup):
+        self.main, self.sup, self.gmax = main, sup, main.gmax
+
+    def near_path(self, U, w_deg, mag_cap=None, sample_deg=None):
+        a = self.main.near_path(U, w_deg, mag_cap, sample_deg)
+        b = self.sup.near_path(U, w_deg, None if mag_cap is None else min(mag_cap, self.sup.gmax), sample_deg)
+        return np.concatenate([_common(a), _common(b)])
+
+
+def open_index(catalog_dir, gmax, supplement=None):
+    """The bright-star index for a pick or pre-screen: the catalog's, merged with its supplement's when there is one
+    and it is in use (use_supplement()). Builds missing indexes (main process before workers start)."""
+    main = BrightIndex(catalog_dir, gmax)
+    if (use_supplement() if supplement is None else supplement) and has_supplement(catalog_dir):
+        sd = supplement_dir(catalog_dir)
+        sg = min(float(gmax), float(json.load(open(os.path.join(sd, "catalog.json")))["gmax"]))
+        return MergedIndex(main, BrightIndex(sd, sg))
+    return main
+
+
 def default_dir():
     try:
         from pyoccult import config as C
@@ -584,7 +707,8 @@ def main():
     d0, g0 = default_dir()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
-    ap.add_argument("cmd", choices=["build", "status", "zenodo"])
+    ap.add_argument("cmd", choices=["build", "supplement", "status", "zenodo"],
+                    help="supplement: build (or resume) <dir>/supplement, the high-RUWE and 2-parameter stars")
     ap.add_argument("--dir", default=d0 or "gaia_dr3_local", help="catalog folder (default: config gaia_local_dir)")
     ap.add_argument("--gmax", type=float, default=g0, help="faintest G kept (default: config gaia_local_gmax or 16)")
     ap.add_argument("--workers", type=int, default=6, help="parallel download/parse processes")
@@ -592,6 +716,8 @@ def main():
     a = ap.parse_args()
     if a.cmd == "build":
         build(a.dir, a.gmax, a.workers)
+    elif a.cmd == "supplement":
+        build(a.dir, a.gmax, a.workers, supplement=True)
     elif a.cmd == "zenodo":
         if fetch_zenodo(a.dir, a.gmax, a.keep_archive)["complete"]:
             BrightIndex(a.dir, 15.0)                                         # for pick.py

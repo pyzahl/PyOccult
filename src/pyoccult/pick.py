@@ -101,7 +101,7 @@ def _init(folder, catalog_dir, cam_limit, lat, lon, ele):
     from pyoccult import screen as SC, gaia_local as L
     os.chdir(folder)
     SC.load_kernels(spice, folder)
-    _W.update(spice=spice, SC=SC, index=L.BrightIndex(catalog_dir, L.index_gmax(cam_limit)),
+    _W.update(spice=spice, SC=SC, index=L.open_index(catalog_dir, L.index_gmax(cam_limit)),
               site=SC.Site(spice, lat, lon, ele))
 
 
@@ -132,7 +132,7 @@ def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000, mp_start="sp
     folder = HOME                                          # kernels and catalogs (workers start there)
     # build a missing bright-star index here, once: workers only open it (before, each worker built it at the same
     # time, reading the whole catalog into memory: swap and a stalled system with a star limit above G 15)
-    L.BrightIndex(site_args[0], L.index_gmax(site_args[1]))
+    L.open_index(site_args[0], L.index_gmax(site_args[1]))
     jobs = [(rows[i:i + chunk], et0, et1, opt) for i in range(0, len(rows), chunk)]
     events, done, t0 = [], 0, time.time()
     single_thread_workers()
@@ -244,9 +244,11 @@ def main(argv=None):
     opt = dict(reach_km=a.reach, min_alt=a.min_alt, max_sun_alt=a.max_sun_alt, min_drop=a.min_drop,
                min_dur=a.min_dur, cam_limit=a.cam_limit, aperture=a.aperture, frames=a.frames,
                mag_adjust=a.mag_adjust, extinction=a.extinction)
+    from pyoccult import gaia_local as L
+    sup = bool(L.use_supplement() and L.has_supplement(a.catalog))   # high-RUWE stars too: the pre-screen must have them
     if a.prescreen == "auto":                           # the newest fitting pre-screen, else the full screen
         from pyoccult import prescreen as PS
-        path, _, other = PS.best_fit(et0, et1, a.lat, a.lon, dict(opt, hmax=hmax, hmax_all=a.all))
+        path, _, other = PS.best_fit(et0, et1, a.lat, a.lon, dict(opt, hmax=hmax, hmax_all=a.all, supplement=sup))
         if path is None:
             print("pre-screen: none fits this pick" + "".join(f"\n  {os.path.basename(p)}: {'; '.join(bad)}"
                                                             for p, _, bad in other)
@@ -255,7 +257,7 @@ def main(argv=None):
     if a.prescreen:                                     # only the asteroids with events in the pre-screen
         from pyoccult import prescreen as PS
         meta = PS.read_meta(a.prescreen)
-        bad = PS.check(meta, et0, et1, a.lat, a.lon, dict(opt, hmax=hmax, hmax_all=a.all))
+        bad = PS.check(meta, et0, et1, a.lat, a.lon, dict(opt, hmax=hmax, hmax_all=a.all, supplement=sup))
         if bad:
             print(f"pre-screen {a.prescreen} does not fit this pick: " + "; ".join(bad) +
                   ". Build a fitting one (pyoccult prescreen build) or pick without --prescreen.", file=sys.stderr)
@@ -288,7 +290,10 @@ def main(argv=None):
     E = E.sort_values(SORT_KEYS[a.sort], ascending=SORT_ASC[a.sort]).reset_index(drop=True)
     cols = ["number", "name", "H", "utc", "star", "star_mag", "drop", "dur_s", "dur_max_s", "mag_margin",
             "miss_km", "inside", "star_alt", "sun_alt", "m_ast", "D_km", "D_est", "speed_kms", "cc", "star_ra",
-            "star_dec", "et"]
+            "star_dec", "et", "star_kind", "star_ruwe"]                # supplement star (gaia_local): at the end
+    for col in ("star_kind", "star_ruwe"):
+        if col not in E:
+            E[col] = 0 if col == "star_kind" else float("nan")
     E[cols].to_csv(a.output, index=False, float_format="%.6g")
     print(f"{'#':>7} {'name':<26} {'UT':<19} {'G':>5} {'drop':>5} {'dur':>5}  {'marg':>5} {'miss':>6} {'alt':>4}")
     for e in E.head(max(a.top, 20)).itertuples():

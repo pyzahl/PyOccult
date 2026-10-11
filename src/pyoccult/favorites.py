@@ -550,7 +550,12 @@ def event_info(entry):
         if apparent:
             star += [("RA [apparent]", apparent[0]), ("Dec [apparent]", apparent[1])]
     ruwe = f("gaia_ruwe")
-    star += [("RUWE", f"{ruwe:.2f}" if ruwe is not None else "< 1.4 (local catalog)"),
+    if ruwe is None:
+        ruwe = f("star_ruwe")                                     # a supplement star: RUWE from the local supplement
+    sflag = (r.get("star_flag") or "").strip()
+    star += [("RUWE", f"{ruwe:.2f}" + (" \u2691 (supplement: position less certain)" if sflag.startswith("RUWE") else "")
+              if ruwe is not None else ("2-parameter source \u2691 (no proper motion)" if sflag
+                                        else "< 1.4 (local catalog)")),
              ("Close/double", double_text(entry) or "not checked yet")]
     dist = f("dist_au")
     mas = (2 * rad / (dist * 1.495978707e8) * 206264806.2) if rad and dist else None

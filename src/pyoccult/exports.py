@@ -86,7 +86,8 @@ def event_shown(e):
         asteroid=(f"{e['label']} ({e['kind'] or 'body'})" if e.get("body") else e["label"])
         + (f" {tag}" if tag else "") + (" *" if R.size_estimated(e) else ""),
         event_time=R.fmt_time(e["when"]), event_utc=e["utc"], gaia_id=e["star"], kind=e["kind"],
-        star_mag=R.fmt(e["mag"]), mag_drop=drop, max_dur=R.fmt(e["dur"]), altitude=R.alt_text(e),
+        star_mag=R.fmt(e["mag"]) + (f" \u2691 {e['sflag']}" if e.get("sflag") else ""), star_flag=e.get("sflag") or "",
+        mag_drop=drop, max_dur=R.fmt(e["dur"]), altitude=R.alt_text(e),
         moon_dist=R.moon_text(e), shadow_dist=shadow_text(e), chance=R.chance_text(e),
         chance_pct=None if e.get("p_site") is None else round(100 * e["p_site"], 1),
         shadow_km=None if e["miss"] is None else round(e["miss"], 1),
@@ -158,6 +159,11 @@ def pick_shown(r, targets):
     if str(r.get("D_est")).lower() == "true":                        # size from H only (see the report note)
         s["name"] = f"{r.get('name', '')} *"
     s["target"] = "✓" if str(r.get("number")) in targets else ""
+    from pyoccult.gaia_local import star_flag                       # supplement star (RUWE >= 1.4, 2-parameter)
+    flag = star_flag(r.get("star_kind") or 0, r.get("star_ruwe"))
+    s["star_flag"] = flag
+    if flag:
+        s["star_mag"] = f"{s['star_mag']} \u2691 {flag}"
     return s
 
 

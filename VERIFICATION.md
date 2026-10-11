@@ -297,6 +297,14 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
     Iceland, Sydney, Svalbard and Tierra del Fuego; the index passes 14-26 % of the events to the exact test. A first
     index that took the reach as ground km dropped 1 % at the loosest limits (low-altitude events seen off the track):
     found and fixed with `ground_reach`.
+- **High-RUWE supplement** (2026-10-10; `ABOUT.md` 2.4): (86288) 1999 UC45 occulted Gaia DR3 2846821043820040832
+  (G 11.73, RUWE 1.65) on 2026-09-30 at 05:28:2x UT, observed from three California sites (1.17 s at one,
+  https://www.dr-ricknolthenius.com/events/20260930-1999UC45/index.html). The star was not in the local catalog
+  (RUWE >= 1.4 left out), so the full pick for that night at one of the sites found 3 events without it. With the
+  supplement (8.0 M stars to G 16, 0.42 GB, built in 106 min): 4 events, among them 86288 at 05:28:26 UT on that
+  star, 3.3 km from the centre line, 1.17 s, drop 5.24 mag, flagged "RUWE 1.65". The same check showed that no
+  catalogued small body (JPL SB Identification, numbered or not) came near any star brighter than G 16 in that
+  field at the time of the unexplained 3.5 s dip of a reference star a minute later (nearest: 44" from a G 15.5 star).
 - **Planets and moons** (0.14.0):
   - Ephemeris: the kernel built from Horizons vectors (SPK type 13, 20 min steps) reproduces Horizons to ~1 m;
     NAIF's `jup365.bsp` and Horizons agree to millimetres at sample times.

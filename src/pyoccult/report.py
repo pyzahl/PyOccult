@@ -326,6 +326,7 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
                 size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(),
                 drop_blend=num(r.get("mag_drop_blended")), dhint=(r.get("double_hint") or "").strip(),
+                sflag=(r.get("star_flag") or "").strip(),
                 p_site=num(r.get("p_site")), sigma1=num(r.get("path_sigma1_km")),
                 sigma_src=(r.get("sigma_source") or "").strip(), ra=ra, dec=dec, fov=fov,
                 globe=globe)
@@ -397,6 +398,7 @@ a.owc{display:inline-block;margin-top:2px;padding:0 6px;border-radius:6px;font-s
 .badge.kind{background:color-mix(in srgb,#7c3aed 14%,transparent);color:#6d28d9;font-size:.72rem}
 sup.bin{color:#0891b2;font-weight:600;margin-left:3px;cursor:help;white-space:nowrap}
 span.dbl{color:#b26a00;font-weight:600;cursor:help;white-space:nowrap}
+span.sflag{color:#b26a00;font-size:85%;cursor:help;white-space:nowrap}
 sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
 .notes{color:var(--muted);font-size:.85rem;margin-top:16px}
 .notes li{margin:3px 0}
@@ -714,6 +716,23 @@ def double_mark(e):
     return f' <span class="dbl" title="{esc(e["dhint"])}">\u26a0{val}</span>'
 
 
+def star_flag_tip(flag):
+    """Hover text of a supplement star's flag (gaia_local supplement: RUWE >= 1.4 or a 2-parameter source)."""
+    if flag.startswith("RUWE"):
+        return (f"Gaia {flag} (>= 1.4): the star's astrometry fits a single star poorly, often an unresolved double; its "
+                f"position, and so the shadow path, is less certain than usual. From the high-RUWE supplement of the "
+                f"local catalog.")
+    return ("Gaia 2-parameter source: position only, no parallax or proper motion; its position at the event date is "
+            "off by its unknown motion since 2016 (typically 0.05-0.2\"), so the shadow path is less certain. From the "
+            "supplement of the local catalog.")
+
+
+def star_mark(e):
+    """' <span class=sflag>⚑ RUWE 1.65</span>' after the star magnitude for a supplement star; empty otherwise."""
+    f = e.get("sflag") or ""
+    return f' <span class="sflag" title="{esc(star_flag_tip(f))}">\u2691 {esc(f)}</span>' if f else ""
+
+
 def contact_text(utc):
     """'2026-10-11T02:19:37.48' -> '02:19:37.5'; '' -> '—'."""
     if not utc:
@@ -741,7 +760,7 @@ def html_row_body(e):
         f'{esc(contact_text(e["utc"]))}</td>'
         f'<td title="{esc(e.get("r_utc") or "")} UTC">{contact_text(e.get("r_utc"))}</td>'
         f'<td class="num" data-s="{s(dur)}">{dur_txt}</td>'
-        f'<td class="num" data-s="{s(e["mag"])}">{fmt(e["mag"])}</td>'
+        f'<td class="num" data-s="{s(e["mag"])}">{fmt(e["mag"])}{star_mark(e)}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
         f'<td data-s="{s(moon["sep"], 1) if moon else ""}" title="{moon_tip}">{esc(moon_text(e))}</td>'
         f"{shadow_cell(e)}" + chance_cell(e) + f"{map_cell(e)}</tr>")
@@ -795,7 +814,7 @@ def html_row(e):
         f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">'
         + (f'<a href="{esc(VIZIER_GAIA)}{urllib.parse.quote(str(e["star"]))}" target="_blank" rel="noopener" '
            f'title="Gaia DR3 {esc(e["star"])} in VizieR. {mag_tip}">{fmt(e["mag"])}</a>' if e.get("star") else fmt(e["mag"]))
-        + '</td>'
+        + star_mark(e) + '</td>'
         f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}{double_mark(e)}</td>'
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
@@ -923,7 +942,8 @@ def to_markdown(events, meta):
         star = " \\*" if size_estimated(e) else ""                      # size from H only (footnote)
         star += f" {binaries.short(e['tid'])}" if binaries.short(e["tid"]) else ""   # known satellites
         dbl = (" \u26a0" + (f" {e['drop_blend']:.2f}" if e.get("drop_blend") is not None else "")) if e.get("dhint") else ""
-        out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])} | {fmt(e['drop'])}{dbl} | {fmt(e['dur'])} "
+        sf = f" \u2691 {e['sflag']}" if e.get("sflag") else ""
+        out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])}{sf} | {fmt(e['drop'])}{dbl} | {fmt(e['dur'])} "
                    f"| {alt_text(e)} | {moon_text(e)} | {off} | {chance_text(e)} | {fmt(e['calc'])} | {kml} |")
     if any(size_estimated(e) for e in events):
         out.append("\n\\* size estimated from H with an assumed albedo (no measured diameter): diameter, duration and "

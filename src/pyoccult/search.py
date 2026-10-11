@@ -935,7 +935,12 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     except Exception as ex:
         print(f"(event data skipped: {ex})")
     RUN_RECORDS.append(record)
-    print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT")
+    # supplement stars (gaia_local: RUWE >= 1.4 or 2-parameter): flagged; new fields at the end of the record
+    kind_, ruwe_ = int(getattr(row, "star_kind", 0) or 0), getattr(row, "ruwe", float("nan"))
+    record.update(star_kind=kind_, star_ruwe=float(ruwe_) if ruwe_ is not None else float("nan"),
+                  star_flag=gaia_local.star_flag(kind_, ruwe_))
+    print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT"
+          + (f"  (star: {record['star_flag']})" if record["star_flag"] else ""))
     db.add_event(DB, RUN_ID, record, kind=record["kind"], contacts=contacts)   # hits_log.csv: exported after the run
     RUN["hits"] += 1
     RUN["calc_s"] += record["calc_s"]

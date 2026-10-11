@@ -33,6 +33,8 @@ min_mag_drop = 0.1         # mag; events with a smaller drop are not logged (als
 corridor_step_s = 600      # s, coarse path step for the corridor candidate scan
 gaia_local_dir = "gaia_dr3_g16"  # folder of the local Gaia copy, required by corridor mode (pyoccult setup, or pyoccult gaia build)
 gaia_local_gmax = 16.0     # faintest G kept when building the local copy (~3 GB for 16, ~11 GB for 18; a new value needs a new folder)
+gaia_supplement = True     # also use <catalog>/supplement (high-RUWE and 2-parameter stars, flagged) when it exists
+                           # (pyoccult gaia supplement --dir <catalog> --gmax 16; GUI header "+ high-RUWE stars")
 gaia_local_dir = _os.environ.get("PYOCCULT_CATALOG", gaia_local_dir)   # choose another catalog folder for one run
 
 ### CONFIG OBSERVER: sites, their view and equipment
