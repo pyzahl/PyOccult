@@ -104,7 +104,9 @@ occultations of Gaia stars for one observer site. Read `ABOUT.md` for the comput
   PYOCCULT_SUPPLEMENT (GUI header checkbox, every run via run_process) else config gaia_supplement. Records/pick events:
   star_kind, star_ruwe, star_flag (end of record); report `star_mark` (⚑, keep exports.event_shown/pick_shown in step);
   prescreen meta/settings `supplement`, check() refuses a pre-screen without it when the pick uses it. Exec-excerpt
-  tests need `gaia_local` in their ns (test_patch). Size from a 1 % archive sample: G16 ~8 M stars.
+  tests need `gaia_local` in their ns (test_patch). Built 2026-10-10: 8.0 M stars G <= 16, 0.42 GB, 106 min.
+  setup.py `supplement_step` (step 3b): `--supplement` builds/resumes, asked on a first-time setup (tty), status line.
+  Not on Zenodo yet (planned: pack <catalog>/supplement like the catalogs, fetch_zenodo + setup --source for it).
 - `pyoccult/sbdb.py`: shared per-asteroid SBDB cache (raw diameter/extent/H/G/albedo/name, not derived sizes). Filled by
   `pyoccult.search.sbdb_phys()` (per-object API) and by `pyoccult/pick.py` for its top targets (bulk rows: size fields only); `get_full()` fetches the per-object
   record (rotation, pole, extent, type) for favorites; standard library only.

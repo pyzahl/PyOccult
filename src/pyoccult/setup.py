@@ -240,11 +240,45 @@ def show_status(d=None):
     gmax = index_limit(d)
     have = os.path.isfile(os.path.join(d, f"bright_G{gmax:.1f}.v2.npy"))
     print(f"  bright-star index G <= {gmax:<5g}  {'ok' if have else 'missing'}")
+    ss = gaia.status(gaia.supplement_dir(d))
+    print(f"  high-RUWE supplement         " + (f"ok, G <= {ss['gmax']:g}, {ss['gb']:.1f} GB" if ss["complete"] else
+          f"incomplete {ss['done']}/{ss['total']} (pyoccult setup --supplement resumes)" if ss["total"] else
+          "not built (optional: pyoccult setup --supplement)"))
     found = gaia.find_catalogs(".")
     if len(found) > 1 or (found and found[0][0] != d):
         print("  catalogs found (choose with gaia_local_dir, or PYOCCULT_CATALOG=<folder> for one run):")
         for f, g, ok, gb in found:
             print(f"    {f:18s} G <= {g:g}, {gb:.1f} GB" + ("" if ok else ", INCOMPLETE") + ("   <- in use" if f == d else ""))
+
+
+def supplement_step(d, gmax, want, sup_gmax, workers, ask):
+    """3b. The high-RUWE supplement of catalog d (gaia_local.build(..., supplement=True)): built or resumed with
+    --supplement, offered on a first-time setup in a terminal, else only mentioned."""
+    sd = gaia.supplement_dir(d)
+    st = gaia.status(sd)
+    if st["complete"]:
+        print(f"3b. high-RUWE supplement: complete ({st['gb']:.1f} GB)")
+        return
+    partial = st["total"] and st["done"]
+    if not want and ask:
+        k = input(f"3b. high-RUWE supplement: the stars the catalog leaves out (Gaia RUWE >= 1.4, often unresolved "
+                  f"doubles, and 2-parameter sources); OWC predicts events on them, PyOccult flags them.\n"
+                  f"   {'resume it' if partial else f'G <= {sup_gmax:g}: ~8 M stars, 0.4 GB, about 2 h from ESA'}"
+                  f"'s files; [Enter] build it (recommended), or [s]kip: ").strip().lower()
+        want = k != "s"
+    if not want:
+        print(f"3b. high-RUWE supplement: {'incomplete ' + str(st['done']) + '/' + str(st['total']) if partial else 'not built'}"
+              f" (optional: pyoccult setup --supplement)")
+        return
+    print(f"3b. high-RUWE supplement G <= {sup_gmax:g} in {sd}" + (" (resuming)" if partial else ""))
+    try:
+        gaia.build(d, sup_gmax, workers, supplement=True)
+    except (OSError, RuntimeError, ValueError, KeyError) as e:
+        print(f"   supplement not finished: {str(e)[:200]}\n   rerun: pyoccult setup --supplement (it resumes)")
+        return
+    if gaia.status(sd)["complete"]:
+        gaia.BrightIndex(sd, min(index_limit(d), sup_gmax))
+        print("   ok: used by picks, searches and pre-screens (GUI header '+ high-RUWE stars', config gaia_supplement)")
 
 
 def index_limit(d):
@@ -338,6 +372,12 @@ def main():
     ap.add_argument("--planet-kernels", action="store_true",
                     help="download NAIF's satellite kernels for planets and moons (Jupiter: jup365.bsp, 1.1 GB) for "
                          "offline use; otherwise their positions come from JPL Horizons per search")
+    ap.add_argument("--supplement", action="store_true",
+                    help="also build (or resume) the catalog's high-RUWE supplement: the stars the catalog leaves out "
+                         "(Gaia RUWE >= 1.4, 2-parameter), flagged in the results; ~8 M stars, 0.4 GB to G 16, about "
+                         "2 h from ESA's files")
+    ap.add_argument("--supplement-gmax", type=float, default=16.0,
+                    help="faintest G of the supplement (default 16, at most the catalog's limit)")
     ap.add_argument("--home", metavar="FOLDER", help="use FOLDER as the data folder from now on (saved as a setting; "
                                                      "files are not moved)")
     a = ap.parse_args()
@@ -391,6 +431,8 @@ def main():
             print("   ok")
         except (OSError, RuntimeError, ValueError, KeyError) as e:  # network (requests' errors are OSErrors), disk
             sys.exit(network_failure(e, d, src if gmax in gaia.ZENODO_GMAX else None))
+        supplement_step(d, gmax, a.supplement, min(a.supplement_gmax, gmax), a.workers,
+                        ask=sys.stdin.isatty() and new_install)
         if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 16.0)):
             print(f"\n   To search with this catalog, set in pyoccult_config.py:\n"
                   f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")

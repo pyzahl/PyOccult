@@ -717,8 +717,12 @@ such events: for example (86288) 1999 UC45 on 2026-09-30 05:28 UT, a G 11.7 star
 California sites. Build the supplement once, into the catalog's folder:
 
 ```bash
-pyoccult gaia supplement --dir gaia_dr3_g18 --gmax 16     # ~8 M stars, ~0.3 GB; one pass over ESA's files, ~2 h, resumable
+pyoccult setup --supplement                                # for the configured catalog (asked on a first setup)
+pyoccult gaia supplement --dir gaia_dr3_g18 --gmax 16     # the same for a given catalog folder
 ```
+
+Either way: 8.0 M stars to G 16, 0.4 GB, one pass over ESA's files (106 min at ~1.4 Gbit/s), resumable;
+`pyoccult setup --status` shows whether it is there.
 
 It is then used by picks, searches and pre-screens (switch: GUI header **+ high-RUWE stars**, config
 `gaia_supplement`), and every event on such a star is flagged **⚑ RUWE 1.65** or **⚑ 2-param** in the results,

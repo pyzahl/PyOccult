@@ -13,7 +13,8 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   pre-screens use it when present (GUI header "+ high-RUWE stars", config `gaia_supplement`, env
   `PYOCCULT_SUPPLEMENT`); events on such stars are flagged ⚑ ("RUWE 1.65", "2-param") in the results, report,
   favorites, Pick table and CSV (`star_kind`, `star_ruwe`, `star_flag` at the end of the record). Pre-screens record
-  whether they were built with it. Motivation: (86288) 1999 UC45 on 2026-09-30, observed by three stations, was not
+  whether they were built with it. `pyoccult setup --supplement` (`--supplement-gmax`) builds or resumes it, a
+  first-time setup offers it, `setup --status` shows it. Motivation: (86288) 1999 UC45 on 2026-09-30, observed by three stations, was not
   predictable (its G 11.7 target has RUWE 1.65); OWC lists such events.
 - GUI Site tab: coordinates pasted as text into Latitude, Longitude or Elevation are parsed (`geo.parse_coords`):
   labels in any order (lat/latitude, lon/lng/long/longitude, alt/elevation/height, also German), degrees-minutes-
