@@ -108,6 +108,12 @@ independent references for comparing results (note at the top of README, GUI Abo
   prescreen meta/settings `supplement`, check() refuses a pre-screen without it when the pick uses it. Exec-excerpt
   tests need `gaia_local` in their ns (test_patch). Built 2026-10-10: 8.0 M stars G <= 16, 0.42 GB, 106 min.
   setup.py `supplement_step` (step 3b): `--supplement` builds/resumes, asked on a first-time setup (tty), status line.
+  2-parameter pm (2026-10-12): `supplement_pm` (CDS XMatch, URL_CDS_XMATCH): UCAC5 (RAgaia/DEgaia 2015 within
+  0.2", |Gmag-g| <= 0.5) then UCAC4 (J2000 + pm to 2016 within 0.5"); kinds 3/4 (PM_SOURCE), SUPP_DTYPE + pm_error,
+  .hpm.npy rewritten too (`_as_dtype`; lookups join parts in one layout); catalog.json `pm_xmatch`; setup
+  `supplement_pm_step` (3c). `star_sigma_mas` -> search: star_sigma_km combined into path sigma (lines, p_site,
+  star_err_* ellipse); report `star_uncertain` red badge when > r_km. Pre-screens built before this used pm 0 for
+  2-parameter stars: rebuild. The Zenodo supplement (version 2) has no pm yet: setup adds it locally.
   On Zenodo since 2026-10-11 (catalog record version 2, doi 10.5281/zenodo.23298192; concept DOI unchanged):
   `gaia_dr3_g18_supplement_g16.tar.xz` (+ .sha256), `ZENODO_SUPPLEMENT`, `fetch_zenodo(dir, 16, supplement=True)`
   unpacks into dir/supplement (works for any catalog folder); setup/`gaia supplement` default to Zenodo, `--source esa`
@@ -288,6 +294,10 @@ independent references for comparing results (note at the top of README, GUI Abo
 - Every download/web address lives in `pyoccult/urls.py` (`URL_*` names; no side effects, so setup/geo/kernels/report
   can import it before a sites.py exists). Never hard-code an http(s) address elsewhere; exceptions: XML namespaces
   (SVG, KML) and `pyoccult.version.__url__`. Tests that exec code excerpts must put `U` (pyoccult.urls) in their ns.
+- Windows: a file must not be memory-mapped (or open) when renamed (WinError 32). Copy blocks out of memmaps
+  (`np.array(mm[i:j])`, never `np.asarray`, which is a view keeping the map alive), drop all references before the
+  rename, and rename finished files with `gaia_local.replace_file` (retries ~10 s: virus scanners). Tests check
+  /proc/self/maps at the rename (test_gaia_local, test_shadowtrack). Found 2026-10-12 in the first Windows install.
 - Write cache files atomically (temp file + `os.replace`). Every cache (asteroid SPKs, SBDB bulk list, per-asteroid SBDB size data
   `PyOccult_sbdb_phys.json`; both SBDB caches refetched after `sbdb_max_age_days`) goes to `config.cache_path`
   (`/dev/shm` if present, else the system temp folder); never hard-code a path. Gaia is not cached: corridor mode

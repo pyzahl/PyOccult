@@ -86,7 +86,9 @@ def event_shown(e):
         asteroid=(f"{e['label']} ({e['kind'] or 'body'})" if e.get("body") else e["label"])
         + (f" {tag}" if tag else "") + (" *" if R.size_estimated(e) else ""),
         event_time=R.fmt_time(e["when"]), event_utc=e["utc"], gaia_id=e["star"], kind=e["kind"],
-        star_mag=R.fmt(e["mag"]) + (f" \u2691 {e['sflag']}" if e.get("sflag") else ""), star_flag=e.get("sflag") or "",
+        star_mag=R.fmt(e["mag"]) + (f" \u26a0 star \u00b1{R.star_uncertain(e):.0f} km" if R.star_uncertain(e)
+                                    else f" \u2691 {e['sflag']}" if e.get("sflag") else ""),
+        star_flag=e.get("sflag") or "", star_sigma_km=None if e.get("star_sigma") is None else round(e["star_sigma"], 1),
         mag_drop=drop, max_dur=R.fmt(e["dur"]), altitude=R.alt_text(e),
         moon_dist=R.moon_text(e), shadow_dist=shadow_text(e), chance=R.chance_text(e),
         chance_pct=None if e.get("p_site") is None else round(100 * e["p_site"], 1),
@@ -162,8 +164,8 @@ def pick_shown(r, targets):
     from pyoccult.gaia_local import star_flag                       # supplement star (RUWE >= 1.4, 2-parameter)
     flag = star_flag(r.get("star_kind") or 0, r.get("star_ruwe"))
     s["star_flag"] = flag
-    if flag:
-        s["star_mag"] = f"{s['star_mag']} \u2691 {flag}"
+    if flag:                                                     # no proper motion at all: the strong warning sign
+        s["star_mag"] = f"{s['star_mag']} {'\u26a0' if 'NO proper motion' in flag else '\u2691'} {flag}"
     return s
 
 

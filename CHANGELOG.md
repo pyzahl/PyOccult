@@ -6,7 +6,31 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+- **Proper motions for the supplement's 2-parameter stars** (Gaia DR3 has none for them): `pyoccult gaia
+  supplement-pm` (run automatically by `setup --supplement` and `gaia supplement`) cross-matches them with UCAC5
+  (Gaia DR1 2015.0 positions within 0.2", G within 0.5 mag), then UCAC4, through CDS XMatch, as OWC/Occult take them
+  from other catalogs. Of 573,735 stars (G <= 16): 294,328 from UCAC5, 171,238 from UCAC4, 108,169 still without
+  (2 min). Flags: "2-param, pm UCAC5" / "pm UCAC4" / "NO proper motion".
+- **The star's position uncertainty in the path**: for supplement stars the 1-sigma position at the event date
+  (2-parameter: position error + proper-motion error, or 10 mas/yr per axis when none is known, times the years
+  since 2016; high RUWE: Gaia's errors scaled by RUWE) is converted to km and combined with the orbit's sigma: wider
+  1- and 3-sigma lines, an honest "chance at site", a star error ellipse. Record fields `star_sigma_mas`,
+  `star_sigma_km`, `ast_sigma1_km`. When it exceeds the asteroid's radius the report shows a red "⚠ star ±157 km"
+  (Pick table: "⚠ 2-param, NO proper motion").
+
 ### Fixed
+- (4089) Galbraith on 2026-10-13: a predicted "hit" 1.6 km from a site was on a G 9.8 2-parameter Gaia star (a
+  resolved double, no proper motion) whose 2016 position was used unchanged; OWC put the path over 100 km away. With
+  UCAC5's proper motion the path lies 206 km away (±27 km); without a proper motion the event is now shown with its
+  real uncertainty (±157 km, chance 1 %).
+- Windows: building the bright-star index failed at the end with `PermissionError: [WinError 32] … being used by
+  another process` (in setup and before the first pick), so picks could not run. The index file was still
+  memory-mapped (a NumPy view kept the mapping open) when it was renamed into place, which Windows refuses (Linux and
+  macOS allow it). The sort now works on copies and releases the mapping first; all finished files (catalog, index,
+  pre-screens) are renamed through `gaia_local.replace_file`, which retries for ~10 s on "file in use" (e.g. a virus
+  scanner holding a new file). Setup no longer blames the network for such errors. Tests check that no file is
+  mapped at its rename.
 - Windows: a console with a legacy code page (cp1252) crashed on PyOccult's symbols (e.g. "✅ All kernels verified" during
   setup: `UnicodeEncodeError`). Console output now replaces characters it cannot show with "?" (every command), and runs
   started by the GUI use Python's UTF-8 mode, so the log shows them all. README: do not install from an administrator

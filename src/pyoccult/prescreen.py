@@ -49,6 +49,12 @@ import numpy as np
 from pyoccult import shadowtrack as ST
 
 DIR = "prescreen"
+
+
+def L_replace(src, dst):
+    """Rename a finished file into place, retried on Windows' "file in use" (gaia_local.replace_file)."""
+    from pyoccult.gaia_local import replace_file
+    replace_file(src, dst)
 FORMAT = 3                                   # 3: padded grid, 161-sample tracks, plane reach -> ground (ground_reach)
 HALF_MAX_S = 6 * 3600.0                      # an event's track: at most +-6 h around its Earth-centre time
 PAD_S = 2 * HALF_MAX_S                       # the build's time grid reaches this far beyond the window
@@ -513,7 +519,7 @@ def build(start, days, region, cam_limit=16.0, hmax=17.0, min_drop=0.1, reach_km
         con.execute("VACUUM")
         n_ev, n_ast = con.execute("SELECT COUNT(*), COUNT(DISTINCT number) FROM events").fetchone()
         con.close()
-        os.replace(partial, out)
+        L_replace(partial, out)
     say(f"pre-screen written: {out}: {n_ev} events of {n_ast} asteroids (of {len(rows)}), {_hms(time.time() - t0)}")
     return out, n_ev, n_ast
 
@@ -537,13 +543,13 @@ def _write_global(con, out, meta):
             srt[b0:b0 + 1_000_000] = u[order[b0:b0 + 1_000_000]]
         n_ast = int(len(np.unique(srt["number"]))) if n else 0
         srt.flush()
-        del srt, u
+        del srt, u, order                                    # unmapped before the rename (Windows needs it)
         meta = dict(meta, kind="global", n_events=int(n), n_asteroids=n_ast, dtype=str(ST.DTYPE.descr))
         mtmp = _meta_path(out) + ".tmp"
         with open(mtmp, "w") as f:
             json.dump(meta, f, indent=1)
-        os.replace(tmp_s, out)
-        os.replace(mtmp, _meta_path(out))
+        L_replace(tmp_s, out)
+        L_replace(mtmp, _meta_path(out))
     finally:
         for p in (tmp_u, tmp_s):
             if os.path.exists(p):
@@ -657,7 +663,7 @@ def index(path, workers=4, block=100_000):
                       flush=True)
         idx.flush()
         del idx
-        os.replace(tmp, out)
+        L_replace(tmp, out)
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)
@@ -712,7 +718,7 @@ def extract(path, box, out=None, start=None, days=None, gmax=None, name=None):
     con.executemany("INSERT INTO meta VALUES (?, ?)", [(k, json.dumps(v)) for k, v in meta.items()])
     con.commit()
     con.close()
-    os.replace(tmp, out)
+    L_replace(tmp, out)
     return out, int(keep.sum()), len(set(e["number"].tolist()))
 
 

@@ -326,7 +326,7 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
                 size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(),
                 drop_blend=num(r.get("mag_drop_blended")), dhint=(r.get("double_hint") or "").strip(),
-                sflag=(r.get("star_flag") or "").strip(),
+                sflag=(r.get("star_flag") or "").strip(), star_sigma=num(r.get("star_sigma_km")),
                 p_site=num(r.get("p_site")), sigma1=num(r.get("path_sigma1_km")),
                 sigma_src=(r.get("sigma_source") or "").strip(), ra=ra, dec=dec, fov=fov,
                 globe=globe)
@@ -399,6 +399,7 @@ a.owc{display:inline-block;margin-top:2px;padding:0 6px;border-radius:6px;font-s
 sup.bin{color:#0891b2;font-weight:600;margin-left:3px;cursor:help;white-space:nowrap}
 span.dbl{color:#b26a00;font-weight:600;cursor:help;white-space:nowrap}
 span.sflag{color:#b26a00;font-size:85%;cursor:help;white-space:nowrap}
+span.swarn{color:#fff;background:#c62828;font-weight:700;font-size:85%;padding:0 4px;border-radius:3px;cursor:help;white-space:nowrap}
 sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
 .notes{color:var(--muted);font-size:.85rem;margin-top:16px}
 .notes li{margin:3px 0}
@@ -727,10 +728,27 @@ def star_flag_tip(flag):
             "supplement of the local catalog.")
 
 
+def star_uncertain(e):
+    """The star's own position uncertainty (km, 1 sigma, across the path) when it matters: larger than the asteroid's
+    radius (then it decides whether the shadow reaches the site at all); else None."""
+    s, r = e.get("star_sigma"), e.get("rad")
+    return s if s is not None and s > max(r or 0.0, 1.0) else None
+
+
 def star_mark(e):
-    """' <span class=sflag>⚑ RUWE 1.65</span>' after the star magnitude for a supplement star; empty otherwise."""
+    """After the star magnitude: a red '⚠ star ±150 km' when the star's position is too uncertain for this path
+    (2-parameter star without a proper motion, ...), else the small '⚑ RUWE 1.65' for a supplement star; empty for a
+    main-catalog star."""
     f = e.get("sflag") or ""
-    return f' <span class="sflag" title="{esc(star_flag_tip(f))}">\u2691 {esc(f)}</span>' if f else ""
+    if not f:
+        return ""
+    s = star_uncertain(e)
+    tip = star_flag_tip(f) + (f" The star's position at the event date is uncertain by about {s:.0f} km (1 sigma) "
+                              f"across the path, more than the asteroid's radius: this event may well not be "
+                              f"observable here; check other predictions (OWC) before observing." if s else "")
+    if s:
+        return f' <span class="swarn" title="{esc(tip)}">\u26a0 star \u00b1{s:.0f} km</span>'
+    return f' <span class="sflag" title="{esc(tip)}">\u2691 {esc(f)}</span>'
 
 
 def contact_text(utc):
@@ -942,7 +960,8 @@ def to_markdown(events, meta):
         star = " \\*" if size_estimated(e) else ""                      # size from H only (footnote)
         star += f" {binaries.short(e['tid'])}" if binaries.short(e["tid"]) else ""   # known satellites
         dbl = (" \u26a0" + (f" {e['drop_blend']:.2f}" if e.get("drop_blend") is not None else "")) if e.get("dhint") else ""
-        sf = f" \u2691 {e['sflag']}" if e.get("sflag") else ""
+        sf = (f" \u26a0 star \u00b1{star_uncertain(e):.0f} km ({e['sflag']})" if star_uncertain(e)
+              else f" \u2691 {e['sflag']}" if e.get("sflag") else "")
         out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])}{sf} | {fmt(e['drop'])}{dbl} | {fmt(e['dur'])} "
                    f"| {alt_text(e)} | {moon_text(e)} | {off} | {chance_text(e)} | {fmt(e['calc'])} | {kml} |")
     if any(size_estimated(e) for e in events):

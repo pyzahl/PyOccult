@@ -1,4 +1,4 @@
-import sys, os, gzip, math, tempfile, numpy as np, pandas as pd
+import sys, os, glob, gzip, math, tempfile, numpy as np, pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 from pyoccult import corridor as C
 from pyoccult import gaia_local as L
@@ -82,7 +82,7 @@ print("strip stars (brute force)", len(need), " returned", len(got))
 assert need <= set(got.source_id), f"missed {len(need - set(got.source_id))}"
 assert len(got) < 3 * len(need) + 10
 assert {10**15 + M - 2, 10**15 + M - 1} <= set(got.source_id), "high-pm stars missing"
-assert (got.phot_g_mean_mag <= cap).all() and list(got.columns) == L.COLS + ["star_kind", "ruwe"]
+assert (got.phot_g_mean_mag <= cap).all() and list(got.columns) == L.COLS + ["star_kind", "ruwe", "pos_err", "pm_err"]
 
 # ---------- 4. the candidate scan works on the local stars, cap above gmax is clipped
 cands = C.corridor_candidates(plan, local=lg, verbose=True)[1]
@@ -92,6 +92,24 @@ plan["mag_cap"] = 19.0; assert (lg.corridor_stars(plan).phot_g_mean_mag <= 18.0)
 # ---------- 5. cells near the pole take the whole band
 c = L.cells_near([10.0], [89.7], [0.5]); assert len(c) >= 360, len(c)
 c = L.cells_near([359.99], [0.0], [0.05]); assert L.cell_of(0.01, 0.0).item() in c
+# ---------- Windows: a file must not be memory-mapped any more when it is renamed into place (WinError 32 there; Linux
+# allows it, so check /proc/self/maps at the moment of the rename)
+if os.path.exists("/proc/self/maps"):
+    real_replace = L.replace_file
+    mapped = []
+    def checked_replace(src, dst, *a, **k):
+        maps = open("/proc/self/maps").read()
+        if os.path.abspath(src) in maps:
+            mapped.append(src)
+        return real_replace(src, dst, *a, **k)
+    L.replace_file = checked_replace
+    for f in glob.glob(os.path.join(out, "bright_G17.0.v2*")):
+        os.remove(f)
+    L.BrightIndex(out, 17.0)
+    L.replace_file = real_replace
+    assert not mapped, f"still memory-mapped while renamed (Windows: WinError 32): {mapped}"
+    print("no file mapped at rename: ok")
+
 # ---------- supplement: the stars the main catalog leaves out (RUWE >= 1.4, no parallax/pm), flagged by kind
 L.build(out, 18.0, workers=0, supplement=True)
 sup_dir = os.path.join(out, L.SUPPLEMENT)
@@ -107,6 +125,51 @@ assert (sup["kind"] == L.KIND_2P).sum() == len(exp2p) and (sup["kind"] == L.KIND
 assert np.all(sup["pmra"][sup["kind"] == L.KIND_2P] == 0) and np.all(sup["ruwe"][sup["kind"] == L.KIND_RUWE] >= 1.4)
 assert np.allclose(sup["ra_error"], 0.05)
 print("supplement:", len(sup), "stars,", int((sup["kind"] == L.KIND_2P).sum()), "2-parameter")
+# proper motions for the 2-parameter stars from UCAC5 / UCAC4 (CDS XMatch, here a stand-in): good partners taken,
+# a close neighbour at the wrong 2015 position or with the wrong magnitude rejected, files rewritten
+two = sup[sup["kind"] == L.KIND_2P]
+good5, good4, wrong = two[:300], two[300:400], two[400:450]
+def fake_xmatch(rows, cat, radius_arcsec=3.0, tries=3):
+    r = rows.set_index("source_id")
+    out = []
+    if "ucac5" in cat:
+        for s_ in good5["source_id"]:
+            if s_ in r.index:
+                q = r.loc[s_]
+                out.append(dict(source_id=s_, ra=q.ra, dec=q.dec, g=q.g, RAgaia=q.ra + 0.02 / 3600, DEgaia=q.dec,
+                                Gmag=q.g + 0.1, pmRAug=-4.0, pmDEug=-13.0, e_pmRAug=1.7, e_pmDEug=1.6))
+        for s_ in wrong["source_id"]:                    # a neighbour 1" away, and one 2 mag fainter: both rejected
+            if s_ in r.index:
+                q = r.loc[s_]
+                out.append(dict(source_id=s_, ra=q.ra, dec=q.dec, g=q.g, RAgaia=q.ra, DEgaia=q.dec + 1.0 / 3600,
+                                Gmag=q.g, pmRAug=50.0, pmDEug=50.0, e_pmRAug=1, e_pmDEug=1))
+                out.append(dict(source_id=s_, ra=q.ra, dec=q.dec, g=q.g, RAgaia=q.ra, DEgaia=q.dec, Gmag=q.g + 2.0,
+                                pmRAug=60.0, pmDEug=60.0, e_pmRAug=1, e_pmDEug=1))
+    else:
+        for s_ in good4["source_id"]:
+            if s_ in r.index:
+                q = r.loc[s_]                            # J2000 position: 16 years of pm before Gaia's 2016 one
+                out.append(dict(source_id=s_, ra=q.ra, dec=q.dec, g=q.g, RAJ2000=q.ra,
+                                DEJ2000=q.dec - 10.0 * 16 / 3.6e6, pmRA=0.0, pmDE=10.0, e_pmRA=3.0, e_pmDE=5.0,
+                                **{"f.mag": q.g + 0.3, "Vmag": q.g + 0.5}))
+    cols = ["source_id", "ra", "dec", "g"]
+    return pd.DataFrame(out) if out else pd.DataFrame(columns=cols)
+real_xm = L._xmatch
+L._xmatch = fake_xmatch
+L.BrightIndex(os.path.join(out, L.SUPPLEMENT), 16.0)          # an index to be dropped
+stats = L.supplement_pm(out, chunk=137, log=lambda *a: None)
+L._xmatch = real_xm
+assert stats["ucac5"] == len(good5) and stats["ucac4"] == len(good4), stats
+assert L.has_supplement_pm(out) and not L.glob_bright(os.path.join(out, L.SUPPLEMENT))
+sup2 = np.concatenate([np.load(os.path.join(out, L.SUPPLEMENT, n[:-len(".csv.gz")] + ".npy")) for n in names])
+by = {int(x["source_id"]): x for x in sup2}
+x5, x4, xw = by[int(good5["source_id"][0])], by[int(good4["source_id"][0])], by[int(wrong["source_id"][0])]
+assert x5["kind"] == L.KIND_2P_UCAC5 and x5["pmra"] == -4.0 and abs(x5["pm_error"] - 1.7) < 1e-6
+assert x4["kind"] == L.KIND_2P_UCAC4 and x4["pmdec"] == 10.0 and abs(x4["pm_error"] - 5.0) < 1e-6
+assert xw["kind"] == L.KIND_2P and xw["pmra"] == 0, "a wrong partner must be rejected"
+assert len(sup2) == len(sup) and sup2.dtype == L.SUPP_DTYPE
+print("supplement pm: UCAC5", stats["ucac5"], "UCAC4", stats["ucac4"], "rejected wrong partners: ok")
+
 # merged lookup: with the supplement (default) its stars come too, flagged; without, the main catalog only
 assert L.has_supplement(out)
 lg_main, lg_all = L.LocalGaia(out, supplement=False), L.LocalGaia(out, supplement=True)
@@ -114,11 +177,16 @@ c0 = lg_main.cone(104.0, 22.0, 3.0)
 c1 = lg_all.cone(104.0, 22.0, 3.0)
 assert (c0.star_kind == 0).all() and c0.ruwe.isna().all() and len(c1) > len(c0)
 extra = c1[c1.star_kind > 0]
-assert len(c1) == len(c0) + len(extra) and set(extra.star_kind) <= {L.KIND_RUWE, L.KIND_2P}
+assert len(c1) == len(c0) + len(extra) and set(extra.star_kind) <= {L.KIND_RUWE, L.KIND_2P, L.KIND_2P_UCAC5, L.KIND_2P_UCAC4}
 assert (extra[extra.star_kind == L.KIND_RUWE].ruwe >= 1.4).all()
 s_all = lg_all.corridor_stars(plan)
 assert (s_all.star_kind > 0).any() and len(s_all) > len(lg_main.corridor_stars(plan))
-assert L.star_flag(L.KIND_RUWE, 1.654) == "RUWE 1.65" and L.star_flag(L.KIND_2P) == "2-param" and L.star_flag(0) == ""
+assert L.star_flag(L.KIND_RUWE, 1.654) == "RUWE 1.65" and L.star_flag(0) == ""
+assert L.star_flag(L.KIND_2P) == "2-param, NO proper motion" and L.star_flag(L.KIND_2P_UCAC5) == "2-param, pm UCAC5"
+# position uncertainty at the event: unknown proper motion 10 mas/yr per axis x years; a known one: its error
+assert abs(L.star_sigma_mas(L.KIND_2P, 0, 2.2, None, 10.78) - (2.2**2 + 107.8**2) ** 0.5) < 1e-6
+assert abs(L.star_sigma_mas(L.KIND_2P_UCAC5, 0, 2.2, 1.7, 10.78) - (2.2**2 + (1.7 * 10.78)**2) ** 0.5) < 1e-6
+assert L.star_sigma_mas(L.KIND_RUWE, 1.65, 0.05, None, 10.78) < 2 and L.star_sigma_mas(0, None, None, None, 10) is None
 # merged bright index: the same stars along the path, plus the supplement's, with kind and ruwe
 mi = L.open_index(out, 16.0, supplement=True)
 assert isinstance(mi, L.MergedIndex)

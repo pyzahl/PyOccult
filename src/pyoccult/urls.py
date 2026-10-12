@@ -22,6 +22,7 @@ GAIA_DR3_LISTING_PREFIX = "Gaia/gdr3/gaia_source/"                              
 
 # --- ready-made local catalogs on Zenodo (gaia_local.py, setup.py)
 URL_ZENODO_CATALOG_RECORD = "https://zenodo.org/api/records/23113337"           # concept record: newest version
+URL_CDS_XMATCH = "https://cdsxmatch.u-strasbg.fr/xmatch/api/v1/sync"             # CDS XMatch (supplement pm: UCAC5/4)
 
 # --- JPL Solar System Dynamics
 URL_JPL_HORIZONS_API = "https://ssd.jpl.nasa.gov/api/horizons.api"              # asteroid orbits as SPK (search.py)

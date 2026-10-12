@@ -64,10 +64,19 @@ for c in range(3):
     con.execute("INSERT INTO chunks VALUES (?, ?)", (len(e), e.tobytes()))
 con.commit()
 out = os.path.join(d, "t.global.npy")
+from pyoccult import gaia_local as GL                        # Windows: nothing may be mapped when renamed (WinError 32)
+real_replace, mapped = GL.replace_file, []
+def checked_replace(src, dst, *a, **k):
+    if os.path.exists("/proc/self/maps") and os.path.abspath(src) in open("/proc/self/maps").read():
+        mapped.append(src)
+    return real_replace(src, dst, *a, **k)
+GL.replace_file = checked_replace
 n_ev, n_ast = PS._write_global(con, out, dict(name="t", start="2026-10-01", days=10, et0=0.0, et1=10 * 86400.0,
                                                 region=None, cam_limit=16.0, reach_km=200.0, min_drop=0.1,
                                                 max_sun_alt=0.0, min_alt=0.0, hmax=17.0, built="2026-10-01T00:00:00"))
 con.close()
+GL.replace_file = real_replace
+assert not mapped, f"still memory-mapped while renamed: {mapped}"
 a = np.load(out)
 assert n_ev == 150 and len(a) == 150 and np.all(np.diff(a["et"]) >= 0), "sorted by time"
 assert n_ast == len(set(a["number"].tolist()))

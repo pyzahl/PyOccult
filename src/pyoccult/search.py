@@ -935,7 +935,20 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
         perr = path_error(target_id, res['best_utc'])
         sigma3_h, src = (perr or {}).get("sigma3_km"), "Horizons"
     sigma3 = sigma3_h or config.default_sigma3_km
-    record.update(path_sigma1_km=sigma3 / 3.0, sigma_source=src if sigma3_h else "default",
+    ast_sigma1 = sigma3 / 3.0
+    # supplement star: its own position uncertainty at the event date (no or a poor proper motion) widens the path
+    star_kind = int(getattr(row, "star_kind", 0) or 0)
+    s_mas = gaia_local.star_sigma_mas(star_kind, getattr(row, "ruwe", None), getattr(row, "pos_err", None),
+                                      getattr(row, "pm_err", None),
+                                      2000.0 + res['best_et'] / (365.25 * 86400) - corridor.GAIA_EPOCH_YEAR)
+    s_km = None
+    if s_mas:
+        d_km = float(np.linalg.norm(spice.spkpos(str(target_id), res['best_et'], 'J2000', 'CN', '399')[0]))
+        s_km = s_mas * d_km * np.pi / 648000000.0
+        sigma3 = 3.0 * float(np.hypot(ast_sigma1, s_km))
+        if not record.get("star_err_smaa_mas"):                # the star's error ellipse (circle) for the favorites
+            record.update(star_err_smaa_mas=s_mas, star_err_smia_mas=s_mas, star_err_pa_deg=0.0)
+    record.update(path_sigma1_km=sigma3 / 3.0, sigma_source=(src if sigma3_h else "default") + (" + star" if s_km else ""),
                   p_site=site_probability(res['min_distance'], size['r_km'], sigma3 / 3.0))
     contacts = []
     record["kind"] = bodies.kind(target_id)
@@ -956,9 +969,11 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     # supplement stars (gaia_local: RUWE >= 1.4 or 2-parameter): flagged; new fields at the end of the record
     kind_, ruwe_ = int(getattr(row, "star_kind", 0) or 0), getattr(row, "ruwe", float("nan"))
     record.update(star_kind=kind_, star_ruwe=float(ruwe_) if ruwe_ is not None else float("nan"),
-                  star_flag=gaia_local.star_flag(kind_, ruwe_))
+                  star_flag=gaia_local.star_flag(kind_, ruwe_), ast_sigma1_km=ast_sigma1,
+                  star_sigma_mas=s_mas if s_mas else float("nan"), star_sigma_km=s_km if s_km else float("nan"))
     print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT"
-          + (f"  (star: {record['star_flag']})" if record["star_flag"] else ""))
+          + (f"  (star: {record['star_flag']}" + (f"; path +-{s_km:.0f} km 1-sigma from the star" if s_km else "")
+             + ")" if record["star_flag"] else ""))
     db.add_event(DB, RUN_ID, record, kind=record["kind"], contacts=contacts)   # hits_log.csv: exported after the run
     RUN["hits"] += 1
     RUN["calc_s"] += record["calc_s"]

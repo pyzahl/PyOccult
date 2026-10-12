@@ -778,7 +778,11 @@ is there.
 
 It is then used by picks, searches and pre-screens (switch: GUI header **+ high-RUWE stars**, config
 `gaia_supplement`), and every event on such a star is flagged **⚑ RUWE 1.65** or **⚑ 2-param** in the results,
-report, favorites and CSV: its position, and so the shadow path, is less certain than usual. Pre-screens remember
+report, favorites and CSV: its position, and so the shadow path, is less certain than usual. Gaia has no proper
+motion at all for the supplement's "2-parameter" stars, so PyOccult takes one from UCAC5 or UCAC4 (as OWC does; 81 %
+of them, done by setup) and adds each star's position uncertainty to the path's sigma lines and chance; where that
+uncertainty is larger than the asteroid, the report shows a red **⚠ star ±… km**: such an event may well not happen
+at your site, compare with other predictions before observing. Pre-screens remember
 whether they were built with it; a pick with the supplement only uses one that was (auto falls back otherwise).
 
 **Other catalog sources.** The search does not care where a catalog comes from: any folder with a `catalog.json`

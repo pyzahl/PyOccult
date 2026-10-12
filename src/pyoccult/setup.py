@@ -27,7 +27,7 @@ an interrupted Gaia build continues where it stopped.
   3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pick.py. ~30 s.
 """
 from pyoccult.version import __version__
-import argparse, os, shutil, sys
+import argparse, json, os, shutil, sys
 
 from pyoccult import home
 from pyoccult.home import PKG
@@ -241,7 +241,16 @@ def show_status(d=None):
     have = os.path.isfile(os.path.join(d, f"bright_G{gmax:.1f}.v2.npy"))
     print(f"  bright-star index G <= {gmax:<5g}  {'ok' if have else 'missing'}")
     ss = gaia.status(gaia.supplement_dir(d))
-    print(f"  high-RUWE supplement         " + (f"ok, G <= {ss['gmax']:g}, {ss['gb']:.1f} GB" if ss["complete"] else
+    pmx = {}
+    if ss["complete"]:
+        try:
+            pmx = json.load(open(os.path.join(gaia.supplement_dir(d), "catalog.json"))).get("pm_xmatch", {})
+        except (OSError, ValueError):
+            pass
+    print(f"  high-RUWE supplement         " + (f"ok, G <= {ss['gmax']:g}, {ss['gb']:.1f} GB" + (
+          f"; 2-param stars with pm: {pmx['ucac5'] + pmx['ucac4']} of {pmx['two_param']} (UCAC5 {pmx['ucac5']}, "
+          f"UCAC4 {pmx['ucac4']})" if pmx else "; 2-param stars without pm (setup --supplement adds them)")
+          if ss["complete"] else
           f"incomplete {ss['done']}/{ss['total']} (pyoccult setup --supplement resumes)" if ss["total"] else
           "not built (optional: pyoccult setup --supplement)"))
     found = gaia.find_catalogs(".")
@@ -259,6 +268,7 @@ def supplement_step(d, gmax, want, sup_gmax, workers, ask, source="auto"):
     st = gaia.status(sd)
     if st["complete"]:
         print(f"3b. high-RUWE supplement: complete ({st['gb']:.1f} GB)")
+        supplement_pm_step(d)
         return
     partial = st["total"] and st["done"]
     if not want and ask:
@@ -286,8 +296,20 @@ def supplement_step(d, gmax, want, sup_gmax, workers, ask, source="auto"):
         print(f"   supplement not finished: {str(e)[:200]}\n   rerun: pyoccult setup --supplement (it resumes)")
         return
     if gaia.status(sd)["complete"]:
+        supplement_pm_step(d)
         gaia.BrightIndex(sd, min(index_limit(d), sup_gmax))
         print("   ok: used by picks, searches and pre-screens (GUI header '+ high-RUWE stars', config gaia_supplement)")
+
+
+def supplement_pm_step(d):
+    """Proper motions for the supplement's 2-parameter stars (UCAC5, then UCAC4; Gaia has none for them), once."""
+    if gaia.has_supplement_pm(d):
+        return
+    print("3c. proper motions for the supplement's 2-parameter stars (UCAC5 / UCAC4 via CDS XMatch, a few minutes)")
+    try:
+        gaia.supplement_pm(d)
+    except (OSError, RuntimeError, ValueError) as e:
+        print(f"   not done ({str(e)[:200]}): their events stay flagged 'NO proper motion'; rerun setup later")
 
 
 def index_limit(d):
@@ -357,6 +379,11 @@ def catalog_target(gmax_arg, dir_arg):
 def network_failure(e, d, source):
     """Message for a failed catalog step (no traceback): what failed, the likely cause, how to go on."""
     other = {"zenodo": "--source esa (build from ESA's files)", "esa": "--source zenodo (ready-made, G <= 16 or 18)"}
+    if isinstance(e, PermissionError):                       # not the network: a file in use (Windows) or no write access
+        return (f"\n   catalog step failed: {type(e).__name__}: {str(e)[:400]}\n"
+                f"   Likely: a file in {d} is in use (the GUI or another PyOccult run with this catalog, a virus "
+                f"scanner) or not writable. Close other PyOccult windows, delete leftover tmp*.tmp files in {d}, "
+                f"then rerun setup (it resumes).")
     return (f"\n   catalog step failed: {type(e).__name__}: {str(e)[:300]}\n"
             f"   Likely: offline, the server is down, or a proxy/firewall blocks the address (see urls.py).\n"
             f"   - behind a proxy: export https_proxy=http://<proxy>:<port>  (and HTTPS_PROXY), then rerun\n"

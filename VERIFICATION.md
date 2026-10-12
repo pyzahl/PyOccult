@@ -303,6 +303,11 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
   it and without it (the full pick over all 464,740 asteroids): the pre-screen picks screened 3,050 and 2,417
   asteroids and gave the same 260 and 259 events, identical in every field (time, star, drop, duration, miss
   distance, supplement flags: 37 and 30 events on supplement stars), and the same 80 targets each.
+- **2-parameter stars: (4089) Galbraith, 2026-10-13** (2026-10-12): PyOccult predicted a central event at a site
+  (1.6 km) on Gaia DR3 3383655504436521856 (G 9.82, 2-parameter, ipd_frac_multi_peak 41 %: a close double, UCAC4
+  573-029535/029536 2.9" apart); OWC (star U029535) put the path over 100 km away. With UCAC5's proper motion
+  (-4.0, -13.0 +- 1.7 mas/yr; UCAC4: -5.6, -15.8) the path lies 206 km from the site, 7.4 s earlier, +-27 km (1 sigma)
+  from the star; UCAC4's pm gives ~250 km. Fixed by `supplement_pm` and the star uncertainty in the path sigma.
 - **High-RUWE supplement** (2026-10-10; `ABOUT.md` 2.4): (86288) 1999 UC45 occulted Gaia DR3 2846821043820040832
   (G 11.73, RUWE 1.65) on 2026-09-30 at 05:28:2x UT, observed from three California sites (1.17 s at one,
   https://www.dr-ricknolthenius.com/events/20260930-1999UC45/index.html). The star was not in the local catalog

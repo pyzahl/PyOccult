@@ -40,7 +40,11 @@ RUWE_MAX = 1.4
 # drifts by the unknown motion since 2016). OWC predicts events on both; PyOccult does with the supplement.
 SUPPLEMENT = "supplement"
 KIND_MAIN, KIND_RUWE, KIND_2P = 0, 1, 2
-SUPP_DTYPE = np.dtype(DTYPE.descr + [("ruwe", "<f4"), ("ra_error", "<f4"), ("dec_error", "<f4"), ("kind", "u1")])
+KIND_2P_UCAC5, KIND_2P_UCAC4 = 3, 4                   # 2-parameter stars with a proper motion from UCAC5 / UCAC4
+PM_SOURCE = {KIND_2P_UCAC5: "UCAC5", KIND_2P_UCAC4: "UCAC4"}
+PM_UNKNOWN_MAS_YR = 10.0                               # 1 sigma per axis of an unknown proper motion (stars G 10-16)
+SUPP_DTYPE = np.dtype(DTYPE.descr + [("ruwe", "<f4"), ("ra_error", "<f4"), ("dec_error", "<f4"), ("kind", "u1"),
+                                      ("pm_error", "<f4")])  # pm_error: of a cross-matched pm (supplement_pm), mas/yr
 
 
 class Progress:
@@ -171,11 +175,29 @@ def _download(name, dst, tries=4):
             time.sleep(10 * (k + 1))
 
 
+def replace_file(src, dst, tries=40, wait=0.25):
+    """os.replace(src, dst), retried for ~10 s on Windows' "file in use" (WinError 32 / PermissionError): Windows refuses
+    to rename a file that is still memory-mapped or open anywhere, and virus scanners (Defender) often hold a freshly
+    written large file for a moment. Linux and macOS rename at once. Raises the last error with an explanation."""
+    import gc
+    for k in range(tries):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError as e:
+            if k == tries - 1:
+                raise PermissionError(f"{e} - the file is still in use (another PyOccult run or the GUI using this "
+                                      f"catalog, or a virus scanner); close them, delete leftover *.tmp files in "
+                                      f"{os.path.dirname(os.path.abspath(dst))} and rerun") from None
+            gc.collect()                                             # drop memory maps that are only waiting for it
+            time.sleep(wait)
+
+
 def _save_atomic(path, arr):
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
     with os.fdopen(fd, "wb") as f:
         np.save(f, arr)
-    os.replace(tmp, path)
+    replace_file(tmp, path)
 
 
 def process_file(name, out_dir, gmax, ruwe_max=RUWE_MAX, supplement=False):
@@ -241,7 +263,7 @@ def build(out_dir, gmax=18.0, workers=6, supplement=False):
     fd, tmp = tempfile.mkstemp(dir=out_dir, suffix=".tmp")
     with os.fdopen(fd, "w") as f:
         json.dump(man, f, indent=1)
-    os.replace(tmp, man_path)
+    replace_file(tmp, man_path)
     for t in os.listdir(out_dir):                                       # leftovers of an interrupted run
         if t.endswith(".tmp"):
             os.remove(os.path.join(out_dir, t))
@@ -284,6 +306,144 @@ def build(out_dir, gmax=18.0, workers=6, supplement=False):
         print(f"{len(failed)} files failed (network); rerun setup to fetch just those (it resumes)")
     if st["complete"] and not supplement:
         BrightIndex(out_dir, 15.0)                                           # for pick.py
+
+
+# ----------------------------------------------------------------------------------------------- supplement pm
+def _xmatch(rows, cat, radius_arcsec=3.0, tries=3):
+    """CDS XMatch of rows (DataFrame source_id, ra, dec, g) with a VizieR catalog: DataFrame of all pairs."""
+    import io, requests
+    buf = rows[["source_id", "ra", "dec", "g"]].to_csv(index=False, float_format="%.9f").encode()
+    for k in range(tries):
+        try:
+            r = requests.post(U.URL_CDS_XMATCH, timeout=600, files={"cat1": ("cat1.csv", buf)},
+                              data=dict(request="xmatch", distMaxArcsec=radius_arcsec, RESPONSEFORMAT="csv",
+                                        colRA1="ra", colDec1="dec", cat2=cat))
+            r.raise_for_status()
+            return pd.read_csv(io.StringIO(r.text))
+        except Exception as e:
+            if k == tries - 1:
+                raise RuntimeError(f"CDS XMatch with {cat} failed: {str(e)[:200]}") from None
+            time.sleep(10 * (k + 1))
+
+
+def _sep_arcsec(ra1, de1, ra2, de2):
+    return 3600.0 * np.degrees(np.arccos(np.clip(
+        np.sin(np.radians(de1)) * np.sin(np.radians(de2)) + np.cos(np.radians(de1)) * np.cos(np.radians(de2))
+        * np.cos(np.radians(ra2 - ra1)), -1.0, 1.0)))
+
+
+def pick_ucac5(m):
+    """Best UCAC5 partner per Gaia star (XMatch pairs m): its Gaia DR1 position (2015.0) within 0.2" of the DR3 one
+    (2016.0) and G within 0.5 mag. Returns DataFrame source_id, pmra, pmdec, pm_error."""
+    if m.empty:
+        return pd.DataFrame(columns=["source_id", "pmra", "pmdec", "pm_error"])
+    m = m.dropna(subset=["RAgaia", "DEgaia", "pmRAug", "pmDEug"]).copy()
+    m["sep"] = _sep_arcsec(m.ra, m.dec, m.RAgaia, m.DEgaia)
+    m = m[(m.sep <= 0.2) & ((m.Gmag - m.g).abs() <= 0.5)].sort_values("sep").drop_duplicates("source_id")
+    err = np.maximum(m.e_pmRAug.fillna(9.9), m.e_pmDEug.fillna(9.9))
+    return pd.DataFrame(dict(source_id=m.source_id, pmra=m.pmRAug, pmdec=m.pmDEug, pm_error=err))
+
+
+def pick_ucac4(m):
+    """Best UCAC4 partner per Gaia star: its J2000 position moved with its pm to 2016.0 within 0.5" of Gaia's, and
+    its magnitude (f.mag, else V) within 1 mag of G."""
+    if m.empty:
+        return pd.DataFrame(columns=["source_id", "pmra", "pmdec", "pm_error"])
+    m = m.dropna(subset=["RAJ2000", "DEJ2000", "pmRA", "pmDE"]).copy()
+    dt = 2016.0 - 2000.0
+    de = m.DEJ2000 + m.pmDE / 3.6e6 * dt
+    ra = m.RAJ2000 + m.pmRA / 3.6e6 * dt / np.cos(np.radians(m.DEJ2000))
+    m["sep"] = _sep_arcsec(m.ra, m.dec, ra, de)
+    mag = m["f.mag"].fillna(m.get("Vmag"))
+    m = m[(m.sep <= 0.5) & ((mag - m.g).abs() <= 1.0)].sort_values("sep").drop_duplicates("source_id")
+    err = np.maximum(m.e_pmRA.fillna(9.9), m.e_pmDE.fillna(9.9))
+    return pd.DataFrame(dict(source_id=m.source_id, pmra=m.pmRA, pmdec=m.pmDE, pm_error=err))
+
+
+def supplement_pm(catalog_dir, chunk=50000, log=print):
+    """Proper motions for the supplement's 2-parameter stars (Gaia DR3 has none for them), as OWC/Occult take them
+    from other catalogs: CDS XMatch with UCAC5 (Zacharias et al. 2017; pm from Gaia DR1 and UCAC, positions at 2015.0,
+    so a match is unambiguous within 0.2"), then UCAC4 for the rest. Matched stars get pmra/pmdec, pm_error and kind
+    KIND_2P_UCAC5 / KIND_2P_UCAC4 (Gaia's 2016 position is kept); the others stay KIND_2P. Rewrites the supplement's
+    star files (SUPP_DTYPE with pm_error), records it in its catalog.json and drops its bright-star index (rebuilt on
+    use). Needs the network (~3 min for ~570k stars). Returns the counts."""
+    sd = supplement_dir(catalog_dir)
+    man_path = os.path.join(sd, "catalog.json")
+    man = json.load(open(man_path))
+    stems = [n[:-len(".csv.gz")] for n in man["files"]]
+    parts = []
+    for s in stems:
+        a = np.load(os.path.join(sd, s + ".npy"), mmap_mode="r")
+        m = np.asarray(a["kind"]) == KIND_2P
+        if m.any():
+            b = np.array(a[m])
+            parts.append(pd.DataFrame(dict(source_id=b["source_id"], ra=b["ra"], dec=b["dec"],
+                                           g=b["phot_g_mean_mag"].astype(float))))
+        del a
+    rows = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=["source_id", "ra", "dec", "g"])
+    log(f"   {len(rows)} 2-parameter stars: proper motions from UCAC5, then UCAC4 (CDS XMatch, {chunk} per request)")
+    found = {}
+    for cat, pick, kind in (("vizier:I/340/ucac5", pick_ucac5, KIND_2P_UCAC5), ("vizier:I/322A/out", pick_ucac4, KIND_2P_UCAC4)):
+        todo = rows[~rows.source_id.isin(found)]
+        t0, got = time.time(), 0
+        for i in range(0, len(todo), chunk):
+            p = pick(_xmatch(todo.iloc[i:i + chunk], cat))
+            for sid, pa, pd_, pe in zip(p.source_id.astype("int64"), p.pmra, p.pmdec, p.pm_error):
+                found[int(sid)] = (float(pa), float(pd_), float(pe), kind)
+            got += len(p)
+            log(f"   {cat.split(':')[1]}: {min(i + chunk, len(todo))}/{len(todo)} stars, {got} with a proper motion, "
+                f"{time.time() - t0:.0f} s")
+    n5 = sum(1 for v in found.values() if v[3] == KIND_2P_UCAC5)
+    n4 = len(found) - n5
+    for s in stems:                                                # rewrite every star file with the new fields
+        path = os.path.join(sd, s + ".npy")
+        a = np.load(path)
+        out = np.zeros(len(a), SUPP_DTYPE)
+        for k in a.dtype.names:
+            if k in SUPP_DTYPE.names:
+                out[k] = a[k]
+        for i in np.where(out["kind"] == KIND_2P)[0]:
+            v = found.get(int(out["source_id"][i]))
+            if v:
+                out["pmra"][i], out["pmdec"][i], out["pm_error"][i], out["kind"][i] = v
+        hpath = os.path.join(sd, s + ".hpm.npy")                 # its fast movers: the same layout (joined in lookups)
+        if os.path.exists(hpath):
+            _save_atomic(hpath, _as_dtype(np.load(hpath), SUPP_DTYPE))
+        _save_atomic(path, out)
+    for f in glob_bright(sd):
+        os.remove(f)
+    man.update(pm_xmatch=dict(two_param=int(len(rows)), ucac5=n5, ucac4=n4, none=int(len(rows) - n5 - n4),
+                              date=time.strftime("%Y-%m-%d"), method="CDS XMatch: UCAC5 (Gaia DR1 2015.0 pos <= 0.2\", "
+                              "dG <= 0.5), then UCAC4 (pos at 2016 <= 0.5\", dmag <= 1)"))
+    fd, tmp = tempfile.mkstemp(dir=sd, suffix=".tmp")
+    with os.fdopen(fd, "w") as f:
+        json.dump(man, f, indent=1)
+    replace_file(tmp, man_path)
+    log(f"   proper motions: {n5} from UCAC5, {n4} from UCAC4, {len(rows) - n5 - n4} still without (of {len(rows)})")
+    return man["pm_xmatch"]
+
+
+def _as_dtype(a, dtype):
+    """a (structured) in the layout dtype: common fields copied, missing ones 0 (older supplement files have no
+    pm_error)."""
+    if a.dtype == dtype:
+        return a
+    out = np.zeros(len(a), dtype)
+    for k in a.dtype.names or ():
+        if k in dtype.names:
+            out[k] = a[k]
+    return out
+
+
+def glob_bright(d):
+    return [os.path.join(d, f) for f in os.listdir(d) if f.startswith("bright_")]
+
+
+def has_supplement_pm(catalog_dir):
+    try:
+        return "pm_xmatch" in json.load(open(os.path.join(supplement_dir(catalog_dir), "catalog.json")))
+    except (OSError, ValueError):
+        return False
 
 
 # ----------------------------------------------------------------------------------------------- ready-made copy
@@ -379,7 +539,7 @@ def unpack_archive(archive, out_dir):
         sys.exit(f"{archive} holds no catalog.json: not a PyOccult catalog archive")
     os.makedirs(out_dir, exist_ok=True)
     for f in sorted(os.listdir(stage), key=lambda f: f == "catalog.json"):   # catalog.json last
-        os.replace(os.path.join(stage, f), os.path.join(out_dir, f))
+        replace_file(os.path.join(stage, f), os.path.join(out_dir, f))
     os.rmdir(stage)
 
 
@@ -415,7 +575,7 @@ def fetch_zenodo(out_dir, gmax=18.0, keep_archive=False, supplement=False):
         if _sha256(archive + ".part") != want:
             os.remove(archive + ".part")
             sys.exit(f"{name}: SHA-256 mismatch (corrupt download, deleted); rerun to download again")
-        os.replace(archive + ".part", archive)
+        replace_file(archive + ".part", archive)
     elif _sha256(archive) != want:
         sys.exit(f"{archive} exists but its SHA-256 does not match Zenodo's; delete it and rerun")
     unpack_archive(archive, out_dir)
@@ -474,14 +634,37 @@ def use_supplement():
 
 
 def star_flag(kind, ruwe=None):
-    """Short text for a supplement star: 'RUWE 1.65', '2-param', or '' for a main-catalog star."""
+    """Short text for a supplement star: 'RUWE 1.65', '2-param, NO proper motion', '2-param, pm UCAC5', or '' for a
+    main-catalog star."""
     try:
         k = int(kind)
     except (TypeError, ValueError):
         return ""
     if k == KIND_RUWE:
         return f"RUWE {float(ruwe):.2f}" if ruwe is not None and np.isfinite(float(ruwe)) else "RUWE >= 1.4"
-    return "2-param" if k == KIND_2P else ""
+    if k == KIND_2P:
+        return "2-param, NO proper motion"
+    return f"2-param, pm {PM_SOURCE[k]}" if k in PM_SOURCE else ""
+
+
+def star_sigma_mas(kind, ruwe, pos_err, pm_err, years):
+    """1-sigma position uncertainty (mas, per axis) of a supplement star `years` after Gaia's 2016.0, or None for a
+    main-catalog star (its Gaia errors are tiny; the online check adds them). 2-parameter star: position error and the
+    proper motion's error (cross-matched) or, without one, an unknown motion of PM_UNKNOWN_MAS_YR per axis, times the
+    years. High-RUWE star: Gaia's errors scaled by RUWE (they are underestimated for such stars), position + motion."""
+    try:
+        k = int(kind)
+    except (TypeError, ValueError):
+        return None
+    f = lambda x, d: d if x is None or not np.isfinite(float(x)) or float(x) <= 0 else float(x)
+    t = max(float(years), 0.0)
+    if k in (KIND_2P, KIND_2P_UCAC5, KIND_2P_UCAC4):
+        pm = PM_UNKNOWN_MAS_YR if k == KIND_2P else f(pm_err, PM_UNKNOWN_MAS_YR)
+        return float(np.hypot(f(pos_err, 1.0), pm * t))
+    if k == KIND_RUWE:
+        e = f(pos_err, 0.1) * max(f(ruwe, 1.4), 1.0)
+        return float(np.hypot(e, e * t))                     # Gaia's pm error ~ its position error per year
+    return None
 
 
 def _frame(arr):
@@ -490,6 +673,9 @@ def _frame(arr):
     names = arr.dtype.names or ()
     df["star_kind"] = arr["kind"].astype(np.int64) if "kind" in names else 0
     df["ruwe"] = arr["ruwe"].astype(np.float64) if "ruwe" in names else np.nan
+    df["pos_err"] = np.maximum(arr["ra_error"], arr["dec_error"]).astype(np.float64) \
+        if "ra_error" in names else np.nan                   # mas at 2016.0 (supplement only)
+    df["pm_err"] = arr["pm_error"].astype(np.float64) if "pm_error" in names else np.nan   # cross-matched pm, mas/yr
     return df
 
 
@@ -519,8 +705,9 @@ class LocalGaia:
 
     def high_pm(self):
         if self._hpm is None:
-            self._hpm = np.concatenate([np.load(os.path.join(self.dir, s + ".hpm.npy")) for s in self.stems] or
-                                       [np.empty(0, self._dtype())])
+            dt = self._dtype()
+            self._hpm = np.concatenate([_as_dtype(np.load(os.path.join(self.dir, s + ".hpm.npy")), dt)
+                                        for s in self.stems] or [np.empty(0, dt)])
         return self._hpm
 
     def cone(self, ra_deg, dec_deg, radius_deg, mag_cap=None):
@@ -535,7 +722,8 @@ class LocalGaia:
             a = a[a["phot_g_mean_mag"] <= cap]
             if len(a):
                 parts.append(np.asarray(a[_unit(a["ra"], a["dec"]) @ c >= math.cos(math.radians(radius_deg))]))
-        df = _frame(np.concatenate(parts) if parts else np.empty(0, self._dtype()))
+        dt = self._dtype()
+        df = _frame(np.concatenate([_as_dtype(p, dt) for p in parts]) if parts else np.empty(0, dt))
         if self.sup is not None:
             df = pd.concat([df, self.sup.cone(ra_deg, dec_deg, radius_deg, mag_cap)], ignore_index=True)
         return df
@@ -564,7 +752,8 @@ class LocalGaia:
         if include_high_pm:
             h = self.high_pm()
             parts.append(h[h["phot_g_mean_mag"] <= cap])
-        df = _frame(np.concatenate(parts) if parts else np.empty(0, self._dtype()))
+        dt = self._dtype()
+        df = _frame(np.concatenate([_as_dtype(p, dt) for p in parts]) if parts else np.empty(0, dt))
         if self.sup is not None:
             sp = dict(plan, mag_cap=min(cap, self.sup.gmax))
             df = pd.concat([df, self.sup.corridor_stars(sp, include_high_pm, chunk_deg)], ignore_index=True)
@@ -637,14 +826,15 @@ class BrightIndex:
             j = int(offsets[np.searchsorted(offsets, i + block, side="right") - 1])     # end on a cell boundary
             if j <= i:
                 j = int(offsets[np.searchsorted(offsets, i, side="right")])           # one cell larger than a block
-            blk = np.asarray(out[i:j])
+            blk = np.array(out[i:j])                                  # a copy: a view would keep the file mapped
             out[i:j] = blk[np.lexsort((blk["phot_g_mean_mag"], cell_of(blk["ra"], blk["dec"], self.CELL)))]
             i = j
         out.flush()
         n_stars = len(out)
-        del out
+        blk = None
+        del out                                                       # unmapped before the rename (Windows needs it)
         _save_atomic(stem + ".offsets.npy", offsets)                  # offsets first: the .npy of the stars marks done
-        os.replace(tmp, stem + ".npy")
+        replace_file(tmp, stem + ".npy")
         print(f"bright-star index G <= {self.gmax}: {n_stars / 1e6:.1f} M stars in {time.time() - t0:.0f} s -> {stem}.npy")
 
     def near_path(self, U, w_deg, mag_cap=None, sample_deg=None):
@@ -720,7 +910,7 @@ def main():
     d0, g0 = default_dir()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PyOccult {__version__}")
-    ap.add_argument("cmd", choices=["build", "supplement", "status", "zenodo"],
+    ap.add_argument("cmd", choices=["build", "supplement", "supplement-pm", "status", "zenodo"],
                     help="supplement: build (or resume) <dir>/supplement, the high-RUWE and 2-parameter stars")
     ap.add_argument("--dir", default=d0 or "gaia_dr3_local", help="catalog folder (default: config gaia_local_dir)")
     ap.add_argument("--gmax", type=float, default=g0, help="faintest G kept (default: config gaia_local_gmax or 16)")
@@ -731,12 +921,17 @@ def main():
     a = ap.parse_args()
     if a.cmd == "build":
         build(a.dir, a.gmax, a.workers)
+    elif a.cmd == "supplement-pm":
+        supplement_pm(a.dir)
     elif a.cmd == "supplement":
         if a.source == "zenodo" and float(a.gmax) in ZENODO_SUPPLEMENT:
-            if fetch_zenodo(a.dir, a.gmax, a.keep_archive, supplement=True)["complete"]:
-                BrightIndex(supplement_dir(a.dir), 15.0)
+            fetch_zenodo(a.dir, a.gmax, a.keep_archive, supplement=True)
         else:
             build(a.dir, a.gmax, a.workers, supplement=True)
+        if has_supplement(a.dir):
+            if not has_supplement_pm(a.dir):                     # proper motions for its 2-parameter stars
+                supplement_pm(a.dir)
+            BrightIndex(supplement_dir(a.dir), 15.0)
     elif a.cmd == "zenodo":
         if fetch_zenodo(a.dir, a.gmax, a.keep_archive)["complete"]:
             BrightIndex(a.dir, 15.0)                                         # for pick.py

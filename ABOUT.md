@@ -46,6 +46,7 @@ results with (VERIFICATION.md).
   - [Gravitational light deflection and stellar parallax (built in 0.10.0, 2026-10-04)](#gravitational-light-deflection-and-stellar-parallax-built-in-0100-2026-10-04)
 - [Part 7: Future plans](#part-7-future-plans)
   - [Major solar-system bodies as targets (planets and moons built in 0.14.0; Earth's Moon open)](#major-solar-system-bodies-as-targets-planets-and-moons-built-in-0140-earths-moon-open)
+- [Supplemental: related tools (notes for later)](#supplemental-related-tools-notes-for-later)
 
 ---
 
@@ -138,7 +139,15 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   bright-star index (`MergedIndex`, `COMMON_DTYPE`) for picks and pre-screens; `use_supplement()` = env
   `PYOCCULT_SUPPLEMENT` (GUI switch) else config `gaia_supplement` (default on). Events on such stars carry
   `star_kind`, `star_ruwe`, `star_flag` ("RUWE 1.65", "2-param") at the end of the record and the pick's events, shown
-  as ⚑ after the star magnitude. On Zenodo with the catalogs since version 2 (2026-10-11,
+  as ⚑ after the star magnitude.
+  **2-parameter stars have no proper motion in Gaia DR3**, so their 2026 position can be 0.1-0.3" off, 100-400 km at
+  main-belt distances ((4089) Galbraith, 2026-10-13: a false "hit"). `supplement_pm` gives them proper motions from
+  UCAC5 (Zacharias et al. 2017: pm from Gaia DR1 and UCAC; matched by its Gaia DR1 2015.0 position within 0.2" of the
+  DR3 2016.0 one and G within 0.5 mag), else UCAC4 (its J2000 position moved to 2016 within 0.5", magnitude within 1),
+  through CDS XMatch (kinds 3, 4; Gaia's position kept). Of 573,735: 51 % UCAC5, 30 % UCAC4, 19 % none (kind 2).
+  `star_sigma_mas`: the star's 1-sigma position at the event date (2-parameter: position + pm error or 10 mas/yr per
+  axis, times the years; high RUWE: Gaia's errors x RUWE), in km at the asteroid combined with the orbit's sigma.
+  On Zenodo with the catalogs since version 2 (2026-10-11,
   [doi:10.5281/zenodo.23298192](https://doi.org/10.5281/zenodo.23298192)): `gaia_dr3_g18_supplement_g16.tar.xz`
   (0.35 GB, `.sha256`; top folder `supplement/`), fetched by `fetch_zenodo(..., supplement=True)` into any catalog
   folder (the cut does not depend on the catalog's limit); built here in 106 min, the download is identical. Found
@@ -807,3 +816,31 @@ from the `L:`/`P:`/`M:` prefix) has to change, most important first:
 
 Hit log: a `target_kind` column (asteroid, planet, moon, moon_earth) so the report can list planet events with or
 apart from asteroid events. The OWC check, the pick tool and the saved picks stay asteroid-only.
+
+---
+
+## Supplemental: related tools (notes for later)
+
+Pointed out by a tester (2026-10-11); kept here for later work. PyOccult stays an independent development: these are
+references to compare with and to learn from, not code bases it is built on. If one is ever used as a library, it is
+credited in the README, the GUI's About box and CITATION.cff.
+
+**SORA, Stellar Occultation Reduction and Analysis** (Gomes-Júnior, Morgado, Benedetti-Rossi, Boufleur, Rommel,
+Banda-Huarca, Kilic, Braga-Ribas, Sicardy; MNRAS 2022, [arXiv:2201.01799](https://arxiv.org/abs/2201.01799); docs
+https://sora.readthedocs.io/latest/modules.html). An open-source Python library on astropy from the Lucky Star team,
+"from predicting such events up to the determination of Solar System bodies' sizes, shapes, and positions"; it can
+also predict events for observers in space (e.g. JWST near the Sun-Earth L2 point). Widely used and actively
+developed. Its focus complements PyOccult's: SORA studies chosen objects in depth (prediction, light-curve fitting,
+chords, limb and ellipse fits, astrometry), PyOccult screens all asteroids for the events at an observer's site
+(bulk pick, pre-screens, planning GUI). Possible uses:
+1. **A third independent validation reference** (besides OWC and Occult): predict the same events with SORA (e.g.
+   (86288) 1999 UC45 on 2026-09-30 and some OWC reference sets), compare time, centre line and path width, and add the
+   results to VERIFICATION.md. SORA would run in a separate environment, so PyOccult's dependencies stay as they are.
+2. **Analysis after an event** (open item "observation data per favorite": result, D/R times, chords): export a
+   favorite's prediction and the observers' timings in a form SORA reads, or use SORA optionally where it is
+   installed, instead of writing chord and shape fitting from scratch. Check its license and API before that.
+
+**Marc Buie's IDL library** (https://www2.boulder.swri.edu/~buie/idl/): an extensive, long-standing collection of
+occultation and astrometry routines in IDL. IDL is commercial (licence on request from NV5 Geospatial Software,
+https://www.nv5geospatialsoftware.com/Products/IDL), so PyOccult cannot run or depend on it; a valuable read for
+methods and edge cases.
