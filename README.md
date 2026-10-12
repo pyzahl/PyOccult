@@ -350,9 +350,11 @@ a shadow can be only a few km wide). Without a terminal, setup copies `src/pyocc
 pyoccult setup              # kernels + local Gaia catalog + bright-star index (asks: zenodo or esa)
 pyoccult setup --source zenodo   # catalog from Zenodo without asking (G <= 16 or 18 only)
 pyoccult setup --source esa      # build the catalog from ESA's files without asking
-pyoccult setup --no-gaia    # kernels only (e.g. to try the old "windows" search mode)
-pyoccult setup --status     # what is installed
-pyoccult setup --gmax 18    # the larger catalog to G 18 (own folder gaia_dr3_g18, ~11 GB); --dir to choose the folder
+pyoccult setup --no-gaia        # kernels only (e.g. to try the old "windows" search mode)
+pyoccult setup --status         # what is installed
+pyoccult setup --gmax 18        # the larger catalog to G 18 (own folder gaia_dr3_g18, ~11 GB); --dir to choose the folder
+pyoccult setup --supplement     # install high RUWE star catalog supplement, derived from Gaia
+pyoccult setup --planet-kernels # install kernels for solar system bodies (planets + moons)
 ```
 
 The catalog limit defaults to `gaia_local_gmax` (16). Another limit with `--gmax` is built in its own folder
