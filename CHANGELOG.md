@@ -20,6 +20,9 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   (Pick table: "⚠ 2-param, NO proper motion").
 
 ### Fixed
+- GUI number fields always use the decimal point (46.99023): Firefox formatted them by the browser's language
+  (German: 46,99023), unlike the values, logs and reports. The page now declares English (`lang`) and every number
+  field carries `lang="en"`; a pasted number with a decimal comma (46,99023) is converted.
 - (4089) Galbraith on 2026-10-13: a predicted "hit" 1.6 km from a site was on a G 9.8 2-parameter Gaia star (a
   resolved double, no proper motion) whose 2016 position was used unchanged; OWC put the path over 100 km away. With
   UCAC5's proper motion the path lies 206 km away (±27 km); without a proper motion the event is now shown with its

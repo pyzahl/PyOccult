@@ -285,6 +285,10 @@ independent references for comparing results (note at the top of README, GUI Abo
   it). Windows mode (cone searches): `launch_job_async`. Online double check and star errors (doubles.py): synchronous
   in chunks (50 events / 1000 source_ids, far below the cap; a chunk reaching 2000 rows is reported), because the
   async job's status polling hung for minutes in 2026-10 while sync answered in ~5 s.
+- GUI numbers always with the decimal point: Firefox localises `type=number` inputs by the element's/page's `lang`
+  (no lang: the browser locale, German -> "46,99023"). gui.main: head script `document.documentElement.lang='en'`,
+  `ui.number.default_props("lang=en")`, `ui.run(language="en-US")`; paste: a single "46,99023" -> "46.99023".
+  Verified 2026-10-12 (Firefox lang=de shows a comma, lang=en a point; CDP: all number inputs lang=en).
 - Console output must never crash on a character: `__main__.safe_console()` sets stdout/stderr `errors="replace"`
   (Windows cp1252 consoles crashed on "✅", 2026-10-11); GUI runs get PYTHONUTF8=1 / PYTHONIOENCODING=utf-8 (the log
   decodes UTF-8). Code started outside `pyoccult.__main__.main` must call `safe_console()` itself.

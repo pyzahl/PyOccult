@@ -9,7 +9,7 @@ It listens on this computer only (127.0.0.1), because it can start programs. Eve
 not changed. Saving a site rewrites sites.py (comments in it are not kept).
 """
 from pyoccult.version import __version__, __codename__, __author__, __copyright__, __license__, __url__
-import argparse, asyncio, csv, json, math, os, pprint, runpy, sys, time
+import argparse, asyncio, csv, json, math, os, pprint, re, runpy, sys, time
 
 from pyoccult import home
 from pyoccult.home import HOME as ROOT, PKG                      # ROOT: the data folder (sites.py, maps/, ...)
@@ -635,10 +635,12 @@ def index():
     # pasted coordinates: a number field drops text, so text that is not a plain number is taken from the paste
     # event in the browser and parsed here (geo.parse_coords: DMS, decimal, N/S/E/W, labels, heights)
     PASTE_JS = ("(e) => { const t = (e.clipboardData || window.clipboardData).getData('text'); "
-                "if (!/^\\s*[+-]?\\d*[.,]?\\d+\\s*$/.test(t)) { e.preventDefault(); emit(t); } }")
+                "if (!/^\\s*[+-]?\\d*\\.?\\d+\\s*$/.test(t)) { e.preventDefault(); emit(t); } }")
 
     async def on_paste(field, e):
         text = e.args if isinstance(e.args, str) else (e.args[0] if e.args else "")
+        if re.fullmatch(r"\s*[+-]?\d+,\d+\s*", text):           # one number with a decimal comma (German, Swiss)
+            text = text.replace(",", ".")                      # the fields always use the decimal point
         try:
             c = geo.parse_coords(text, field)
         except ValueError as ex:
@@ -1421,8 +1423,13 @@ def main():
                         strict=False, max_cache_age=0)
     app.add_static_file(local_file=os.path.join(ROOT, "bodies_report.html"), url_path="/out/bodies_report.html",
                         strict=False, max_cache_age=0)
+    # always the decimal point: Firefox formats number fields by the page's language (German: "46,99023"), while the
+    # values, logs and reports are Python's "46.99023". The page declares English before it is drawn, and every number
+    # field carries lang="en" itself (so a browser translation or add-on cannot change it either)
+    ui.add_head_html("<script>document.documentElement.lang = 'en';</script>", shared=True)
+    ui.number.default_props("lang=en")
     ui.run(host="127.0.0.1", port=a.port, title="PyOccult", favicon=os.path.join(PKG, "pyoccult_logo.svg"),
-           show=not a.no_browser, reload=False, reconnect_timeout=60)   # a busy browser keeps its page
+           show=not a.no_browser, reload=False, reconnect_timeout=60, language="en-US")   # a busy browser keeps its page
 
 
 if __name__ in {"__main__", "__mp_main__"}:
