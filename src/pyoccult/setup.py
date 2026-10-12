@@ -409,9 +409,10 @@ def main():
                     help="download NAIF's satellite kernels for planets and moons (Jupiter: jup365.bsp, 1.1 GB) for "
                          "offline use; otherwise their positions come from JPL Horizons per search")
     ap.add_argument("--supplement", action="store_true",
-                    help="also build (or resume) the catalog's high-RUWE supplement: the stars the catalog leaves out "
-                         "(Gaia RUWE >= 1.4, 2-parameter), flagged in the results; ~8 M stars, 0.4 GB to G 16, about "
-                         "2 h from ESA's files")
+                    help="also install the catalog's high-RUWE supplement: the stars the catalog leaves out (Gaia "
+                         "RUWE >= 1.4, 2-parameter), flagged in the results; ~8 M stars to G 16: 0.35 GB from Zenodo "
+                         "(--source esa: built from ESA's files, ~2 h), then proper motions for its 2-parameter stars "
+                         "from UCAC5/UCAC4 (a few minutes)")
     ap.add_argument("--supplement-gmax", type=float, default=16.0,
                     help="faintest G of the supplement (default 16, at most the catalog's limit)")
     ap.add_argument("--home", metavar="FOLDER", help="use FOLDER as the data folder from now on (saved as a setting; "

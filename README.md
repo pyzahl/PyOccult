@@ -353,9 +353,28 @@ pyoccult setup --source esa      # build the catalog from ESA's files without as
 pyoccult setup --no-gaia        # kernels only (e.g. to try the old "windows" search mode)
 pyoccult setup --status         # what is installed
 pyoccult setup --gmax 18        # the larger catalog to G 18 (own folder gaia_dr3_g18, ~11 GB); --dir to choose the folder
-pyoccult setup --supplement     # install high RUWE star catalog supplement, derived from Gaia
-pyoccult setup --planet-kernels # install kernels for solar system bodies (planets + moons)
+pyoccult setup --supplement     # also the high-RUWE supplement (Gaia stars the catalog leaves out) + their proper motions
+pyoccult setup --planet-kernels # NAIF kernels for planets and moons, for offline use (Jupiter: 1.1 GB)
 ```
+
+All options of `pyoccult setup` (also `pyoccult setup --help`):
+
+| Option | What it does |
+|---|---|
+| (none) | everything that is missing: your site (first run), SPICE kernels, local Gaia catalog, bright-star index; asks where questions are needed |
+| `--status` | only show what is installed (data folder, site, kernels, catalog, index, supplement, planet kernels) |
+| `--gmax G` | faintest Gaia G of the catalog (default `gaia_local_gmax`, 16); another limit gets its own folder `gaia_dr3_g<G>` |
+| `--dir FOLDER` | the catalog folder (default `gaia_local_dir`, or `gaia_dr3_g<G>` for another `--gmax`) |
+| `--source auto\|zenodo\|esa` | where the catalog comes from: `auto` asks (Enter = Zenodo), `zenodo` the ready-made download (G 16 or 18), `esa` built from ESA's files (any limit, 1.5-2 h); also for the supplement |
+| `--keep-archive` | keep the downloaded Zenodo `.tar.xz` (deleted after unpacking otherwise) |
+| `--workers N` | parallel downloads for an ESA build (default 6) |
+| `--no-gaia` | kernels (and site) only, no catalog |
+| `--supplement` | also the high-RUWE supplement of the catalog (Gaia stars with RUWE >= 1.4 or without proper motion, flagged in the results): 0.35 GB from Zenodo, then proper motions for its 2-parameter stars from UCAC5/UCAC4 (a few minutes); `--source esa` builds it instead (~2 h). A first-time setup offers it |
+| `--supplement-gmax G` | faintest G of the supplement (default 16, at most the catalog's limit; Zenodo has G 16) |
+| `--planet-kernels` | download NAIF's kernels for planets and moons (e.g. Jupiter's `jup365.bsp`, 1.1 GB) for offline use; without them positions come from JPL Horizons per search |
+| `--no-geoip` | do not guess your site from your IP address (first run) |
+| `--home FOLDER` | use FOLDER as the data folder from now on (saved as a setting; files are not moved); see "Where your data and settings live" |
+| `--version` | show PyOccult's version |
 
 The catalog limit defaults to `gaia_local_gmax` (16). Another limit with `--gmax` is built in its own folder
 (`gaia_dr3_g<limit>`, or `--dir`); setup then prints the two lines to set in `pyoccult_config.py` (`gaia_local_dir`,
