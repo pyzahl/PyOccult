@@ -279,6 +279,9 @@ independent references for comparing results (note at the top of README, GUI Abo
   it). Windows mode (cone searches): `launch_job_async`. Online double check and star errors (doubles.py): synchronous
   in chunks (50 events / 1000 source_ids, far below the cap; a chunk reaching 2000 rows is reported), because the
   async job's status polling hung for minutes in 2026-10 while sync answered in ~5 s.
+- Console output must never crash on a character: `__main__.safe_console()` sets stdout/stderr `errors="replace"`
+  (Windows cp1252 consoles crashed on "✅", 2026-10-11); GUI runs get PYTHONUTF8=1 / PYTHONIOENCODING=utf-8 (the log
+  decodes UTF-8). Code started outside `pyoccult.__main__.main` must call `safe_console()` itself.
 - Standard-library web requests go through `pyoccult.net.urlopen` (SSL context with certifi's CA list): some Pythons
   (macOS) have no CAs for urllib -> CERTIFICATE_VERIFY_FAILED, while requests (own certifi) works. Never call
   `urllib.request.urlopen` directly; test stand-ins must accept `context=`.

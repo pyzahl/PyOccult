@@ -44,7 +44,19 @@ def run(command, args):
     return importlib.import_module(module).main()
 
 
+def safe_console():
+    """Never crash on a character the console cannot show (Windows consoles with a legacy code page such as cp1252
+    cannot encode e.g. the check mark of the kernel download): replace it with '?' instead. Runs started by the GUI use
+    Python's UTF-8 mode (PYTHONUTF8), so their log shows every character."""
+    for s in (sys.stdout, sys.stderr):
+        try:
+            s.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv=None):
+    safe_console()
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv and argv[0] in ("-h", "--help", "help"):
         print(__doc__)

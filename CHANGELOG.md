@@ -6,6 +6,12 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Fixed
+- Windows: a console with a legacy code page (cp1252) crashed on PyOccult's symbols (e.g. "✅ All kernels verified" during
+  setup: `UnicodeEncodeError`). Console output now replaces characters it cannot show with "?" (every command), and runs
+  started by the GUI use Python's UTF-8 mode, so the log shows them all. README: do not install from an administrator
+  prompt (it starts in `C:\Windows\System32`).
+
 ### Changed
 - Geodetic coordinates use the WGS84 ellipsoid exactly (`pyoccult/earth.py`): shadow paths are points at height 0 m
   on WGS84 (as Occult's default output, for exact comparisons), and sites, the observer and the globe plot convert

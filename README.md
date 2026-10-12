@@ -177,6 +177,12 @@ catalogs, results) stays in the PyOccult folder, see "Your data folder" below.
 
 Not tested on Windows yet: please report what works and what does not (GitHub issue or e-mail).
 
+> **Use a normal PowerShell or command prompt, not "Run as administrator",** and always `cd` into your PyOccult folder
+> before running anything. An administrator prompt starts in `C:\Windows\System32`, and commands typed there create
+> PyOccult's environment and data inside the Windows system folder (seen in a test install as
+> `C:\Windows\System32\.venv`). If that happened: delete that `.venv` folder (as administrator) and start again in your
+> own folder, e.g. `C:\PyOccult`.
+
 1. **Install uv.** Open PowerShell (Start menu, type "PowerShell", Enter) and paste:
 
    ```powershell

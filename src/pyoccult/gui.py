@@ -103,7 +103,8 @@ async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
     if Job.proc and Job.proc.returncode is None:
         ui.notify("A run is already in progress", type="warning")
         return None
-    env = dict(os.environ, PYTHONUNBUFFERED="1", PYOCCULT_HOME=ROOT)
+    env = dict(os.environ, PYTHONUNBUFFERED="1", PYOCCULT_HOME=ROOT,
+               PYTHONUTF8="1", PYTHONIOENCODING="utf-8")       # UTF-8 output on every system (log: decoded as UTF-8)
     env["PYTHONPATH"] = os.pathsep.join(x for x in (os.path.dirname(PKG), env.get("PYTHONPATH")) if x)   # not installed
     if env_site:
         env["PYOCCULT_SITE"] = env_site
