@@ -811,6 +811,13 @@ whether they were built with it; a pick with the supplement only uses one that w
 (stars with the 7 Gaia columns, sky cells, fast movers) is found and can be selected. A converter for another source
 only has to write that layout.
 
+**Add Proper motions for two-parameter stars in Gaia, as OWC/Occult does it.**
+Matching: it cross-matches the supplement's two-parameter stars through CDS XMatch with UCAC5 first, then UCAC4.
+Strict criteria reject a wrong partner, such as the companion star 2.9″ away in the Galbraith case.
+
+```bash
+pyoccult gaia supplement-pm --dir gaia_dr3_g18   # or your gaia_dr_g16 as installed
+```
 
 
 ## Pick tool: choose targets
