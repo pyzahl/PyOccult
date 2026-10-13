@@ -6,7 +6,23 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.18.0] "New Horizons" - 2026-10-12
+
+More honest predictions for less well-measured stars, and older events. Gaia gives no proper motion for its
+"2-parameter" stars; PyOccult now takes it from UCAC5 or UCAC4 (as OWC does) and puts every supplement star's position
+uncertainty into the path, with a red warning where it decides whether the shadow reaches the site (a false "hit" of
+(4089) Galbraith, OWC 100+ km away, prompted it). Shadow paths are exactly on the WGS84 ellipsoid at height 0 (as
+Occult's default output), events before 2000 work with NAIF's historic Earth orientation, and four near-Earth asteroid
+events of 2019-2021 (Phaethon, Apophis) check out. Also: Windows fixes for the first installs, always a decimal point
+in the GUI, pick timings, and a debug file of each event's geodetic path.
+
 ### Added
+- **Historic events before 2000**: the Earth orientation file `earth_latest_high_prec.bpc` starts 2000-01-01; for
+  earlier windows PyOccult loads NAIF's historic `earth_1962_*_combined.bpc` (measured from 1962; ~31 MB; the newest
+  by name) before it, so the high-precision file still rules from 2000 on (checked: identical there). A search or pick
+  before 2000 downloads it when missing (`pyoccult setup --historic-earth` beforehand); every search now checks that
+  the whole window has Earth orientation (before: only its end) and stops with a clear message otherwise (e.g.
+  before 1962). `setup --status`, `cleanup` and the run summary know the file.
 - **Proper motions for the supplement's 2-parameter stars** (Gaia DR3 has none for them): `pyoccult gaia
   supplement-pm` (run automatically by `setup --supplement` and `gaia supplement`) cross-matches them with UCAC5
   (Gaia DR1 2015.0 positions within 0.2", G within 0.5 mag), then UCAC4, through CDS XMatch, as OWC/Occult take them
@@ -18,6 +34,21 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   1- and 3-sigma lines, an honest "chance at site", a star error ellipse. Record fields `star_sigma_mas`,
   `star_sigma_km`, `ast_sigma1_km`. When it exceeds the asteroid's radius the report shows a red "⚠ star ±157 km"
   (Pick table: "⚠ 2-param, NO proper motion").
+- Debug option `debug_save_paths` (config, default off): each event's geodetic shadow path (WGS84, height 0 m) (centre, edges, 1- and
+  3-sigma limits, satellite zone; ET, longitude, latitude, duration) together with the event (target, Gaia star, time,
+  size, sigma, site, version) as `<map_dir>/<event>_path.npz`, for later verification.
+- The pick prints where its time went: `timing: total … = start-up + asteroid list + kernels + pre-screen (or
+  asteroid choice) + screen (workers incl.) + output` (start-up measured from the start of the `pyoccult` command).
+
+### Changed
+- Geodetic coordinates use the WGS84 ellipsoid exactly (`pyoccult/earth.py`): shadow paths are points at height 0 m
+  on WGS84 (as Occult's default output, for exact comparisons), and sites, the observer and the globe plot convert
+  with it too. Before, the SPICE kernel's Earth radii (pck00010, ~0.4 m off WGS84) were used: paths move by 0.3 m
+  (median), up to ~3.6 m near the limb.
+- Documentation: VERIFICATION.md section 3 with four near-Earth asteroid events (Phaethon 2019 and 2021,
+  Apophis 2021 x2): found by the regular search on the right Gaia stars within 1-3 m of the computed centre
+  lines; one given time (Phaethon 2021-10-03 "17:30 UT") does not fit any star. README: installing and
+  updating the supplement's proper motions; all setup options in one table.
 
 ### Fixed
 - GUI number fields always use the decimal point (46.99023): Firefox formatted them by the browser's language
@@ -38,19 +69,6 @@ All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https:
   setup: `UnicodeEncodeError`). Console output now replaces characters it cannot show with "?" (every command), and runs
   started by the GUI use Python's UTF-8 mode, so the log shows them all. README: do not install from an administrator
   prompt (it starts in `C:\Windows\System32`).
-
-### Changed
-- Geodetic coordinates use the WGS84 ellipsoid exactly (`pyoccult/earth.py`): shadow paths are points at height 0 m
-  on WGS84 (as Occult's default output, for exact comparisons), and sites, the observer and the globe plot convert
-  with it too. Before, the SPICE kernel's Earth radii (pck00010, ~0.4 m off WGS84) were used: paths move by 0.3 m
-  (median), up to ~3.6 m near the limb.
-
-### Added
-- Debug option `debug_save_paths` (config, default off): each event's geodetic shadow path (WGS84, height 0 m) (centre, edges, 1- and
-  3-sigma limits, satellite zone; ET, longitude, latitude, duration) together with the event (target, Gaia star, time,
-  size, sigma, site, version) as `<map_dir>/<event>_path.npz`, for later verification.
-- The pick prints where its time went: `timing: total … = start-up + asteroid list + kernels + pre-screen (or
-  asteroid choice) + screen (workers incl.) + output` (start-up measured from the start of the `pyoccult` command).
 
 ## [0.17.0] "New Horizons" - 2026-10-11
 

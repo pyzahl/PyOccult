@@ -306,6 +306,12 @@ independent references for comparing results (note at the top of README, GUI Abo
   `PyOccult_sbdb_phys.json`; both SBDB caches refetched after `sbdb_max_age_days`) goes to `config.cache_path`
   (`/dev/shm` if present, else the system temp folder); never hard-code a path. Gaia is not cached: corridor mode
   reads the local catalog, the old windows mode queries the archive uncached.
+- Historic Earth orientation (2026-10-12): `kernels.historic_earth_pck` (newest `earth_1962_*_combined.bpc`, NAIF
+  pck/ listing, `download_historic_earth_pck`, URL_NAIF_PCK_DIR), loaded BEFORE earth_latest_high_prec.bpc
+  (`earth_kernels`, screen.load_kernels; SPICE: last loaded wins, so the latest rules from 2000 on: identical, checked).
+  search.py start-up: window start before the latest's start -> fetch it; `window_coverage(spans, et0, et1)` checks
+  the whole window (start, gaps); the end check stays on the latest file only (no silent century predictions).
+  pick: same fetch. setup `--historic-earth`, status line, cleanup pattern. tests/test_kernels_coverage.py.
 - Earth PCK coverage: `pck_comment_dates` reads "Creation date" and "UTC Epoch of last datum" (end of measured EOP)
   from the file's comment block; `pckcov` gives the end of the prediction. Run summary key `earth_pck`; a search window
   past the end exits at start-up.

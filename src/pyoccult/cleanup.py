@@ -22,8 +22,8 @@ import argparse, glob, os, shutil, sys, tempfile
 
 KERNEL_FILES = ("naif0012.tls", "de440.bsp", "pck00010.tpc", "earth_latest_high_prec.bpc")
 NAIF_FILES = ("jup365.bsp", "sat441.bsp", "nep097.bsp", "plu060.bsp", "mar099.bsp")   # bodies.NAIF_KERNELS
-DOWNLOADS = KERNEL_FILES + NAIF_FILES + ("data/ObsCodes.html", "jpl_asteroids_spice.csv", "sbdb_cache.json",
-                                         "owc_cache.json")
+DOWNLOADS = KERNEL_FILES + NAIF_FILES + ("earth_1962_*_combined.bpc", "data/ObsCodes.html", "jpl_asteroids_spice.csv",
+                                         "sbdb_cache.json", "owc_cache.json")
 CACHE_PATTERNS = ("PyOccult_asteroid_*.bsp", "PyOccult_body_*.bsp", "PyOccult_sbdb_cache.json",
                   "PyOccult_sbdb_phys.json", "pyoccult_exports")
 OUTPUTS = ("pyoccult.db", "pyoccult.db-wal", "pyoccult.db-shm", "owc_check.db", "owc_check.db-wal", "owc_check.db-shm",

@@ -67,17 +67,39 @@ if download_kernels(config.earth_pck_max_age):
         spice.furnsh("naif0012.tls")       # Leapseconds
         spice.furnsh("pck00010.tpc")       # Planetary constants
         spice.furnsh("de440.bsp")          # Major planets base
-        spice.furnsh("earth_latest_high_prec.bpc")
-        
-        cover = spice.stypes.SPICEDOUBLE_CELL(1000)
-        spice.pckcov("earth_latest_high_prec.bpc", 3000, cover)      # 3000 = ITRF93 segments, verify
-        EARTH_PCK = pck_comment_dates("earth_latest_high_prec.bpc")
-        EARTH_PCK["stop"] = spice.et2utc(spice.wnfetd(cover, spice.wncard(cover) - 1)[1], 'ISOC', 0)
-        _win_end = spice.et2utc(spice.str2et(str(config.ct)) + config.days * 86400.0, 'ISOC', 0)
+        from pyoccult import kernels as K
+        _w0 = spice.str2et(str(config.ct))
+        _w1 = _w0 + config.days * 86400.0
+        _latest = K.pck_span(spice, K.EARTH_PCK)                    # 2000-01-01 .. ~3 months ahead
+        _hist = K.historic_earth_pck(".")
+        if _w0 < _latest[0] and not _hist:                          # a historic window: Earth orientation before 2000
+            print(f"* Search window starts {spice.et2utc(_w0, 'ISOC', 0)[:10]}, before {K.EARTH_PCK} "
+                  f"({spice.et2utc(_latest[0], 'ISOC', 0)[:10]}): getting the historic Earth orientation file")
+            _hist = K.download_historic_earth_pck(".")
+        _spans = []
+        if _hist:                                                   # loaded first: EARTH_PCK wins where both cover
+            spice.furnsh(_hist)
+            _spans.append((os.path.basename(_hist), *K.pck_span(spice, _hist)))
+        spice.furnsh(K.EARTH_PCK)
+        _spans.append((K.EARTH_PCK, *_latest))
+        EARTH_PCK = pck_comment_dates(K.EARTH_PCK)
+        EARTH_PCK["stop"] = spice.et2utc(_latest[1], 'ISOC', 0)
+        if _hist:
+            EARTH_PCK["historic"] = dict(file=os.path.basename(_hist), start=spice.et2utc(_spans[0][1], 'ISOC', 0))
+        _win_start, _win_end = spice.et2utc(_w0, 'ISOC', 0), spice.et2utc(_w1, 'ISOC', 0)
         print ('---------------------------------------------')
         print (f"* Earth PCK of {EARTH_PCK['created'] or '?'}: measured to {EARTH_PCK['last_datum'] or '?'}, "
-               f"predicted to {EARTH_PCK['stop'][:10]}")
-        if _win_end > EARTH_PCK["stop"]:
+               f"predicted to {EARTH_PCK['stop'][:10]}"
+               + (f"; before {spice.et2utc(_latest[0], 'ISOC', 0)[:10]}: {os.path.basename(_hist)} (from "
+                  f"{EARTH_PCK['historic']['start'][:10]})" if _hist else ""))
+        _ok, _why = K.window_coverage(_spans, _w0, min(_w1, _latest[1]))
+        if not _ok:                                                 # start (or a gap): no Earth orientation there
+            sys.exit(f"Search window {_win_start[:10]} .. {_win_end[:10]}: no Earth orientation for all of it ({_why} "
+                     f"the files: " + ", ".join(f"{n_} {spice.et2utc(a_, 'ISOC', 0)[:10]}..{spice.et2utc(b_, 'ISOC', 0)[:10]}"
+                                                 for n_, a_, b_ in _spans)
+                     + "). For dates before 2000: pyoccult setup --historic-earth (downloads "
+                       f"{K.EARTH_HISTORIC_GLOB}, ~31 MB)")
+        if _win_end > EARTH_PCK["stop"]:                            # future: only the high-precision file's prediction
             sys.exit(f"Search window ends {_win_end[:10]}, after the Earth orientation file ({EARTH_PCK['stop'][:10]}): "
                      f"shorten the window (days) or refresh earth_latest_high_prec.bpc (delete it, rerun)")
         print ('---------------------------------------------')

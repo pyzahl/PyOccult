@@ -244,6 +244,13 @@ def main(argv=None):
     T["kernels"] = time.time()
     et0 = spice.str2et(a.start + "T00:00:00")
     et1 = et0 + a.days * 86400.0
+    from pyoccult import kernels as K
+    if et0 < K.pck_span(spice, os.path.join(HOME, K.EARTH_PCK))[0] and not K.historic_earth_pck(HOME):
+        print("window before 2000: getting the historic Earth orientation file", file=sys.stderr)
+        if not K.download_historic_earth_pck(HOME):            # the workers load it (screen.load_kernels)
+            sys.exit("no Earth orientation before 2000: pyoccult setup --historic-earth (when online)")
+        spice.kclear()
+        SC.load_kernels(spice, HOME)                           # again, the historic file first
     opt = dict(reach_km=a.reach, min_alt=a.min_alt, max_sun_alt=a.max_sun_alt, min_drop=a.min_drop,
                min_dur=a.min_dur, cam_limit=a.cam_limit, aperture=a.aperture, frames=a.frames,
                mag_adjust=a.mag_adjust, extinction=a.extinction)

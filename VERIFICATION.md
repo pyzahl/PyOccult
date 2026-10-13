@@ -2,7 +2,7 @@
 
 How PyOccult's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
 event plots, against its own older code paths, and with independent geometry. What is computed and how: `ABOUT.md`;
-open items: `ABOUT.md`, Part 6. Updated 2026-10-11 (PyOccult 0.17.0).
+open items: `ABOUT.md`, Part 6. Updated 2026-10-12 (PyOccult 0.18.0).
 
 Contents:
 
@@ -297,6 +297,32 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
     Iceland, Sydney, Svalbard and Tierra del Fuego; the index passes 14-26 % of the events to the exact test. A first
     index that took the reach as ground km dropped 1 % at the loosest limits (low-altitude events seen off the track):
     found and fixed with `ground_reach`.
+- **Near-Earth asteroids, historic events** (2026-10-12; four test cases given without locations): (3200) Phaethon
+  occulting HIP 24973 on 2019-07-29 ~11:20 UT and UCAC4 646-021974 on 2021-10-03 "17:30 UT"; (99942) Apophis occulting
+  TYC 0789-01041-1 on 2021-04-04 ~05:24 UT and TYC 1929-01244-1 on 2021-05-06 ~03:00 UT. Demanding: small objects
+  close to the Earth (Apophis 0.14-0.17 AU: 1" is ~100 m, and its position seen from different places on the Earth
+  differs by up to ~1').
+  1. *Stars*: HIP 24973 through the Gaia archive's Hipparcos cross-match; the others as the only bright Gaia star
+     within the asteroid's parallax range of its Horizons position at the given time (for HIP 24973 the same star).
+     All four have full astrometry (5-parameter, RUWE 0.87-1.22) and are in the local main catalog.
+  2. *Geometry from the Earth's centre* (Horizons SPK for the date, the local Gaia star with proper motion, parallax
+     and light deflection, `paths.shadow_path` on WGS84): the shadow reaches the Earth in all four cases.
+  3. *The regular PyOccult search* at a test site placed on each computed centre line (dark, star above 20 deg) found
+     each event by itself, on that star, within 1-3 m of the centre line and at the same second:
+
+  | Event | PyOccult (test site) | Gaia DR3 star | Shadow on the Earth | Duration, drop | Path 1 sigma |
+  |---|---|---|---|---|---|
+  | Phaethon 2019-07-29 | 11:19:35.0 UT (lon -111.49, lat 37.19) | 194811405789498112, G 7.29 | 11:04-11:21 UT | 0.56 s, 8.9 mag | 0.69 km |
+  | Phaethon 2021-10-03 | 16:58:44.0 UT (lon 157.34, lat 27.25) | 199543119717831424, G 12.02 | 16:46-17:12 UT | 0.75 s, 6.6 mag | 0.43 km |
+  | Apophis 2021-04-04 | 05:21:53.1 UT (lon -104.66, lat 27.49) | 650172153566702208, G 11.01 | 04:51-05:53 UT | 0.14 s, 6.1 mag | 0.55 km |
+  | Apophis 2021-05-06 | 02:57:36.3 UT (lon -110.80, lat 28.91) | 681575923641521536, G 11.57 | 02:16-03:48 UT | 0.18 s, 7.0 mag | 0.57 km |
+
+  Three given times lie on the computed tracks (the 2019 Phaethon test site in Utah/Arizona at 11:19:35 matches
+  ~11:20, where that event was observed). **The Phaethon 2021-10-03 "17:30 UT" does not fit**: no other Gaia star down
+  to G 17 lies within 14" of Phaethon then, and with the only candidate the shadow left the Earth at 17:12 (closest
+  approach 16:59): the given time is probably rounded or wrong (to be checked at its source). This is a consistency
+  check (corridor search, exact solver, WGS84 ground track, star corrections agree for very close objects); an
+  absolute check needs the observers' positions and timings (open).
 - **Whole-Earth pre-screen on another computer** (2026-10-11, Apple M4, 32 GB, macOS, 8 workers): a 30-day
   whole-Earth pre-screen with the supplement (Oct 11 + 30 d, G <= 16: 14,867,681 events of 458,051 asteroids,
   1.1 GB + 0.34 GB index, built in 77 min). Picks for two sites (one in the US, one in Europe), Oct 11 + 20 d, with

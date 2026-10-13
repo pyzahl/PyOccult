@@ -11,7 +11,7 @@ authors:
     alias: pyzahl
 license: GPL-3.0-or-later
 doi: 10.5281/zenodo.23149371
-version: "0.17.0"
+version: "0.18.0"
 repository-code: "https://github.com/pyzahl/PyOccult"
 abstract: >-
   Independent occultation predictor in Python, written from scratch (not derived from

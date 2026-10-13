@@ -227,6 +227,10 @@ def show_status(d=None):
               " replace it with your exact position (GPS, map) before observing.")
     for k in KERNELS:
         print(f"  {k:28s} {'ok' if os.path.isfile(k) else 'missing'}")
+    from pyoccult import kernels as KK
+    h = KK.historic_earth_pck(".")
+    print(f"  {'Earth orientation < 2000':28s} " + (f"ok ({os.path.basename(h)})" if h else
+          "not downloaded (only for dates before 2000: pyoccult setup --historic-earth)"))
     from pyoccult import bodies
     for group, (fname, size) in bodies.NAIF_KERNELS.items():
         print(f"  {fname:28s} {'ok (planets and moons offline)' if bodies.naif_kernel(group) else 'not downloaded: planets and moons via JPL Horizons (optional: --planet-kernels, ' + size + ')'}")
@@ -415,6 +419,10 @@ def main():
                          "from UCAC5/UCAC4 (a few minutes)")
     ap.add_argument("--supplement-gmax", type=float, default=16.0,
                     help="faintest G of the supplement (default 16, at most the catalog's limit)")
+    ap.add_argument("--historic-earth", action="store_true",
+                    help="also download NAIF's historic Earth orientation file (earth_1962_*_combined.bpc, ~31 MB) "
+                         "for search windows before 2000 (earth_latest_high_prec.bpc starts 2000-01-01); a search "
+                         "before 2000 fetches it by itself when online")
     ap.add_argument("--home", metavar="FOLDER", help="use FOLDER as the data folder from now on (saved as a setting; "
                                                      "files are not moved)")
     a = ap.parse_args()
@@ -425,6 +433,10 @@ def main():
     if not download_kernels(config.earth_pck_max_age):
         sys.exit("kernel download failed (see above); rerun setup when the address is reachable, or copy the kernel "
                  "files (*.tls, *.bsp, *.tpc, *.bpc) from another computer into this folder")
+    if a.historic_earth:
+        from pyoccult import kernels as KK
+        h = KK.historic_earth_pck(".") or KK.download_historic_earth_pck(".")
+        print(f"   historic Earth orientation: {h or 'not available (offline?), rerun later'}")
     d, new_install = None, False
     if not a.no_gaia:
         d, gmax = catalog_target(a.gmax, a.dir)

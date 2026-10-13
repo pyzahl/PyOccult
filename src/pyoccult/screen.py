@@ -29,10 +29,13 @@ from pyoccult.kernels import KERNELS
 
 
 def load_kernels(spice, folder="."):
+    from pyoccult.kernels import EARTH_PCK, historic_earth_pck
     for k in KERNELS:
         p = os.path.join(folder, k)
         if not os.path.isfile(p):
             raise FileNotFoundError(f"{p} missing: run  pyoccult setup --no-gaia  (downloads the kernels)")
+        if k == EARTH_PCK and historic_earth_pck(folder):   # before 2000: the historic file, loaded first (lower rank)
+            spice.furnsh(historic_earth_pck(folder))
         spice.furnsh(p)
 
 

@@ -3,11 +3,89 @@ orientation file is refreshed after earth_pck_max_age days). Used by search.py a
 Standard library only (downloads with the system curl)."""
 from pyoccult.version import __version__
 from pyoccult import urls as U
-import os, subprocess
+import glob, os, re, subprocess
 from datetime import datetime
 from pathlib import Path
 
 KERNELS = ("naif0012.tls", "de440.bsp", "pck00010.tpc", "earth_latest_high_prec.bpc")
+EARTH_PCK = "earth_latest_high_prec.bpc"           # Earth orientation 2000-01-01 .. ~3 months ahead (refreshed)
+# Earth orientation before 2000 (historic events): NAIF's combined file, measured from 1962, e.g.
+# earth_1962_260806_2126_combined.bpc (31 MB; the name changes with each NAIF update: the newest matching file is used).
+# Loaded BEFORE EARTH_PCK, so where both cover a time SPICE uses EARTH_PCK (the last loaded file wins).
+EARTH_HISTORIC_GLOB = "earth_1962_*_combined.bpc"
+EARTH_HISTORIC_RE = re.compile(r"earth_1962_\d{6}_\d{4}_combined\.bpc")
+
+
+def historic_earth_pck(folder="."):
+    """The newest local historic Earth orientation file (path), or None."""
+    files = sorted(glob.glob(os.path.join(folder, EARTH_HISTORIC_GLOB)))
+    return files[-1] if files else None
+
+
+def earth_kernels(folder="."):
+    """The Earth orientation files to load, in load order: the historic one (if any) first, then EARTH_PCK."""
+    h = historic_earth_pck(folder)
+    return ([h] if h else []) + [os.path.join(folder, EARTH_PCK)]
+
+
+def window_coverage(spans, et0, et1):
+    """Which loaded Earth orientation files cover a window. spans: [(name, start_et, stop_et)] in LOAD ORDER (the last
+    loaded wins where they overlap). Returns (ok, problem): ok when every time in et0..et1 lies in some file's span;
+    problem: a short text when the window starts before or ends after what the files cover together."""
+    if not spans:
+        return False, "no Earth orientation file loaded"
+    lo, hi = min(s[1] for s in spans), max(s[2] for s in spans)
+    if et0 < lo:
+        return False, "starts before"
+    if et1 > hi:
+        return False, "ends after"
+    # gaps between the files' spans inside the window
+    edges = sorted((s[1], s[2]) for s in spans)
+    reach = edges[0][1]
+    for a, b in edges[1:]:
+        if a > reach and a > et0 and reach < et1:
+            return False, "gap"
+        reach = max(reach, b)
+    return True, ""
+
+
+def download_historic_earth_pck(folder="."):
+    """Download NAIF's newest earth_1962_*_combined.bpc (Earth orientation from 1962, ~31 MB) into folder, found in the
+    PCK directory listing. Returns its path, or None (offline: a message is printed)."""
+    import urllib.request
+    try:
+        from pyoccult import net
+        html = net.urlopen(urllib.request.Request(U.URL_NAIF_PCK_DIR, headers={"User-Agent": "Mozilla/5.0"}),
+                           timeout=60).read().decode("latin-1")
+        names = sorted(set(EARTH_HISTORIC_RE.findall(html)))
+        if not names:
+            raise RuntimeError(f"no earth_1962_*_combined.bpc listed at {U.URL_NAIF_PCK_DIR}")
+    except Exception as e:
+        print(f"🚨 historic Earth orientation file: listing failed ({str(e)[:160]})")
+        return None
+    name = names[-1]
+    dst = os.path.join(folder, name)
+    if os.path.isfile(dst):
+        return dst
+    print(f"Downloading {name} (Earth orientation from 1962, ~31 MB) via system curl...")
+    try:
+        subprocess.run(["curl", "-f", "-L", "-A", "Mozilla/5.0", U.URL_NAIF_PCK_DIR + name, "-o", dst + ".part"],
+                       check=True)
+        os.replace(dst + ".part", dst)
+    except (subprocess.CalledProcessError, OSError) as e:
+        if os.path.exists(dst + ".part"):
+            os.remove(dst + ".part")
+        print(f"🚨 download of {name} failed: {e}")
+        return None
+    return dst
+
+
+def pck_span(spice, path, frame=3000):
+    """(start_et, stop_et) of an Earth orientation PCK (frame 3000 = ITRF93)."""
+    cover = spice.cell_double(2000) if hasattr(spice, "cell_double") else spice.stypes.SPICEDOUBLE_CELL(2000)
+    spice.pckcov(path, frame, cover)
+    n = spice.wncard(cover)
+    return spice.wnfetd(cover, 0)[0], spice.wnfetd(cover, n - 1)[1]
 
 
 def check_file_age(file_path_str, days=-1):

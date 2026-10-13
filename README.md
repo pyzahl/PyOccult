@@ -6,7 +6,7 @@
 > or endorsed by its author or by Occult Watcher Cloud. Occult and OWC served only as independent references to compare
 > results with.
 
-Python Occultation Searcher by PyZahl (C) 2026, version 0.17.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 0.18.0 “New Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pyoccult/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md). How the predictions were verified: [VERIFICATION.md](VERIFICATION.md).
@@ -373,6 +373,7 @@ All options of `pyoccult setup` (also `pyoccult setup --help`):
 | `--supplement-gmax G` | faintest G of the supplement (default 16, at most the catalog's limit; Zenodo has G 16) |
 | `--planet-kernels` | download NAIF's kernels for planets and moons (e.g. Jupiter's `jup365.bsp`, 1.1 GB) for offline use; without them positions come from JPL Horizons per search |
 | `--no-geoip` | do not guess your site from your IP address (first run) |
+| `--historic-earth` | also download NAIF's historic Earth orientation file (`earth_1962_*_combined.bpc`, ~31 MB) for dates before 2000, e.g. to check historic events; a search or pick before 2000 fetches it by itself when online |
 | `--home FOLDER` | use FOLDER as the data folder from now on (saved as a setting; files are not moved); see "Where your data and settings live" |
 | `--version` | show PyOccult's version |
 
@@ -797,11 +798,29 @@ version 2, [10.5281/zenodo.23298192](https://doi.org/10.5281/zenodo.23298192)): 
 (106 min at ~1.4 Gbit/s; other limits with `--supplement-gmax` / `--gmax`). `pyoccult setup --status` shows whether it
 is there.
 
+**Proper motions for the supplement's 2-parameter stars** (since 0.18.0). Gaia DR3 has no proper motion for these
+574k stars, so their position in the 2020s can be off by 0.1-0.3", which is 100-400 km on the ground for a main-belt
+asteroid. Right after installing the supplement, setup therefore looks up proper motions in UCAC5 and UCAC4 through
+the CDS cross-match service (cdsxmatch.u-strasbg.fr; ~2-3 minutes, needs the network) and stores them in the
+supplement: about 51 % from UCAC5, 30 % from UCAC4; the remaining 19 % stay flagged "NO proper motion". It happens
+automatically with `pyoccult setup --supplement` (step "3c") and `pyoccult gaia supplement`.
+
+* **New install**: answer the setup question about the supplement with Enter (or run `pyoccult setup --supplement`):
+  download, proper motions and its star index in one go.
+* **Supplement installed with an earlier version** (no proper motions yet): run `pyoccult setup --supplement` again
+  (it sees the supplement is complete and only adds the proper motions), or directly
+  `pyoccult gaia supplement-pm --dir gaia_dr3_g18` (your catalog folder).
+* **Check**: `pyoccult setup --status` shows e.g. `high-RUWE supplement  ok, G <= 16, 0.4 GB; 2-param stars with pm:
+  465566 of 573735 (UCAC5 294328, UCAC4 171238)`.
+* **Offline** during setup: the step is skipped with a message (the events stay flagged "NO proper motion"); rerun
+  `pyoccult setup --supplement` later.
+* **Pre-screens** built with the supplement before the proper motions were added used zero motion for these stars:
+  rebuild them.
+
 It is then used by picks, searches and pre-screens (switch: GUI header **+ high-RUWE stars**, config
 `gaia_supplement`), and every event on such a star is flagged **⚑ RUWE 1.65** or **⚑ 2-param** in the results,
-report, favorites and CSV: its position, and so the shadow path, is less certain than usual. Gaia has no proper
-motion at all for the supplement's "2-parameter" stars, so PyOccult takes one from UCAC5 or UCAC4 (as OWC does; 81 %
-of them, done by setup) and adds each star's position uncertainty to the path's sigma lines and chance; where that
+report, favorites and CSV: its position, and so the shadow path, is less certain than usual. For the "2-parameter"
+stars PyOccult uses the UCAC5/UCAC4 proper motions (see above; as OWC does) and adds each star's position uncertainty to the path's sigma lines and chance; where that
 uncertainty is larger than the asteroid, the report shows a red **⚠ star ±… km**: such an event may well not happen
 at your site, compare with other predictions before observing. Pre-screens remember
 whether they were built with it; a pick with the supplement only uses one that was (auto falls back otherwise).
