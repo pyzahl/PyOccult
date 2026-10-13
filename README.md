@@ -802,14 +802,17 @@ is there.
 574k stars, so their position in the 2020s can be off by 0.1-0.3", which is 100-400 km on the ground for a main-belt
 asteroid. Right after installing the supplement, setup therefore looks up proper motions in UCAC5 and UCAC4 through
 the CDS cross-match service (cdsxmatch.u-strasbg.fr; ~2-3 minutes, needs the network) and stores them in the
-supplement: about 51 % from UCAC5, 30 % from UCAC4; the remaining 19 % stay flagged "NO proper motion". It happens
-automatically with `pyoccult setup --supplement` (step "3c") and `pyoccult gaia supplement`.
+supplement, as OWC/Occult do: about 51 % from UCAC5, 30 % from UCAC4; the remaining 19 % stay flagged "NO proper
+motion". The matching is strict, so a close neighbour cannot be taken by mistake: UCAC5's position (Gaia DR1, 2015)
+must lie within 0.2" of Gaia DR3's and G within 0.5 mag (UCAC4: 0.5" and 1 mag; for (4089) Galbraith's star, a
+double, the companion 2.9" away is rejected). It happens automatically with `pyoccult setup --supplement` (step "3c") and
+`pyoccult gaia supplement`.
 
 * **New install**: answer the setup question about the supplement with Enter (or run `pyoccult setup --supplement`):
   download, proper motions and its star index in one go.
 * **Supplement installed with an earlier version** (no proper motions yet): run `pyoccult setup --supplement` again
   (it sees the supplement is complete and only adds the proper motions), or directly
-  `pyoccult gaia supplement-pm --dir gaia_dr3_g18` (your catalog folder).
+  `pyoccult gaia supplement-pm --dir gaia_dr3_g18` (or `gaia_dr3_g16`: your catalog folder).
 * **Check**: `pyoccult setup --status` shows e.g. `high-RUWE supplement  ok, G <= 16, 0.4 GB; 2-param stars with pm:
   465566 of 573735 (UCAC5 294328, UCAC4 171238)`.
 * **Offline** during setup: the step is skipped with a message (the events stay flagged "NO proper motion"); rerun
@@ -829,14 +832,6 @@ whether they were built with it; a pick with the supplement only uses one that w
 (`gmax`, `files`) and, per listed file, the three `.npy` files described at the top of `pyoccult/gaia_local.py`
 (stars with the 7 Gaia columns, sky cells, fast movers) is found and can be selected. A converter for another source
 only has to write that layout.
-
-**Add Proper motions for two-parameter stars in Gaia, as OWC/Occult does it.**
-Matching: it cross-matches the supplement's two-parameter stars through CDS XMatch with UCAC5 first, then UCAC4.
-Strict criteria reject a wrong partner, such as the companion star 2.9″ away in the Galbraith case.
-
-```bash
-pyoccult gaia supplement-pm --dir gaia_dr3_g18   # or your gaia_dr_g16 as installed
-```
 
 
 ## Pick tool: choose targets
