@@ -12,6 +12,7 @@ PyOccult is now **PySyzygos**. *Syzygos* is Greek for "yoked together", the root
 in a straight line, as the observer, the asteroid and the star are during an occultation. The predictions are
 unchanged; names, the command and the package are new. Old installations keep working: the old names are still read
 for a transition period. The GitHub repository moved to https://github.com/pyzahl/PySyzygos (the old address forwards).
+Zenodo: doi:10.5281/zenodo.23381498 (this release; all versions: 10.5281/zenodo.23149371, unchanged).
 
 ### Changed
 - **Name**: command `pysyzygos` (was `pyoccult`), Python package `pysyzygos` (`src/pysyzygos/`), settings file
