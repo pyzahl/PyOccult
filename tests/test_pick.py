@@ -1,6 +1,6 @@
 import os, sys, json, math, time, types, tempfile, numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import pick as P, screen as SC
+from pysyzygos import pick as P, screen as SC
 
 # ---------- 1. OWC General Observability Criterion: StarMag < 5 log10(ap_cm) + 2.5 log10(dur/frames) + 8.5 + adj
 opt = dict(aperture=25.0, frames=4, mag_adjust=0.0)
@@ -21,7 +21,7 @@ assert SC.extinction_loss(10.0, k) > SC.extinction_loss(30.0, k) > SC.extinction
 print("OWC limit 25 cm, 4 frames: 0.5 s event ->", round(float(SC.owc_limit(0.5, opt)), 2), " 2 s ->",
       round(float(SC.owc_limit(2.0, opt)), 2), "; extinction 0.2 at 15 deg:", round(float(SC.extinction_loss(15.0, k)), 2))
 
-# ---------- 2. asteroid table: sizes like pyoccult.get_asteroid_size, bad orbits skipped, H limit
+# ---------- 2. asteroid table: sizes like pysyzygos.get_asteroid_size, bad orbits skipped, H limit
 F = P.SBDB_FIELDS
 def row(**kw):
     d = dict(spkid=20000001, full_name=" 1 Test", H="10", G=None, diameter=None, diameter_sigma=None, extent=None,
@@ -78,7 +78,7 @@ assert abs(t[0] - 2200.0) < 1e-9, "the solution must stay inside the bracket"
 # worker processes must start with "spawn": with "fork" (Linux default before Python 3.14) they share the parent's open
 # SPICE kernel files and their read position, and parallel reads of de440.bsp collide (regression 2026-10-05)
 import inspect
-from pyoccult import pick as _pk
+from pysyzygos import pick as _pk
 assert inspect.signature(_pk.run_screen).parameters["mp_start"].default == "spawn"
 assert 'mp_context=multiprocessing.get_context(mp_start)' in inspect.getsource(_pk.run_screen)
 print("PICK TESTS PASSED")

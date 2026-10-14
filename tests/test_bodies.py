@@ -1,9 +1,9 @@
-"""Planets and moons as targets (pyoccult.bodies): prefixes, kinds, deflectors, size and brightness rules, and the
+"""Planets and moons as targets (pysyzygos.bodies): prefixes, kinds, deflectors, size and brightness rules, and the
 kernel built from Horizons vectors. No network and no SPICE: stand-ins follow the real call contracts."""
 import sys, os, tempfile, types
 import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import bodies as B
+from pysyzygos import bodies as B
 
 # prefixes: readable, case-insensitive, never an asteroid number
 assert B.parse("M:Io")["naif"] == 501 and B.parse("m:io")["alias"] == "M:IO" and B.parse("P:Jupiter")["kind"] == "planet"

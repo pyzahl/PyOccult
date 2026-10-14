@@ -1,9 +1,9 @@
-"""Close and double stars (pyoccult.doubles): neighbours at the event date, the blended drop, Gaia's hints, the online
+"""Close and double stars (pysyzygos.doubles): neighbours at the event date, the blended drop, Gaia's hints, the online
 query and the hit-log update. No network: the archive answer is a stand-in DataFrame."""
 import sys, os, csv, tempfile, math
 import numpy as np, pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import doubles as D
+from pysyzygos import doubles as D
 
 # drop: equal star and companion, faint asteroid -> at most 0.75 mag; no companion -> the star's own drop
 assert abs(D.blended_drop(10.0, 30.0, [10.0]) - 2.5 * math.log10(2)) < 1e-3

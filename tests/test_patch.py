@@ -1,7 +1,7 @@
 import sys, os, math, types, tempfile, numpy as np, pandas as pd
-sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src')); from pyoccult import corridor as C
+sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src')); from pysyzygos import corridor as C
 exec(open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), 'test_corridor.py')).read().split("# ---------- 3. magnitude cap")[0])      # reuse synthetic path, catalogue, FakeLocal (no tests after this point)
-src = open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src', 'pyoccult', 'search.py')).read()
+src = open(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src', 'pysyzygos', 'search.py')).read()
 funcs = src[src.index("RUN = dict("):src.index('if __name__ == "__main__":')]   # run stats, handle_star, target_test_corridor
 
 out_csv = os.path.join(tempfile.mkdtemp(), "hits.csv")
@@ -16,18 +16,18 @@ class Cfg:
     star_parallax = False; light_deflection = False      # covered by test_astrometry (needs SPICE positions)
     pick_aperture_cm = 25.0; pick_frames = 4; pick_mag_adjust = 0.0; pick_extinction = 0.2       # site equipment
 import time, json, datetime
-from pyoccult import screen as pyoccult_screen, astrometry as pyoccult_astrometry
-ns = dict(np=np, pd=pd, os=os, time=time, json=json, datetime=datetime.datetime, screen=pyoccult_screen, astrometry=pyoccult_astrometry, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
-from pyoccult import doubles as pyoccult_doubles
-ns.update(doubles=pyoccult_doubles, RUN_RECORDS=[], LOCAL=None)       # close/double star check (no local catalog here)
-from pyoccult.paths import site_probability
+from pysyzygos import screen as pysyzygos_screen, astrometry as pysyzygos_astrometry
+ns = dict(np=np, pd=pd, os=os, time=time, json=json, datetime=datetime.datetime, screen=pysyzygos_screen, astrometry=pysyzygos_astrometry, config=Cfg, corridor=C, u=types.SimpleNamespace(rad=None, km=None))
+from pysyzygos import doubles as pysyzygos_doubles
+ns.update(doubles=pysyzygos_doubles, RUN_RECORDS=[], LOCAL=None)       # close/double star check (no local catalog here)
+from pysyzygos.paths import site_probability
 ns.update(site_probability=site_probability)                         # chance at the site (pure function)
-from pyoccult import db as pyoccult_db                                  # results database in a temporary folder
-_con = pyoccult_db.connect(os.path.join(os.path.dirname(out_csv), "test.db"))
-from pyoccult import bodies as pyoccult_bodies
-ns.update(db=pyoccult_db, bodies=pyoccult_bodies)             # asteroid targets here: bodies.* answers 'not a body'
-from pyoccult import gaia_local as pyoccult_gaia_local
-ns.update(gaia_local=pyoccult_gaia_local)                       # star_flag for supplement stars
+from pysyzygos import db as pysyzygos_db                                  # results database in a temporary folder
+_con = pysyzygos_db.connect(os.path.join(os.path.dirname(out_csv), "test.db"))
+from pysyzygos import bodies as pysyzygos_bodies
+ns.update(db=pysyzygos_db, bodies=pysyzygos_bodies)             # asteroid targets here: bodies.* answers 'not a body'
+from pysyzygos import gaia_local as pysyzygos_gaia_local
+ns.update(gaia_local=pysyzygos_gaia_local)                       # star_flag for supplement stars
 ns['spice'] = types.SimpleNamespace(et2utc=lambda et, f, p: "ET:%r" % float(et))
 def star_test(loc, utc, span, ra, dec, tid, r, reach):
     calls['star_test'] += 1
@@ -42,7 +42,7 @@ ns.update(star_test=star_test,
           besselian_offsets=lambda et, sd, geo, t: (1.0, 2.0), get_asteroid_name=lambda t: "Test",
           path_sigma3_km=lambda t, utc: None, path_error=lambda t, utc: None)
 exec(funcs, ns)
-ns.update(DB=_con, RUN_ID=pyoccult_db.start_run(_con, "corridor")[0])   # after the excerpt (it resets them)
+ns.update(DB=_con, RUN_ID=pysyzygos_db.start_run(_con, "corridor")[0])   # after the excerpt (it resets them)
 # propagation stand-in (astropy is not installed in this sandbox): same output columns as propagate_exact
 def fake_prop(df, utc):
     out = df.copy(); out["ra_20261003"], out["dec_20261003"] = out["ra"], out["dec"]; calls['propagate'] += 1; return out
@@ -55,7 +55,7 @@ class _ET(list): pass
 ns['_et'] = [float(sub.et_guess.iloc[0])]
 size = dict(r_km=10.0, r_min_km=5.0, r_max_km=15.0, source="test", H=12.0, G=0.15)
 n = ns['target_test_corridor'](Loc, plan, 'X', size, stars_cands=(stars, sub))
-pyoccult_db.export(_con, out_csv)                                      # as the run summary does after a run
+pysyzygos_db.export(_con, out_csv)                                      # as the run summary does after a run
 log = pd.read_csv(out_csv)
 print("candidates", len(sub), "gate calls", calls['gate'], "solver calls", calls['star_test'], "propagations", calls['propagate'], "logged", n, "csv rows", len(log))
 assert calls['gate'] == len(sub) and calls['propagate'] == calls['gate'] - (sub.et_guess.astype(int) % 5 == 0).sum()

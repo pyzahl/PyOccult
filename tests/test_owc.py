@@ -1,8 +1,8 @@
-"""OccultWatcher Cloud lookup (pyoccult.owc): matching by Gaia star id or time, the cache, the table label.
+"""OccultWatcher Cloud lookup (pysyzygos.owc): matching by Gaia star id or time, the cache, the table label.
 No network: owc._get is replaced by a stand-in that answers like the OWC interface."""
 import sys, os, tempfile, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import owc
+from pysyzygos import owc
 
 EVENTS = [dict(id="A-1", time="2026-Oct-09, 18:55:32", astNo=30819, star="UCAC4 466-002898", tags=None),
           dict(id="B-2", time="2026-Oct-11, 22:51:08", astNo=30819, star="TYC 0041-00123-1",

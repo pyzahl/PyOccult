@@ -1,4 +1,4 @@
-"""Test pyoccult/paths.py with a stand-in 'spiceypy' that follows the real contract:
+"""Test pysyzygos/paths.py with a stand-in 'spiceypy' that follows the real contract:
 surfpt() returns ONLY the point and raises NotFoundError on a miss (as in the user's traceback).
 Geometry (ellipsoid intersection, geodetic lon/lat, Earth rotation) is exact; only ephemerides are synthetic."""
 import sys, types, importlib.util
@@ -70,8 +70,8 @@ def make_stub(xi0, eta0, vxi, veta):
 
 def load_module():
     import os, sys
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))   # for pyoccult.version
-    spec = importlib.util.spec_from_file_location('pyoccult_paths', __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src', 'pyoccult', 'paths.py'))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))   # for pysyzygos.version
+    spec = importlib.util.spec_from_file_location('pysyzygos_paths', __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src', 'pysyzygos', 'paths.py'))
     m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
     return m
 

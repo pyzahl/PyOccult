@@ -1,15 +1,41 @@
 # Changelog
 
-All notable changes to PyOccult. Newest first. Format: [Keep a Changelog](https://keepachangelog.com), versions:
+All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https://keepachangelog.com), versions:
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
-`src/pyoccult/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
+`src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
 ## [Unreleased]
+
+## [1.0.0] "New Horizons" - 2026-10-14
+
+PyOccult is now **PySyzygos**. *Syzygos* is Greek for "yoked together", the root of *syzygy*: three celestial bodies
+in a straight line, as the observer, the asteroid and the star are during an occultation. The predictions are
+unchanged; names, the command and the package are new. Old installations keep working: the old names are still read
+for a transition period. The GitHub repository moved to https://github.com/pyzahl/PySyzygos (the old address forwards).
+
+### Changed
+- **Name**: command `pysyzygos` (was `pyoccult`), Python package `pysyzygos` (`src/pysyzygos/`), settings file
+  `pysyzygos_config.py`, results database `pysyzygos.db`, environment variables `PYSYZYGOS_HOME`, `PYSYZYGOS_SITE`,
+  `PYSYZYGOS_CATALOG`, `PYSYZYGOS_SUPPLEMENT`, data-folder setting in `~/.config/pysyzygos/home` (macOS
+  `~/Library/Application Support/PySyzygos/home`, Windows `%APPDATA%\PySyzygos\home`), default data folder
+  `~/PySyzygos`, cache files `PySyzygos_*`, logo `pysyzygos_logo.svg/.png` (same design).
+- Documentation, GUI About box and CITATION.cff: the name and its origin.
+- A source checkout needs a fresh install after updating: `pip install -e .` in the project folder (or
+  `linux_install.sh`, or `uv run pysyzygos`, which does it by itself), because the installed package name changed.
+
+### Transition (names before 1.0.0, still read)
+- `PYOCCULT_*` environment variables count as `PYSYZYGOS_*` where those are not set.
+- The data-folder setting of PyOccult (`~/.config/pyoccult/home` etc.) is copied to the new place once; an existing
+  `~/PyOccult` stays the default data folder of an installed copy.
+- In the data folder, `pyoccult_config.py` becomes `pysyzygos_config.py` on the first start, with the old names in it
+  replaced (the original kept as `pyoccult_config.py.pre-1.0`), and `pyoccult.db` becomes `pysyzygos.db`. A message
+  says so.
+- `pysyzygos cleanup` also finds the old file and cache names.
 
 ## [0.18.0] "New Horizons" - 2026-10-12
 
 More honest predictions for less well-measured stars, and older events. Gaia gives no proper motion for its
-"2-parameter" stars; PyOccult now takes it from UCAC5 or UCAC4 (as OWC does) and puts every supplement star's position
+"2-parameter" stars; PySyzygos now takes it from UCAC5 or UCAC4 (as OWC does) and puts every supplement star's position
 uncertainty into the path, with a red warning where it decides whether the shadow reaches the site (a false "hit" of
 (4089) Galbraith, OWC 100+ km away, prompted it). Shadow paths are exactly on the WGS84 ellipsoid at height 0 (as
 Occult's default output), events before 2000 work with NAIF's historic Earth orientation, and four near-Earth asteroid
@@ -18,12 +44,12 @@ in the GUI, pick timings, and a debug file of each event's geodetic path.
 
 ### Added
 - **Historic events before 2000**: the Earth orientation file `earth_latest_high_prec.bpc` starts 2000-01-01; for
-  earlier windows PyOccult loads NAIF's historic `earth_1962_*_combined.bpc` (measured from 1962; ~31 MB; the newest
+  earlier windows PySyzygos loads NAIF's historic `earth_1962_*_combined.bpc` (measured from 1962; ~31 MB; the newest
   by name) before it, so the high-precision file still rules from 2000 on (checked: identical there). A search or pick
-  before 2000 downloads it when missing (`pyoccult setup --historic-earth` beforehand); every search now checks that
+  before 2000 downloads it when missing (`pysyzygos setup --historic-earth` beforehand); every search now checks that
   the whole window has Earth orientation (before: only its end) and stops with a clear message otherwise (e.g.
   before 1962). `setup --status`, `cleanup` and the run summary know the file.
-- **Proper motions for the supplement's 2-parameter stars** (Gaia DR3 has none for them): `pyoccult gaia
+- **Proper motions for the supplement's 2-parameter stars** (Gaia DR3 has none for them): `pysyzygos gaia
   supplement-pm` (run automatically by `setup --supplement` and `gaia supplement`) cross-matches them with UCAC5
   (Gaia DR1 2015.0 positions within 0.2", G within 0.5 mag), then UCAC4, through CDS XMatch, as OWC/Occult take them
   from other catalogs. Of 573,735 stars (G <= 16): 294,328 from UCAC5, 171,238 from UCAC4, 108,169 still without
@@ -38,10 +64,10 @@ in the GUI, pick timings, and a debug file of each event's geodetic path.
   3-sigma limits, satellite zone; ET, longitude, latitude, duration) together with the event (target, Gaia star, time,
   size, sigma, site, version) as `<map_dir>/<event>_path.npz`, for later verification.
 - The pick prints where its time went: `timing: total … = start-up + asteroid list + kernels + pre-screen (or
-  asteroid choice) + screen (workers incl.) + output` (start-up measured from the start of the `pyoccult` command).
+  asteroid choice) + screen (workers incl.) + output` (start-up measured from the start of the `pysyzygos` command).
 
 ### Changed
-- Geodetic coordinates use the WGS84 ellipsoid exactly (`pyoccult/earth.py`): shadow paths are points at height 0 m
+- Geodetic coordinates use the WGS84 ellipsoid exactly (`pysyzygos/earth.py`): shadow paths are points at height 0 m
   on WGS84 (as Occult's default output, for exact comparisons), and sites, the observer and the globe plot convert
   with it too. Before, the SPICE kernel's Earth radii (pck00010, ~0.4 m off WGS84) were used: paths move by 0.3 m
   (median), up to ~3.6 m near the limb.
@@ -65,7 +91,7 @@ in the GUI, pick timings, and a debug file of each event's geodetic path.
   pre-screens) are renamed through `gaia_local.replace_file`, which retries for ~10 s on "file in use" (e.g. a virus
   scanner holding a new file). Setup no longer blames the network for such errors. Tests check that no file is
   mapped at its rename.
-- Windows: a console with a legacy code page (cp1252) crashed on PyOccult's symbols (e.g. "✅ All kernels verified" during
+- Windows: a console with a legacy code page (cp1252) crashed on PySyzygos's symbols (e.g. "✅ All kernels verified" during
   setup: `UnicodeEncodeError`). Console output now replaces characters it cannot show with "?" (every command), and runs
   started by the GUI use Python's UTF-8 mode, so the log shows them all. README: do not install from an administrator
   prompt (it starts in `C:\Windows\System32`).
@@ -75,22 +101,21 @@ in the GUI, pick timings, and a debug file of each event's geodetic path.
 Events on the stars Gaia measured less well are now predicted, flagged: a high-RUWE supplement of the local catalog
 (8.0 M stars with RUWE >= 1.4 or without proper motions, 0.35 GB, ready-made on Zenodo) is merged into picks, searches
 and pre-screens, so an event like (86288) 1999 UC45 on 2026-09-30, observed from three sites and missed before, is
-found (1.17 s predicted, 1.17 s observed). Also: `pyoccult cleanup` to start over, coordinates pasted in any usual
-format in the Site tab, named regions in the GUI, and clearer documentation, including that PyOccult is an independent
-development with no roots in Occult.
+found (1.17 s predicted, 1.17 s observed). Also: `pysyzygos cleanup` to start over, coordinates pasted in any usual
+format in the Site tab, named regions in the GUI, and clearer documentation.
 
 ### Added
-- `pyoccult cleanup`: remove what PyOccult downloaded and generated (kernels, its cache files, bright-star indexes,
+- `pysyzygos cleanup`: remove what PySyzygos downloaded and generated (kernels, its cache files, bright-star indexes,
   the supplement, run outputs), keeping the large Gaia catalogs, `owc_refs/`, `private-docs/`, `release/` and `.venv`;
   a dry run with sizes unless `--yes`; `--keep-results`, `--all` (also settings and favorites). For testing a fresh
   install.
-- **High-RUWE supplement** of the local catalog (`pyoccult gaia supplement --dir <catalog> --gmax 16`, into
+- **High-RUWE supplement** of the local catalog (`pysyzygos gaia supplement --dir <catalog> --gmax 16`, into
   `<catalog>/supplement/`): the stars the main catalog leaves out, Gaia RUWE >= 1.4 (often unresolved doubles) and
   2-parameter sources (no parallax or proper motion), about 8 M stars / 0.3 GB to G 16. Picks, searches and
   pre-screens use it when present (GUI header "+ high-RUWE stars", config `gaia_supplement`, env
-  `PYOCCULT_SUPPLEMENT`); events on such stars are flagged ⚑ ("RUWE 1.65", "2-param") in the results, report,
+  `PYSYZYGOS_SUPPLEMENT`); events on such stars are flagged ⚑ ("RUWE 1.65", "2-param") in the results, report,
   favorites, Pick table and CSV (`star_kind`, `star_ruwe`, `star_flag` at the end of the record). Pre-screens record
-  whether they were built with it. `pyoccult setup --supplement` (`--supplement-gmax`) installs it, a first-time
+  whether they were built with it. `pysyzygos setup --supplement` (`--supplement-gmax`) installs it, a first-time
   setup offers it, `setup --status` shows it: ready-made from Zenodo (catalog record version 2,
   doi:10.5281/zenodo.23298192, 0.35 GB, SHA-256 checked) or built from ESA's files (`--source esa`, ~2 h). Motivation: (86288) 1999 UC45 on 2026-09-30, observed by three stations, was not
   predictable (its G 11.7 target has RUWE 1.65); OWC lists such events.
@@ -102,9 +127,7 @@ development with no roots in Occult.
   East Asia, Japan, Australia, New Zealand) in the Region selector, with their lat/lon boxes.
 
 ### Changed
-- Documentation: a note at the top of the README, in the GUI's About box, ABOUT.md and CITATION.cff that PyOccult is
-  an independent development written from scratch, with no roots in Occult (occult.exe, D. Herald), not affiliated
-  with it or with OWC (both only independent references); README sections "If something goes wrong: start over" and
+- Documentation: README sections "If something goes wrong: start over" and
   "Files, copying and sharing" (pre-screens); ABOUT.md 3.8, where a prediction's time goes and what a live search
   engine would keep ready.
 
@@ -118,7 +141,7 @@ it, is tested in seconds; for a 4-day window the pick with it gave exactly the f
 them. Picks and builds also run up to 2.4x faster with one math thread per worker.
 
 ### Added
-- **Pre-screens** (`pyoccult/prescreen.py`, `pyoccult prescreen build|list|show|query|extract|index`): the asteroids
+- **Pre-screens** (`pysyzygos/prescreen.py`, `pysyzygos prescreen build|list|show|query|extract|index`): the asteroids
   with possible occultations in a window, using the pick's own parts (SBDB elements, orbits, bright-star index,
   candidate scan) for the whole Earth plus each candidate's ground track (161 samples, the Earth's rotation from SPICE).
   Regions: a box around the site (`--around-site KM`), one box around all sites of sites.py (`--around-sites KM`,
@@ -128,7 +151,7 @@ them. Picks and builds also run up to 2.4x faster with one math thread per worke
   observer (`shadowtrack.ground_reach`: up to 1/sin(star altitude) longer); the orbit grid reaches 12 h beyond the
   window, so events whose track touches it are found. Checked against dense sampling and the exact site test at many
   sites (VERIFICATION.md).
-- **Whole-Earth pre-screens** (`prescreen build --global`, new `pyoccult/shadowtrack.py`): per event the shadow's
+- **Whole-Earth pre-screens** (`prescreen build --global`, new `pysyzygos/shadowtrack.py`): per event the shadow's
   motion across the fundamental plane (star direction, quadratic in time, misfit; 80 bytes) in a time-sorted
   `.global.npy` + `.json`, at about the cost of a region build (~1 GB per month at G 16 for 465k asteroids). An
   **index** (`.idx.npy`, written after the build; `prescreen index` for older files) holds each track's lat/lon box
@@ -194,14 +217,14 @@ longer show a false second path for tracks across the date line.
   28.00 x 22.33 mas @ 94 (OWC 22.30); with Gaia's correlations, which OWC seems to leave out (without them
   ours equals OWC's), the star's ellipse is 0.30 x 0.22 mas @ 126 (1 % of the target's). The search logs the target's ellipse (`ast_err_*`), the Gaia online check
   the star's (`star_err_*`); older favorites get them once at GUI start (Horizons, one Gaia job, in the
-  background). New module `pyoccult/ellipses.py`.
+  background). New module `pysyzygos/ellipses.py`.
   The diagram also shows the target's disk at its angular size and the star where it stands as seen from the site
   at closest approach (its ellipse again, dashed, with its track relative to the target): from the logged offsets
   of the shadow axis, so its distance from the centre is the site's distance from the centre line (in mas and km,
   "inside" or "outside" the shadow). A star more than 2 shadow widths outside is not drawn (the diagram does not
   zoom out for it); the legend gives its distance.
-- `pyoccult owc-check --markdown FILE`: the full comparison as a Markdown table, by star magnitude (every OWC event
-  and PyOccult's extra events, marked); `--hits FILE` compares a saved hit list (with `--compare-only`).
+- `pysyzygos owc-check --markdown FILE`: the full comparison as a Markdown table, by star magnitude (every OWC event
+  and PySyzygos's extra events, marked); `--hits FILE` compares a saved hit list (with `--compare-only`).
 
 ### Fixed
 - Maps (report, favorites): a shadow path across the date line showed a false second path, a straight band
@@ -219,24 +242,24 @@ longer show a false second path for tracks across the date line.
 
 **Planets and moons** join the asteroids as occulting bodies: Mars to Neptune, Pluto and 91 of their moons, in
 their own GUI tab with disappearance and reappearance times. All results now live in one **results database**
-(`pyoccult.db`). Also new: Stellarium pointing, a column file for the CSV downloads, the star limit per run in the
+(`pysyzygos.db`). Also new: Stellarium pointing, a column file for the CSV downloads, the star limit per run in the
 Search tab, and the search corridor in the previews. Nothing to do after updating: an existing `hits_log.csv` and
 `favorites/favorites.json` are imported into the database once.
 
 ### Added
-- **Planets and moons as targets** (`pyoccult/bodies.py`): `P:Mars`, `P:Jupiter`, ... `P:Neptune`, `P:Pluto` and
+- **Planets and moons as targets** (`pysyzygos/bodies.py`): `P:Mars`, `P:Jupiter`, ... `P:Neptune`, `P:Pluto` and
   moons such as `M:Io`, `M:Titan`, `M:Himalia`, `M:Triton`, `M:Charon` in the target list (the prefix keeps them
-  apart from asteroid numbers; `python -m pyoccult.bodies` lists them). Positions from JPL Horizons as a small SPICE
+  apart from asteroid numbers; `python -m pysyzygos.bodies` lists them). Positions from JPL Horizons as a small SPICE
   kernel per search window (cached; the same ephemeris as NAIF's satellite kernels, reproduced to ~1 m), radii from
   the planet constants. Events get **disappearance and reappearance times** at the site (`d_utc`, `r_utc`, also as
   contacts in the database); verified: D and R put the star exactly one Jupiter radius from its centre in
   independent geometry. A star covered by a planet disappears, so planets have no drop limit; moons and Pluto
   follow the asteroid rules (drop limit). The light deflection leaves out the target's own planet.
-- Satellite table `src/pyoccult/data/satellites.json`: all 458 moons of Mars to Pluto known to JPL Horizons, with
+- Satellite table `src/pysyzygos/data/satellites.json`: all 458 moons of Mars to Pluto known to JPL Horizons, with
   radius and brightness (H with the phase removed, H-G law with G 0.5; within ~0.2 mag of published values for the
   major moons, Phobos ~1 mag). 91 can be searched; a missing size or brightness is estimated as for asteroids
   (marked \*); the rest (mostly tiny, recently found moons of magnitude 22-25) have neither. Rebuilt with
-  `python -m pyoccult.bodies build`. Rough 3-sigma path uncertainty by size (15-200 km) for the sigma lines and
+  `python -m pysyzygos.bodies build`. Rough 3-sigma path uncertainty by size (15-200 km) for the sigma lines and
   the chance.
 - GUI tab **Planets & Moons** (after Pick): per system the planet and its larger moons (radius 150 km or more) to
   tick, one box for its smaller moons; window, star G limit, the moons' minimum drop, Run. Results right in the
@@ -244,26 +267,26 @@ Search tab, and the search corridor in the previews. Nothing to do after updatin
   report layout for major bodies: D, closest approach and R at the site, duration, star, sky, shadow distance,
   chance, tools. Previews show the planet and its moons as disks at their size, zoomed to the system, each moon
   marked with a small cyan **+** whatever its size. File and favorite names use `P-Jupiter` (no ':' for Windows).
-- Optional offline ephemeris: `pyoccult setup --planet-kernels` (also asked on a first-time setup) downloads NAIF's
+- Optional offline ephemeris: `pysyzygos setup --planet-kernels` (also asked on a first-time setup) downloads NAIF's
   satellite kernels (Jupiter `jup365.bsp` 1.1 GB, Saturn `sat441.bsp`, Neptune `nep097.bsp`, Pluto `plu060.bsp`,
   Mars `mar099.bsp`), used instead of Horizons when they cover the search window.
-- **Stellarium** button next to KStars in the Results and Favorites tables (`pyoccult/stellarium.py`, any
+- **Stellarium** button next to KStars in the Results and Favorites tables (`pysyzygos/stellarium.py`, any
   system): through Stellarium's Remote Control plugin (port 8090) it sets the event time with the clock stopped,
   the view on the star and the field, and with "KStars/Stellarium: set its location to the event site" the site.
-  Shown whenever the GUI serves the report; a click tries and reports. Also `pyoccult stellarium`.
-- **CSV columns file** `csv_exports.py` in the data folder (`pyoccult/exports.py`, template
+  Shown whenever the GUI serves the report; a click tries and reports. Also `pysyzygos stellarium`.
+- **CSV columns file** `csv_exports.py` in the data folder (`pysyzygos/exports.py`, template
   `templates/csv_exports.py`, created at the first download): which columns the CSV buttons of the Pick, Results,
   Planets & Moons and Favorites tabs export, in which order and with which headings. Default: exactly the table's
   columns and values as shown; any raw field of the event record (`"raw:star"`, ...), all of them (`"*"`) or a
   function can be added. UTF-8 with byte order mark for spreadsheets.
 - GUI Search and Planets & Moons tabs: **Star G limit** for one run (as in the Pick tab; default from the site's
   telescope, capped at the selected catalog's limit). A search notes when `gaia_local_gmax` in your
-  `pyoccult_config.py` caps the limit below the catalog's (older configs have 13).
+  `pysyzygos_config.py` caps the limit below the catalog's (older configs have 13).
 - Event preview: the **search corridor** (the strip searched for stars: Earth radius + body radius + reach, at the
   event distance) as dotted lines on both sides of the track, with its half-width in the legend.
 
 ### Changed
-- **Results database** (`pyoccult/db.py`): searches and favorites are stored in `pyoccult.db` in the data folder
+- **Results database** (`pysyzygos/db.py`): searches and favorites are stored in `pysyzygos.db` in the data folder
   (SQLite, part of Python): every run with its summary, every event, and the favorites. "Start a fresh hits_log.csv"
   became **Start a fresh results list**: a new list (series) begins, the older ones stay in the database instead of
   being deleted. `hits_log.csv` / `bodies_log.csv` and their `.runs.jsonl` are still written after each search, as
@@ -283,8 +306,8 @@ Search tab, and the search corridor in the previews. Nothing to do after updatin
 
 ## [0.13.0] "New Horizons" - 2026-10-07
 
-A standard Python package now (`pyproject.toml`, code in `src/pyoccult/`, one `pyoccult` command; install with
-`pip install -e .` or run with `uv run pyoccult`): **after updating, run `pip install -e .` once** in your virtual
+A standard Python package now (`pyproject.toml`, code in `src/pysyzygos/`, one `pysyzygos` command; install with
+`pip install -e .` or run with `uv run pysyzygos`): **after updating, run `pip install -e .` once** in your virtual
 environment, or use uv. New reference information with each event: close and double stars, known asteroid
 satellites, earlier occultations; plus the camera list, the data folder setting and several fixes.
 
@@ -292,28 +315,28 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 - Default Gaia catalog G <= 16 (`gaia_dr3_g16`, 2.1 GB download, ~3 GB on disk; enough for most amateur
   telescopes): template `gaia_local_dir`/`gaia_local_gmax`, setup's limit question (Enter = 16) and the pick's
   default catalog. Before, the template capped the star limit at G 13 (`gaia_local_gmax = 13.0`). G 18 stays
-  available (`pyoccult setup --gmax 18`). Your own `pyoccult_config.py` keeps its values.
+  available (`pysyzygos setup --gmax 18`). Your own `pysyzygos_config.py` keeps its values.
 - **Standard Python package** (PEP 517/518/621, src layout as PyMovie and PyOTE use): `pyproject.toml` replaces
-  `requirements.txt`; the code moved from the project root into `src/pyoccult/` with short module names
-  (`pyoccult_pick.py` -> `pyoccult/pick.py`, `pyoccult.py` -> `pyoccult/search.py`, ...); imports are
-  `from pyoccult import ...`. One command, `pyoccult`, starts everything: `pyoccult` (web interface),
-  `pyoccult setup`, `pyoccult pick ...`, `pyoccult search`, `pyoccult report hits_log.csv`, `pyoccult owc-check`,
-  `pyoccult gaia ...`, `pyoccult picks ...` (`pyoccult --help`; options unchanged); also `python -m pyoccult`.
-  Your data stays where it is: the project folder is the data folder (`PYOCCULT_HOME` chooses another one).
-  `pyoccult_config.py` is now your own file there (not in git): it is created from
-  `src/pyoccult/templates/pyoccult_config.py` when missing, and settings it lacks keep the template's default.
+  `requirements.txt`; the code moved from the project root into `src/pysyzygos/` with short module names
+  (`pysyzygos_pick.py` -> `pysyzygos/pick.py`, `pysyzygos.py` -> `pysyzygos/search.py`, ...); imports are
+  `from pysyzygos import ...`. One command, `pysyzygos`, starts everything: `pysyzygos` (web interface),
+  `pysyzygos setup`, `pysyzygos pick ...`, `pysyzygos search`, `pysyzygos report hits_log.csv`, `pysyzygos owc-check`,
+  `pysyzygos gaia ...`, `pysyzygos picks ...` (`pysyzygos --help`; options unchanged); also `python -m pysyzygos`.
+  Your data stays where it is: the project folder is the data folder (`PYSYZYGOS_HOME` chooses another one).
+  `pysyzygos_config.py` is now your own file there (not in git): it is created from
+  `src/pysyzygos/templates/pysyzygos_config.py` when missing, and settings it lacks keep the template's default.
   `sites_example.py`, the logo and the globe's map data moved into the package. Checked: tests on Python 3.10 and
   3.14, a clean install with uv (Python 3.10), and pick (spawn workers), search, report, setup and the GUI run
   through the new command from another folder.
   **Upgrading an existing install:** `git pull`, then once `pip install -e .` in your virtual environment (or
-  `.venv/bin/python -m pip install -e .`); start the GUI with `pyoccult` (`.venv/bin/pyoccult`) instead of
-  `python pyoccult_gui.py`. If you changed `pyoccult_config.py`, keep a copy before pulling (git removes the tracked
-  file; PyOccult then recreates it from the template, so copy your changes back in).
-- All download and web addresses moved into one file, `pyoccult/urls.py`, each with its own name (`URL_NAIF_DE440`,
+  `.venv/bin/python -m pip install -e .`); start the GUI with `pysyzygos` (`.venv/bin/pysyzygos`) instead of
+  `python pysyzygos_gui.py`. If you changed `pysyzygos_config.py`, keep a copy before pulling (git removes the tracked
+  file; PySyzygos then recreates it from the template, so copy your changes back in).
+- All download and web addresses moved into one file, `pysyzygos/urls.py`, each with its own name (`URL_NAIF_DE440`,
   `URL_JPL_HORIZONS_API`, `URL_MPC_OBSCODES`, ...), so they are maintained in one place. A separate file rather than
-  `pyoccult_config.py`, which reads `sites.py` when imported: setup and the report need addresses without it.
+  `pysyzygos_config.py`, which reads `sites.py` when imported: setup and the report need addresses without it.
 - GUI Site tab: the site list is now the Minor Planet Center's list of observatory codes (ObsCodes.html, ~2700
-  observatories, downloaded once into `data/`, not in git; `pyoccult.geo.mpc_observatories`), searchable by code or
+  observatories, downloaded once into `data/`, not in git; `pysyzygos.geo.mpc_observatories`), searchable by code or
   name. It replaces Occult's site list of 0.12.0, which turned out to hold mainly reference cities. Positions and
   heights come from the MPC parallax constants (WGS84); for old entries with fewer than 5 decimals the height is
   looked up instead.
@@ -325,8 +348,8 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 
 ### Added
 - Experimental, off by default: **Check OWC** buttons in the GUI's Results and Favorites tabs (`owc_lookup = True` in
-  `pyoccult_config.py`; no GUI switch). They look the events up in OccultWatcher Cloud through the interface of its
-  public event pages (`pyoccult/owc.py`; one request per second, PyOccult named as the client, only on click) and
+  `pysyzygos_config.py`; no GUI switch). They look the events up in OccultWatcher Cloud through the interface of its
+  public event pages (`pysyzygos/owc.py`; one request per second, PySyzygos named as the client, only on click) and
   show the prediction feeds and signed-up stations under the asteroid, e.g. "OWC IBEROC · 2 stations", linked
   to the OWC event page (stations with distance and commitment on hover). Matched by the star's Gaia DR3 id, else
   by time; results cached in `owc_cache.json` in the data folder.
@@ -334,7 +357,7 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
   offset, the shadow radius and the 1-sigma path uncertainty (JPL Horizons' 3-sigma position uncertainty / 3, else
   `default_sigma3_km`), like Occult's "Rank" but for your site; sortable, details on hover. New hit-log columns
   `path_sigma1_km`, `sigma_source`, `p_site` (events logged before show "—").
-- **Asteroid satellites** (`pyoccult/binaries.py`, `data/binaries.json`: 325 systems from W. R. Johnston's Binary
+- **Asteroid satellites** (`pysyzygos/binaries.py`, `data/binaries.json`: 325 systems from W. R. Johnston's Binary
   Minor Planets Compilation V3.0, NASA PDS 2019, doi:10.26033/bb68-pw96, plus satellites seen in occultations):
   "+moon" / "+2 moons" ("+moon?": only reported in an occultation) after the asteroid in the Results and Favorites
   tables with sizes, distances and periods on hover, a "Satellites" line in the favorites panel, and a dotted
@@ -343,7 +366,7 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 - Favorites: the close/double-star check also for favorites added before it (filled in once at GUI start from the
   local catalog), shown in the favorites table (⚠ after the drop) and as a "close or double star" line in the
   detail panel.
-- **Close and double stars** (`pyoccult/doubles.py`): each event checks the local catalog for neighbours within
+- **Close and double stars** (`pysyzygos/doubles.py`): each event checks the local catalog for neighbours within
   4" (`companion_radius_arcsec`) whose light stays in the camera image, and recomputes the drop with it
   (`mag_drop_blended`; the report shows e.g. "3.61 ⚠ 3.31" with details on hover when the drop is 0.1 mag or
   more smaller). Optional online check after a search (`gaia_online_check`, default on, GUI Search tab): one query to
@@ -354,27 +377,27 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 - **Earlier occultations** of an asteroid in the favorites panel, e.g. "Occultations (NASA PDS archive, to 2023-12):
   8 events 1991-2021 (1 reliable size, ...); shape-model diameter 107.8 +- 5.6 km (6 events); best profile
   2008-06-06: 119.1 x 101.7 km". From NASA PDS Small Bodies Node "Small Bodies Occultations" V4.0 (Herald, Dunham et
-  al., doi:10.26033/ehqs-jp27): a compact extract ships with PyOccult (`pyoccult/occultations.py`,
+  al., doi:10.26033/ehqs-jp27): a compact extract ships with PySyzygos (`pysyzygos/occultations.py`,
   `data/occultations_pds.json`, 2903 asteroids, 387 kB). Reference only; the prediction's size source is unchanged.
   ABOUT.md 4.1 explains what Horizons/SBDB holds (no chords) and what the archive adds.
 - GUI Site tab: **Sensor (cameras)** list next to the MPC observatory list: 21 sensors common in occultation work, one
   entry each as "Sony IMX174: 11.34 x 7.13 mm, 1936 x 1216 px of 5.86 um (ZWO ASI174MM / MC, QHY174M-GPS, ...,
   DVTI+CAM 174)", with the ZWO, QHY, ASTRID, DVTI+CAM, Seestar and Unistellar cameras built with them, plus analog
   video formats. Searchable by sensor or camera name (e.g. "174", "QHY600", "ASTRID"); picking one fills sensor width
-  and height (computed from pixels x pixel size; `pyoccult/cameras.py`). The Site
+  and height (computed from pixels x pixel size; `pysyzygos/cameras.py`). The Site
   form now has MagAdjust next to the focal length, and sensor width, height and detection frames in one row.
-- **uv support** (as PyMovie and PyOTE): `uv run pyoccult` in the PyOccult folder installs Python 3.12
+- **uv support** (as PyMovie and PyOTE): `uv run pysyzygos` in the PySyzygos folder installs Python 3.12
   (`.python-version`) and the exact package versions of `uv.lock` (Linux, macOS, Windows) into `.venv` by itself;
-  then `uv run pyoccult setup` and `uv run pyoccult`. README: install steps for uv on each system (also from the
+  then `uv run pysyzygos setup` and `uv run pysyzygos`. README: install steps for uv on each system (also from the
   GitHub ZIP, without git). The pip way still works.
 - README: **Windows, step by step (with uv)**: installing uv, the ZIP (or git), a folder outside OneDrive, setup,
-  start, an optional `PyOccult.bat` start icon, updating and removing. Not yet tested on Windows.
-- **Data folder setting** for installed copies (pip/uv without a clone): the first `pyoccult setup` asks where to keep
-  the data (Enter = `~/PyOccult`) and saves the choice in the system's settings folder (Linux
-  `~/.config/pyoccult/home`, macOS `~/Library/Application Support/PyOccult/home`, Windows `%APPDATA%\PyOccult\home`);
-  `pyoccult setup --home <folder>` changes it (for a clone too; files are not moved, setup says if the old folder
-  holds your data). A clone keeps using its own folder; `PYOCCULT_HOME` still sets it for one run. The folder in use
-  and why: `pyoccult setup --status`, the GUI's About box and start-up line.
+  start, an optional `PySyzygos.bat` start icon, updating and removing. Not yet tested on Windows.
+- **Data folder setting** for installed copies (pip/uv without a clone): the first `pysyzygos setup` asks where to keep
+  the data (Enter = `~/PySyzygos`) and saves the choice in the system's settings folder (Linux
+  `~/.config/pysyzygos/home`, macOS `~/Library/Application Support/PySyzygos/home`, Windows `%APPDATA%\PySyzygos\home`);
+  `pysyzygos setup --home <folder>` changes it (for a clone too; files are not moved, setup says if the old folder
+  holds your data). A clone keeps using its own folder; `PYSYZYGOS_HOME` still sets it for one run. The folder in use
+  and why: `pysyzygos setup --status`, the GUI's About box and start-up line.
 - Pick: the asteroid's H in `pick_events.csv`, the saved picks and the Pick tab table (the "H below" limit is the
   most common reason an asteroid is missing from a pick).
 - GUI Pick and Results tabs: a **CSV** button downloads the selected saved pick's events, or the search results
@@ -389,7 +412,7 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 - Results, Favorites and Pick tables: an **\*** after the asteroid name marks a size estimated from H with an
   assumed albedo (no measured diameter; uncertain by a factor of about 1.7); hover text and a note below the table.
 - Favorites detail panel: a **shape and rotation** line (axes from SBDB `extent`, rotation period, pole, taxonomic
-  type) where SBDB has them. Favorites get SBDB's full per-object record once (`pyoccult.sbdb.get_full`; the pick
+  type) where SBDB has them. Favorites get SBDB's full per-object record once (`pysyzygos.sbdb.get_full`; the pick
   tool's bulk rows hold only size fields); older favorites when the GUI starts.
 - Site key `mpc_code` (the official MPC observatory code), a **MPC code** field in the GUI Site tab (filled in when
   an MPC observatory is picked), shown in the report header and kept in the run summary.
@@ -399,7 +422,7 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 - Web lookups with Python's standard library (OWC check, place/elevation/IP lookups and the MPC list, the full SBDB
   record for favorites, the pick's SBDB download) failed on Python installations without certificate authorities
   (often macOS: "CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate"), while the browser worked. They
-  now use certifi's list (installed with requests) via `pyoccult/net.py`. OWC check failures name the request and
+  now use certifi's list (installed with requests) via `pysyzygos/net.py`. OWC check failures name the request and
   the error in the GUI log.
 - Results and Favorites tables were wider than the page (the right side looked cut off; its scroll bar was only at
   the table's end): tool buttons and column headings may wrap, the asteroid name and offset too, tighter cell
@@ -414,7 +437,7 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 - Favorites tab: the check boxes' mass actions (**Remove**, **Set status**, the "selected" count) did nothing since
   0.12.0: the times selector's script variable `sel` replaced the selection helper `sel()` of the same script
   (seen as "cannot remove a favorite"). Renamed; the favorites test now guards against it.
-- README: the logo at the top pointed to its old place in the project root (moved into `src/pyoccult/`).
+- README: the logo at the top pointed to its old place in the project root (moved into `src/pysyzygos/`).
 - GUI Favorites tab: the **CSV** download was saved as "true.csv" (the link's `download` attribute); it is now a
   button like in the Pick and Results tabs and saves `favorites_<date>.csv`.
 - Pick tool with a star limit above G 15 (now easy to reach with the GUI's **Star G limit** field): the deeper
@@ -456,16 +479,16 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
 
 ### Added
 - GUI Site tab: **Occult/OWC site list**, a searchable list of Occult's ~800 reference places and observatories
-  (InstallSites.zip from occultations.org, downloaded once into `data/`, not in git; `pyoccult_geo.occult_sites`).
+  (InstallSites.zip from occultations.org, downloaded once into `data/`, not in git; `pysyzygos_geo.occult_sites`).
   Picking one sets position, elevation and description and proposes it as a new site name (**Add site**).
 - Favorites table: a **times** selector shows the event times in UT (default), in this computer's time zone
   (Local) or in each event site's time zone (Site, e.g. "2026-Oct-12 00:47:46 GMT+2 (Zurich)"), with daylight saving
   time; remembered in the browser, sorting unchanged. Site time zones are looked up once per site (Open-Meteo,
-  `pyoccult_geo.timezone`) when a favorite is added, and for older favorites when the GUI starts.
+  `pysyzygos_geo.timezone`) when a favorite is added, and for older favorites when the GUI starts.
 
 ### Changed
 - GUI: the start date of the Pick and Search windows defaults to today (UTC) instead of `ct` from
-  `pyoccult_config.py` (which stays the default for command-line runs).
+  `pysyzygos_config.py` (which stays the default for command-line runs).
 
 ## [0.11.1] "New Horizons" - 2026-10-05
 
@@ -481,11 +504,11 @@ First GitHub release with a Zenodo DOI: 10.5281/zenodo.23149372 (this release; a
 
 ## [0.11.0] "New Horizons" - 2026-10-04
 
-The code name: PyOccult's orbits come from JPL Horizons, and the New Horizons mission measured its flyby target
+The code name: PySyzygos's orbits come from JPL Horizons, and the New Horizons mission measured its flyby target
 Arrokoth beforehand with stellar occultations observed around the globe.
 
 ### Added
-- Globe plot (`pyoccult_globe.py`): an Occult-style event plot per event, `maps/<event>_globe.svg`. The whole Earth
+- Globe plot (`pysyzygos_globe.py`): an Occult-style event plot per event, `maps/<event>_globe.svg`. The whole Earth
   as seen from the star at the event time with the shadow path (centre line, shadow limits, 1- and 3-sigma limits,
   minute marks), the shadow axis off the Earth, the site, and a header with Occult's parameter set (star position as
   used and of date, durations, time per km and per mas, drop, Sun and Moon, 1-sigma error, asteroid size, parallax,
@@ -497,7 +520,7 @@ Arrokoth beforehand with stellar occultations observed around the globe.
 - Links in the tables: the asteroid name to the JPL Small-Body Database, the star magnitude to its Gaia DR3 record
   in VizieR.
 - GUI **About** box (header): logo, version and code name, author, purpose, credits, licence, GitHub link. Project
-  facts (`__codename__`, `__author__`, `__copyright__`, `__license__`, `__url__`) in `pyoccult_version.py`.
+  facts (`__codename__`, `__author__`, `__copyright__`, `__license__`, `__url__`) in `pysyzygos_version.py`.
 - `CHANGELOG.md` (this file).
 
 ### Changed
@@ -506,25 +529,25 @@ Arrokoth beforehand with stellar occultations observed around the globe.
 ## [0.10.0] - 2026-10-04
 
 ### Added
-- Astrometric corrections of the star direction (`pyoccult_astrometry.py`), applied once per candidate in the
+- Astrometric corrections of the star direction (`pysyzygos_astrometry.py`), applied once per candidate in the
   search: stellar parallax (Gaia parallax) and the gravitational light deflection by the Sun, Jupiter and Saturn
   (as star minus asteroid). Switches `star_parallax`, `light_deflection` (config and GUI Search tab, both on by
   default; off reproduces the 0.9.0 results exactly). Log columns `corr_parallax_mas`, `corr_deflection_mas`; the
   report header shows which corrections were on. Against Occult's printed star positions the difference dropped
   from 4.52 to 0.90 mas (16556) and is 0.29 mas near opposition (30819). Paths move by up to ~10 km.
-- `pyoccult_owc_check.py --sea-level`: our side at elevation 0, as OWC online computes (it ignores the site
+- `pysyzygos_owc_check.py --sea-level`: our side at elevation 0, as OWC online computes (it ignores the site
   height; up to ~0.9 km across the track at a 1000 m site).
 
 ### Fixed
-- `pyoccult_owc_check.py` silently skipped OWC events marked with the Sun's altitude (twilight events,
+- `pysyzygos_owc_check.py` silently skipped OWC events marked with the Sun's altitude (twilight events,
   "sun symbol -5 deg"); it now reads them and sets the Sun limit to match.
 
 ## [0.9.0] - 2026-10-04
 
-First numbered version (`pyoccult_version.py`; GUI header, run summary, report, picks, favorites and `--version`
+First numbered version (`pysyzygos_version.py`; GUI header, run summary, report, picks, favorites and `--version`
 show it). It collects the work since the first commit:
 
-- 2026-09-28: the search script (`pyoccult.py`): SPICE-based exact closest-approach solver in the fundamental
+- 2026-09-28: the search script (`pysyzygos.py`): SPICE-based exact closest-approach solver in the fundamental
   plane, Gaia stars, hit log, asteroid name lookups.
 - 2026-09-30: configuration file and observing window, Moon information, automatic refresh of the Earth orientation
   kernel, KML shadow paths, the HTML/Markdown report with an embedded map, the all-asteroid pick tool.
@@ -536,11 +559,12 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
-[0.15.0]: https://github.com/pyzahl/PyOccult/commits/main
-[0.14.0]: https://github.com/pyzahl/PyOccult/commits/main
-[0.13.0]: https://github.com/pyzahl/PyOccult/commits/main
-[0.12.0]: https://github.com/pyzahl/PyOccult/commits/main
-[0.11.1]: https://github.com/pyzahl/PyOccult/releases/tag/V0.11.1-NewHorizons
-[0.11.0]: https://github.com/pyzahl/PyOccult/commit/5abc5f6
-[0.10.0]: https://github.com/pyzahl/PyOccult/commit/0047057
-[0.9.0]: https://github.com/pyzahl/PyOccult/commit/a2d5c21
+[1.0.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.0.0
+[0.15.0]: https://github.com/pyzahl/PySyzygos/commits/main
+[0.14.0]: https://github.com/pyzahl/PySyzygos/commits/main
+[0.13.0]: https://github.com/pyzahl/PySyzygos/commits/main
+[0.12.0]: https://github.com/pyzahl/PySyzygos/commits/main
+[0.11.1]: https://github.com/pyzahl/PySyzygos/releases/tag/V0.11.1-NewHorizons
+[0.11.0]: https://github.com/pyzahl/PySyzygos/commit/5abc5f6
+[0.10.0]: https://github.com/pyzahl/PySyzygos/commit/0047057
+[0.9.0]: https://github.com/pyzahl/PySyzygos/commit/a2d5c21

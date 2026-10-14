@@ -1,8 +1,8 @@
-"""Earth orientation coverage (pyoccult.kernels): which loaded files cover a search window; the historic file
+"""Earth orientation coverage (pysyzygos.kernels): which loaded files cover a search window; the historic file
 (earth_1962_*_combined.bpc) is found by its pattern and loaded before earth_latest_high_prec.bpc. No SPICE."""
 import sys, os, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import kernels as K
+from pysyzygos import kernels as K
 
 DAY = 86400.0
 Y2000, Y1962, Y2027 = 0.0, -38 * 365.25 * DAY, 27 * 365.25 * DAY        # ET ~ seconds from J2000 (rough is fine)

@@ -1,10 +1,10 @@
-"""Error ellipses (pyoccult.ellipses): covariance round trip, the star's ellipse from Gaia errors carried to the event
+"""Error ellipses (pysyzygos.ellipses): covariance round trip, the star's ellipse from Gaia errors carried to the event
 date, the combined ellipse and the error across the track, the SVG; favorites.backfill_errors with stand-ins.
 Reference: OccultWatcher's event page of (369152) 2008 SJ52 on 2026-10-12 (Horizons SMAA/SMIA/Theta 3-sigma 0.084",
 0.067", -4.444 deg; star 0.28 x 0.26 mas at PA 90; combined 28.00 x 22.30 mas at PA 94)."""
 import sys, os, math, tempfile, xml.etree.ElementTree as ET
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import ellipses as E, favorites as F
+from pysyzygos import ellipses as E, favorites as F
 
 for a, b, pa in ((28.0, 22.33, 94.44), (3.0, 1.0, 10.0), (2.0, 0.5, 170.0)):
     a2, b2, pa2 = E.ellipse(E.cov(a, b, pa))

@@ -1,7 +1,7 @@
-"""Earlier occultations (pyoccult.occultations): extract from the PDS archive tables, lookup and the display line."""
+"""Earlier occultations (pysyzygos.occultations): extract from the PDS archive tables, lookup and the display line."""
 import sys, os, tempfile, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import occultations as O
+from pysyzygos import occultations as O
 
 d = tempfile.mkdtemp()
 summary = ["SEQ_NUM|OBS_DATE|AST_DESIG|AST_NAME|MAJOR_AXIS|MINOR_AXIS|MAJOR_AXIS_PA|FIT_QUAL_CODE|USED_ASSUMED_DIA_FLAG|"

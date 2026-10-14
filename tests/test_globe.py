@@ -1,8 +1,8 @@
-"""pyoccult_globe: projection, hidden-side clipping, day side and SVG output, without SPICE (pure render_svg)."""
+"""pysyzygos_globe: projection, hidden-side clipping, day side and SVG output, without SPICE (pure render_svg)."""
 import math, os, sys, xml.etree.ElementTree as ET
 import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import globe as G
+from pysyzygos import globe as G
 
 # Earth orientation: ITRF = J2000 (identity); star straight above lon 0, lat 0 -> that point is the disk centre
 R = np.eye(3)
@@ -38,7 +38,7 @@ d = dict(R=R, basis=basis, sun_dir=np.array([0.0, 1.0, 0.0]), paths=paths, axis=
          title="1 Test occults Gaia DR3 1 <&>", columns=(["Star:", " G 9.0"], ["Durations: Max = 1.00 secs"], ["Asteroid:"]),
          inset=dict(field_arcmin=120.0, mag_limit=11.0, stars=[(0.0, 0.0, 9.0), (10.0, -5.0, 10.5), (200.0, 0.0, 9.0)],
                     track=[(-20.0, 5.0), (0.0, 0.0), (20.0, -5.0)]),
-         minute_label=lambda t: f"{int(t // 60) % 60:02d}", footer="PyOccult test", style="lines")
+         minute_label=lambda t: f"{int(t // 60) % 60:02d}", footer="PySyzygos test", style="lines")
 svg = G.render_svg(d)
 root = ET.fromstring(svg)                               # well-formed (title escaped)
 ns = "{http://www.w3.org/2000/svg}"

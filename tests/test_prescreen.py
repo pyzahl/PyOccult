@@ -1,9 +1,9 @@
-"""Pre-screens (pyoccult.prescreen): region boxes (also across the date line), the box around a site, the fit check
+"""Pre-screens (pysyzygos.prescreen): region boxes (also across the date line), the box around a site, the fit check
 before a pick uses one, and the asteroid list of a window from the SQLite file."""
 import sys, os, json, sqlite3, tempfile, time
 import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import prescreen as PS
+from pysyzygos import prescreen as PS
 
 box = PS.region_box(35, 60, -130, -60)
 lat, lon = np.array([40.0, 40.0, 40.0, 30.0, 34.8]), np.array([-72.9, -50.0, -59.5, -100.0, -100.0])

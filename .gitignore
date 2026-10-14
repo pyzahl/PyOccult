@@ -1,4 +1,4 @@
-# generated data and downloads (pyoccult setup recreates them)
+# generated data and downloads (pysyzygos setup recreates them)
 *.bsp
 *.bpc
 *.tls
@@ -11,11 +11,12 @@ owc_reference.txt
 owc_reference.csv
 owc_refs/
 /sites.py
-/pyoccult_config.py
+/pysyzygos_config.py
+/pyoccult_config.py*
 /csv_exports.py
 /gui_state.json
 run.sh
-# run outputs (results database: pyoccult.db, its WAL files; owc_check.db)
+# run outputs (results database: pysyzygos.db, its WAL files; owc_check.db)
 *.db
 *.db-wal
 *.db-shm
@@ -47,7 +48,7 @@ dist/
 # Zenodo catalog archives
 release/
 *.tar.xz
-# downloaded MPC observatory code list (minorplanetcenter.net), see pyoccult_geo.mpc_observatories
+# downloaded MPC observatory code list (minorplanetcenter.net), see pysyzygos_geo.mpc_observatories
 data/ObsCodes.html
 # private reading and notes (not in git)
 private-docs/

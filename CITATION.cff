@@ -1,9 +1,9 @@
 cff-version: 1.2.0
 message: >-
-  If you use PyOccult, please cite it as below. Parts of the code and documentation were
+  If you use PySyzygos, please cite it as below. Parts of the code and documentation were
   developed with the help of Claude (Anthropic), an AI model, using Claude Code; all results
   were reviewed and validated by the author.
-title: "PyOccult: predicting stellar occultations by asteroids, planets and moons for observer sites"
+title: "PySyzygos: predicting stellar occultations by asteroids, planets and moons for observer sites"
 type: software
 authors:
   - family-names: Zahl
@@ -11,11 +11,11 @@ authors:
     alias: pyzahl
 license: GPL-3.0-or-later
 doi: 10.5281/zenodo.23149371
-version: "0.18.0"
-repository-code: "https://github.com/pyzahl/PyOccult"
+version: "1.0.0"
+repository-code: "https://github.com/pyzahl/PySyzygos"
 abstract: >-
-  Independent occultation predictor in Python, written from scratch (not derived from
-  Occult): finds asteroid occultations of Gaia DR3 stars for an observer site (JPL Horizons orbits, NAIF SPICE,
+  Occultation predictor in Python (called PyOccult up to version 0.18; syzygos, Greek
+  "yoked together": observer, asteroid and star in one line): finds asteroid occultations of Gaia DR3 stars for an observer site (JPL Horizons orbits, NAIF SPICE,
   a local magnitude-limited Gaia catalog), with an all-asteroid target pick, shadow paths
   with 1- and 3-sigma limits, event previews and a local web interface; also occultations
   by planets and their moons with disappearance and reappearance times. Validated against
@@ -30,7 +30,7 @@ keywords:
   - Python
 references:
   - type: data
-    title: "Gaia DR3 star catalogs for PyOccult: G <= 16 and G <= 18 subsets and a high-RUWE supplement (NumPy format)"
+    title: "Gaia DR3 star catalogs for PySyzygos: G <= 16 and G <= 18 subsets and a high-RUWE supplement (NumPy format)"
     authors:
       - family-names: Zahl
         given-names: Percy

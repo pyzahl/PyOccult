@@ -3,7 +3,7 @@ would otherwise draw the step from -179.8 to +178.8 deg as a straight line acros
 "path"), placed next to the observer; minute marks follow their line."""
 import os, sys, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import report as R
+from pysyzygos import report as R
 
 lons = [-33.4, -60.0, -100.0, -140.0, -179.8, 178.8, 171.0]
 lats = [16.8, 30.0, 40.0, 41.0, 40.5, 40.0, 36.4]

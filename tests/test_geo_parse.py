@@ -1,8 +1,8 @@
-"""Site coordinates pasted as text (pyoccult.geo.parse_coords): labels in any order, DMS / decimal minutes / decimal
+"""Site coordinates pasted as text (pysyzygos.geo.parse_coords): labels in any order, DMS / decimal minutes / decimal
 degrees, N/S/E/W or signs, heights in m/ft/km, and where a single value was pasted. No network."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult.geo import parse_coords as P
+from pysyzygos.geo import parse_coords as P
 
 LAT, LON = 37 + 1 / 60 + 27 / 3600, -(121 + 57 / 60 + 19 / 3600)
 

@@ -1,42 +1,41 @@
-# PyOccult: computation reference
+# PySyzygos: computation reference
 
-How PyOccult computes its predictions, where its data comes from, how it was validated ([VERIFICATION.md](VERIFICATION.md)) and what is still under active development.
+How PySyzygos computes its predictions, where its data comes from, how it was validated ([VERIFICATION.md](VERIFICATION.md)) and what is still under active development.
 Data comes from Gaia DR3 (stars), JPL Horizons and SBDB (asteroid orbits and sizes) and NAIF SPICE kernels
 (planets, Earth orientation); see Part 4. Usage is in `README.md`; to contribute, see `CONTRIBUTING.md`.
 Updated 2026-10-08.
 
-PyOccult is a portable occultation predictor in Python. It finds asteroid occultations of Gaia stars for one
-observer site. It is an independent development, written from scratch: it has no roots in Occult (occult.exe) by David
-Herald, is not a port, translation or derivative of it, shares no code with it, and is not affiliated with or endorsed
-by its author or by Occult Watcher Cloud (OWC). Occult and OWC served only as independent references to compare
-results with (VERIFICATION.md).
+PySyzygos is a portable occultation predictor in Python. It finds asteroid occultations of Gaia stars for one
+observer site. Its name comes from Greek *sýzygos* (σύζυγος), "yoked together" (*syn* "together", *zygón* "yoke"),
+the root of the astronomers' *syzygy*, three celestial bodies in a straight line, as observer, asteroid and star are
+during an occultation. Up to version 0.18 it was called PyOccult.
 
 ---
 
 ## Contents
 
 - [Part 1: The tools and how they fit together](#part-1-the-tools-and-how-they-fit-together)
-- [Part 2: The prediction (pyoccult/search.py)](#part-2-the-prediction-pyoccultsearchpy)
+- [Part 2: The prediction (pysyzygos/search.py)](#part-2-the-prediction-pysyzygossearchpy)
   - [2.1 Pipeline (corridor mode, the default)](#21-pipeline-corridor-mode-the-default)
   - [2.2 Fundamental (Besselian) plane: besselian_offsets](#22-fundamental-besselian-plane-besselian_offsets)
   - [2.3 Star magnitude cap and corridor width: plan_corridor](#23-star-magnitude-cap-and-corridor-width-plan_corridor)
-  - [2.4 Local Gaia catalog: pyoccult/gaia_local.py](#24-local-gaia-catalog-pyoccultgaia_localpy)
+  - [2.4 Local Gaia catalog: pysyzygos/gaia_local.py](#24-local-gaia-catalog-pysyzygosgaia_localpy)
   - [2.5 Candidate scan: find_candidates](#25-candidate-scan-find_candidates)
   - [2.6 Exact closest approach: star_test](#26-exact-closest-approach-star_test)
   - [2.7 Checks before logging: handle_star](#27-checks-before-logging-handle_star)
   - [2.8 Asteroid size: get_asteroid_size](#28-asteroid-size-get_asteroid_size)
   - [2.9 Event metrics: event_metrics, apparent_mag_HG, moon_info](#29-event-metrics-event_metrics-apparent_mag_hg-moon_info)
-  - [2.10 Shadow ground track: pyoccult/paths.py](#210-shadow-ground-track-pyoccultpathspy)
-  - [2.11 Event preview: pyoccult/preview.py](#211-event-preview-pyoccultpreviewpy)
-  - [2.12 Globe plot: pyoccult/globe.py (0.11.0)](#212-globe-plot-pyoccultglobepy-0110)
-- [Part 3: Choosing targets (pyoccult/pick.py)](#part-3-choosing-targets-pyoccultpickpy)
-  - [3.1 Orbits: pyoccult/orbits.py](#31-orbits-pyoccultorbitspy)
-  - [3.2 The screen: pyoccult/screen.py](#32-the-screen-pyoccultscreenpy)
+  - [2.10 Shadow ground track: pysyzygos/paths.py](#210-shadow-ground-track-pysyzygospathspy)
+  - [2.11 Event preview: pysyzygos/preview.py](#211-event-preview-pysyzygospreviewpy)
+  - [2.12 Globe plot: pysyzygos/globe.py (0.11.0)](#212-globe-plot-pysyzygosglobepy-0110)
+- [Part 3: Choosing targets (pysyzygos/pick.py)](#part-3-choosing-targets-pysyzygospickpy)
+  - [3.1 Orbits: pysyzygos/orbits.py](#31-orbits-pysyzygosorbitspy)
+  - [3.2 The screen: pysyzygos/screen.py](#32-the-screen-pysyzygosscreenpy)
   - [3.3 Detection rule](#33-detection-rule)
   - [3.4 Bright-star index: BrightIndex](#34-bright-star-index-brightindex)
   - [3.5 Speed and output](#35-speed-and-output)
-  - [3.6 Saved picks: pyoccult/picks.py](#36-saved-picks-pyoccultpickspy)
-  - [3.7 Pre-screens: pyoccult/prescreen.py, pyoccult/shadowtrack.py (0.16.0)](#37-pre-screens-pyoccultprescreenpy-pyoccultshadowtrackpy-0160)
+  - [3.6 Saved picks: pysyzygos/picks.py](#36-saved-picks-pysyzygospickspy)
+  - [3.7 Pre-screens: pysyzygos/prescreen.py, pysyzygos/shadowtrack.py (0.16.0)](#37-pre-screens-pysyzygosprescreenpy-pysyzygosshadowtrackpy-0160)
   - [3.8 Notes: where a prediction's time goes, and a live search engine](#38-notes-where-a-predictions-time-goes-and-a-live-search-engine)
 - [Part 4: Data sources](#part-4-data-sources)
   - [4.1 Sizes: what Horizons/SBDB has, and what occultations measured](#41-sizes-what-horizonssbdb-has-and-what-occultations-measured)
@@ -54,31 +53,31 @@ results with (VERIFICATION.md).
 
 | Step | Tool | What it does |
 |---|---|---|
-| once | `pyoccult/setup.py` | downloads the SPICE kernels, installs the local Gaia catalog (ready-made from Zenodo, or built from ESA's files) and builds the bright-star index |
-| choose | `pyoccult/pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` and saves the pick per site and window in `picks/` |
-| pre-screen | `pyoccult/prescreen.py`, `pyoccult/shadowtrack.py` | once per window: the asteroids with possible events in a region, or the shadow elements of every event on the Earth, so picks there take seconds |
-| predict | `pyoccult/search.py` | computes the events of the target asteroids exactly, appends them to `hits_log.csv`, writes KML maps |
-| present | `pyoccult/report.py` | turns `hits_log.csv` into an HTML or Markdown event list with an embedded map |
-| operate | `pyoccult/gui.py` | local web interface (NiceGUI): sites on a map, runs, live log, results |
-| check | `pyoccult/owc_check.py` | reruns an OWC search result you saved (`owc_reference.txt`, private) and compares event by event |
+| once | `pysyzygos/setup.py` | downloads the SPICE kernels, installs the local Gaia catalog (ready-made from Zenodo, or built from ESA's files) and builds the bright-star index |
+| choose | `pysyzygos/pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` and saves the pick per site and window in `picks/` |
+| pre-screen | `pysyzygos/prescreen.py`, `pysyzygos/shadowtrack.py` | once per window: the asteroids with possible events in a region, or the shadow elements of every event on the Earth, so picks there take seconds |
+| predict | `pysyzygos/search.py` | computes the events of the target asteroids exactly, appends them to `hits_log.csv`, writes KML maps |
+| present | `pysyzygos/report.py` | turns `hits_log.csv` into an HTML or Markdown event list with an embedded map |
+| operate | `pysyzygos/gui.py` | local web interface (NiceGUI): sites on a map, runs, live log, results |
+| check | `pysyzygos/owc_check.py` | reruns an OWC search result you saved (`owc_reference.txt`, private) and compares event by event |
 
-Supporting modules: `pyoccult/corridor.py` (per-asteroid star corridor and candidate scan), `pyoccult/gaia_local.py`
-(local Gaia catalog and bright-star index), `pyoccult/screen.py` (the pick tool's event screen),
-`pyoccult/orbits.py` (fast orbit integration), `pyoccult/paths.py` (shadow ground track), `pyoccult/sbdb.py` (shared
-asteroid size cache), `pyoccult/kernels.py` (kernel download, Earth orientation coverage), `pyoccult/picks.py` (saved
-picks: which one a search uses), `pyoccult/kstars.py` (points KStars at an event over D-Bus, Linux), `pyoccult/favorites.py` (starred events with their
+Supporting modules: `pysyzygos/corridor.py` (per-asteroid star corridor and candidate scan), `pysyzygos/gaia_local.py`
+(local Gaia catalog and bright-star index), `pysyzygos/screen.py` (the pick tool's event screen),
+`pysyzygos/orbits.py` (fast orbit integration), `pysyzygos/paths.py` (shadow ground track), `pysyzygos/sbdb.py` (shared
+asteroid size cache), `pysyzygos/kernels.py` (kernel download, Earth orientation coverage), `pysyzygos/picks.py` (saved
+picks: which one a search uses), `pysyzygos/kstars.py` (points KStars at an event over D-Bus, Linux), `pysyzygos/favorites.py` (starred events with their
 own copies of map and preview).
 
 ---
 
-## Part 2: The prediction (`pyoccult/search.py`)
+## Part 2: The prediction (`pysyzygos/search.py`)
 
 ### 2.1 Pipeline (corridor mode, the default)
 
-1. Kernels are checked and loaded at start-up (`pyoccult/kernels.py`). The local Gaia catalog is opened before any
+1. Kernels are checked and loaded at start-up (`pysyzygos/kernels.py`). The local Gaia catalog is opened before any
    other work; a missing or incomplete catalog stops the run.
 2. Pass 1, per target: size, H and G (`get_asteroid_size`, 2.8), the asteroid's orbit file from JPL Horizons
-   (`fetch_target_orbit`), and a corridor plan (`pyoccult.corridor.plan_corridor`): the astrometric path every
+   (`fetch_target_orbit`), and a corridor plan (`pysyzygos.corridor.plan_corridor`): the astrometric path every
    `corridor_step_s` over the whole run, the strip half-width and the star magnitude cap (2.3).
 3. Pass 2, per target: stars in the strip from the local catalog (2.4), all star/time pairs scanned at once for
    closest approaches to the Earth's centre (2.5), then each candidate solved exactly for the site (2.6) and checked
@@ -99,7 +98,7 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   (TETE, true equator and equinox of date) appear only in displays (favorites, globe).
 - Asteroid: `spkpos(target, et, 'J2000', 'CN', '399')`. 399 is the Earth's centre (3 would be the Earth-Moon
   barycentre). `CN` is converged light time without stellar aberration: astrometric, like Gaia positions.
-- Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pyoccult/earth.py`), rotated ITRF93 to J2000 with
+- Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), rotated ITRF93 to J2000 with
   `pxform('ITRF93', 'J2000', et)`. Longitude east-positive, geodetic, radians.
 - Offsets `(dx, dy)` = the first two components of `M @ (r_asteroid - r_observer)`, km east and north. Miss distance =
   `hypot(dx, dy)`.
@@ -112,7 +111,7 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   (the observer can be anywhere on the Earth's disc) and a proper-motion pad for stars up to 1500 mas/yr over the time
   since Gaia's epoch 2016.0. Faster stars are added from an all-sky list kept with the catalog.
 
-### 2.4 Local Gaia catalog: `pyoccult/gaia_local.py`
+### 2.4 Local Gaia catalog: `pysyzygos/gaia_local.py`
 
 - Built from ESA's bulk Gaia DR3 `gaia_source` files (3386 gzipped CSV files, 753 GB, streamed and not kept). Kept:
   G <= `gaia_local_gmax` (18), 5-parameter astrometry, RUWE < 1.4; columns `source_id, ra, dec, parallax, pmra, pmdec,
@@ -128,16 +127,16 @@ comparison; it shares the per-star solve and checks (`handle_star`).
 - Ready-made copies for G <= 16 and G <= 18 (the same files a build writes, without the bright-star index) are on
   Zenodo, [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it contains): `gaia_dr3_g16.tar.xz`
   (2.1 GB) and `gaia_dr3_g18.tar.xz` (8.2 GB), each with a `.sha256`. `fetch_zenodo` downloads one (resumable), checks
-  the SHA-256 and unpacks it into any folder name; `pyoccult/setup.py` offers it before the ESA build.
+  the SHA-256 and unpacks it into any folder name; `pysyzygos/setup.py` offers it before the ESA build.
 
-- **Supplement** (`<catalog>/supplement/`, `pyoccult gaia supplement --dir <catalog> --gmax 16`, 0.17.0): the stars
+- **Supplement** (`<catalog>/supplement/`, `pysyzygos gaia supplement --dir <catalog> --gmax 16`, 0.17.0): the stars
   the main catalog leaves out, from the same pass over ESA's files with the opposite filter: RUWE >= 1.4 (kind 1)
   and 2-parameter sources without parallax or proper motion (kind 2; stored as 0, so their position is that of 2016),
   with `ruwe`, `ra_error`, `dec_error` (`SUPP_DTYPE`). From a 1 % archive sample: G < 12 ~0.6 M stars, G < 16 ~8 M
   (~0.3 GB), G < 18 ~25 M (~1 GB), about 9-10 % of the main catalog at each limit, mostly high RUWE (at G < 12 one star
   in five). `LocalGaia` merges it into `cone` and `corridor_stars` (columns `star_kind`, `ruwe`), `open_index` merges its
   bright-star index (`MergedIndex`, `COMMON_DTYPE`) for picks and pre-screens; `use_supplement()` = env
-  `PYOCCULT_SUPPLEMENT` (GUI switch) else config `gaia_supplement` (default on). Events on such stars carry
+  `PYSYZYGOS_SUPPLEMENT` (GUI switch) else config `gaia_supplement` (default on). Events on such stars carry
   `star_kind`, `star_ruwe`, `star_flag` ("RUWE 1.65", "2-param") at the end of the record and the pick's events, shown
   as ⚑ after the star magnitude.
   **2-parameter stars have no proper motion in Gaia DR3**, so their 2026 position can be 0.1-0.3" off, 100-400 km at
@@ -192,7 +191,7 @@ Order of precedence:
 `D = 1329 / sqrt(p) * 10^(-H/5)` km. `r_min_km` is clamped at 0. The bounds describe size uncertainty only, not orbit
 uncertainty. No diameter and no H gives no size (the target is skipped).
 
-The raw SBDB data is cached per asteroid in `<cache_path>/PyOccult_sbdb_phys.json` (`pyoccult/sbdb.py`), refreshed
+The raw SBDB data is cached per asteroid in `<cache_path>/PySyzygos_sbdb_phys.json` (`pysyzygos/sbdb.py`), refreshed
 after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk download.
 
 ### 2.9 Event metrics: `event_metrics`, `apparent_mag_HG`, `moon_info`
@@ -215,13 +214,13 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
   summary (start-up, asteroid data loading = pass 1, search = pass 2, maps, per asteroid, per exact solve, counts,
   site, equipment, limits) printed and appended to `<hits log>.runs.jsonl` for the report header.
 
-### 2.10 Shadow ground track: `pyoccult/paths.py`
+### 2.10 Shadow ground track: `pysyzygos/paths.py`
 
 - About 1.3 Earth radii of track on each side of the event, ~100 km per step. Seven lines: centre, the shadow limits
   (+/-r), the 1-sigma limits (+/-(r + sigma)) and the 3-sigma limits (+/-(r + 3 sigma)); each plane point is projected onto the Earth ellipsoid
   (`surfpt`; a miss raises `NotFoundError` and the point is skipped), with the centre-line duration at each point.
 - **The path is geodetic at height 0 m on the WGS84 ellipsoid** (a = 6378.137 km, f = 1/298.257223563;
-  `pyoccult/earth.py`), as Occult's default output and GPS positions, so it can be compared exactly. All geodetic
+  `pysyzygos/earth.py`), as Occult's default output and GPS positions, so it can be compared exactly. All geodetic
   conversions (sites, observer, globe plot) use WGS84 too; until 2026-10-11 they used the SPICE kernel's Earth radii
   (pck00010: 6378.1366 / 6356.7519 km, ~0.4 m off), which moved the path by 0.3 m (median), 1.2 m (95 %), up to
   3.6 m near the limb (checked on the 1999 UC45 event), the event time by 0.01 ms. Earth orientation: ITRF93
@@ -248,7 +247,7 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
   `r_max + max_shadow_dist` (the shadow plus the distance you can travel), also when the site lies outside the
   3-sigma band: then the map shows where to go.
 
-### 2.11 Event preview: `pyoccult/preview.py`
+### 2.11 Event preview: `pysyzygos/preview.py`
 
 - For every hit, an SVG next to its KML: the local-catalog stars (to `preview_mag_limit`) in a field
   `preview_field_factor` times the camera field (at least 10′), moved linearly by proper motion to the event date;
@@ -256,10 +255,10 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
 - Camera field `2 atan(sensor / 2 focal)` from the site's `focal_mm` and `sensor_mm`; asteroid track from the SPK
   (`CN`, geocentric) over a span chosen so it covers about a quarter of the field (30 min to 12 h each side).
 
-### 2.12 Globe plot: `pyoccult/globe.py` (0.11.0)
+### 2.12 Globe plot: `pysyzygos/globe.py` (0.11.0)
 
-- The whole Earth as seen from the star at the event time (orthographic, east right, north up), as on Occult's
-  plot: the shadow path from `shadow_path` (centre line, shadow limits, 1- and 3-sigma limits) with dots and labels
+- The whole Earth as seen from the star at the event time (orthographic, east right, north up): the
+  shadow path from `shadow_path` (centre line, shadow limits, 1- and 3-sigma limits) with dots and labels
   at whole minutes, the shadow axis beyond the Earth (fundamental plane, dashed, minute ticks), the site, and either
   sea, land and the night side (`globe_style = "color"`, like OWC's globe) or a line drawing with the day side
   (`"lines"`). Land is drawn with an extended orthographic projection (r = sin c on the visible side, 2 - sin c
@@ -277,11 +276,11 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
 
 ---
 
-## Part 3: Choosing targets (`pyoccult/pick.py`)
+## Part 3: Choosing targets (`pysyzygos/pick.py`)
 
 An OWC-style event search over all asteroids (numbered, H < `pick_hmax`, or all with `--all`) for a window, at the site.
 
-### 3.1 Orbits: `pyoccult/orbits.py`
+### 3.1 Orbits: `pysyzygos/orbits.py`
 
 - SBDB bulk query with **full-precision** elements (`full-prec=true`). The default output is rounded (e.g. `a = 2.766`),
   which alone gave ~40" errors.
@@ -291,7 +290,7 @@ An OWC-style event search over all asteroids (numbered, H < `pick_hmax`, or all 
 - Against the JPL Horizons orbit files of 102 asteroids over 21 days: worst 0.01", median 2 km. 102 asteroids in 0.2 s.
   Not for close Earth approaches (no Moon separately, fixed step).
 
-### 3.2 The screen: `pyoccult/screen.py`
+### 3.2 The screen: `pysyzygos/screen.py`
 
 Per chunk of asteroids, positions every 600 s over the window, then per asteroid:
 1. Only samples when the asteroid is above `MIN_STAR_ALT - 3` at the site and the Sun below `MAX_SUN_ALT` (both from the
@@ -304,7 +303,7 @@ Per chunk of asteroids, positions every 600 s over the window, then per asteroid
 5. Kept if the miss is below `r_max + reach`, the star is high enough and the Sun low enough at that time, and the
    detection rules pass.
 
-Against `pyoccult/search.py` on the same events: same stars, times within 5 s, the same drops and durations.
+Against `pysyzygos/search.py` on the same events: same stars, times within 5 s, the same drops and durations.
 Stars are moved linearly by proper motion (no parallax), and stars faster than 1500 mas/yr are not searched.
 
 ### 3.3 Detection rule
@@ -368,16 +367,16 @@ Workers up to the number of physical cores; the GUI default is half the logical 
 Output: `pick_events.csv`, a ranked table (brightest star first by default) and `targets.py` with the
 asteroids of the best events; their size data goes to the shared size cache.
 
-### 3.6 Saved picks: `pyoccult/picks.py`
+### 3.6 Saved picks: `pysyzygos/picks.py`
 
 The pick is the slow step, so each run for a named site is also saved as `picks/<site>__<start>_<days>d.py` (targets,
 names and `pick_meta`: site, position, window, settings, time of the pick) plus the `.csv` of its events. With
-`targets_source = "auto"` (default) `pyoccult/search.py` takes the newest saved pick of its site whose window covers the
+`targets_source = "auto"` (default) `pysyzygos/search.py` takes the newest saved pick of its site whose window covers the
 search window and that was made at the site's current position (within 0.01 deg); otherwise `targets.py` or the
 config list. An explicit target list (GUI text field, a run override, the OWC check) always wins. The run summary
 records which list was used, and the report header shows it.
 
-### 3.7 Pre-screens: `pyoccult/prescreen.py`, `pyoccult/shadowtrack.py` (0.16.0)
+### 3.7 Pre-screens: `pysyzygos/prescreen.py`, `pysyzygos/shadowtrack.py` (0.16.0)
 
 A pick spends most of its time on a site-independent question: which asteroids pass close enough to a star that its
 shadow touches the Earth at all. A pre-screen answers it once for a window and stores the answer; a pick then screens
@@ -518,15 +517,15 @@ setup of OccultWatcher Cloud, whose server keeps its predictions ready; locally,
 | `naif0012.tls`, `pck00010.tpc`, `de440.bsp` | NAIF generic kernels | leap seconds, Earth radii, Sun/Moon/planets |
 | `earth_latest_high_prec.bpc` | NAIF generic kernels | ITRF93 Earth orientation, refreshed after `earth_pck_max_age` days; measured to its "last datum", predicted ~3 months beyond (both shown at start-up and in the report header; a window past the coverage is refused) |
 | `earth_1962_*_combined.bpc` (optional) | NAIF generic kernels | ITRF93 Earth orientation from 1962 (measured to its creation, then a long-term prediction), for windows before 2000 (historic events); loaded before `earth_latest_high_prec.bpc`, which rules from 2000 on; fetched by a search or pick before 2000, or `setup --historic-earth` (~31 MB) |
-| Asteroid orbit files | JPL Horizons API (`EPHEM_TYPE=SPK`), cached in `cache_path` | `pyoccult/search.py` positions |
+| Asteroid orbit files | JPL Horizons API (`EPHEM_TYPE=SPK`), cached in `cache_path` | `pysyzygos/search.py` positions |
 | Asteroid size, H, G | SBDB API (`sbdb.api`, `phys-par=1`), cached per asteroid | `get_asteroid_size` |
-| Elements, sizes for all asteroids | SBDB Query API (`sbdb_query.api`, numbered, full precision), cached | `pyoccult/pick.py` |
+| Elements, sizes for all asteroids | SBDB Query API (`sbdb_query.api`, numbered, full precision), cached | `pysyzygos/pick.py` |
 | Asteroid names | SBDB full name, from the same per-asteroid cache as the size | `get_asteroid_name` |
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
 | Stars, ready-made | Zenodo [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (G <= 16, G <= 18) | local catalog without the build |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
-| Asteroid satellites | W. R. Johnston, Binary Minor Planets Compilation V3.0 (NASA PDS 2019, [doi:10.26033/bb68-pw96](https://doi.org/10.26033/bb68-pw96)) plus satellites seen in occultations (archive below); extract `pyoccult/data/binaries.json` | "+moon" in the tables, satellite line in the favorites panel, satellite zone on the maps |
-| Earlier occultations | NASA PDS Small Bodies Node, "Small Bodies Occultations" V4.0 (Herald, Dunham et al., [doi:10.26033/ehqs-jp27](https://doi.org/10.26033/ehqs-jp27)), extract shipped as `pyoccult/data/occultations_pds.json` | reference line in the favorites panel (not used for the prediction) |
+| Asteroid satellites | W. R. Johnston, Binary Minor Planets Compilation V3.0 (NASA PDS 2019, [doi:10.26033/bb68-pw96](https://doi.org/10.26033/bb68-pw96)) plus satellites seen in occultations (archive below); extract `pysyzygos/data/binaries.json` | "+moon" in the tables, satellite line in the favorites panel, satellite zone on the maps |
+| Earlier occultations | NASA PDS Small Bodies Node, "Small Bodies Occultations" V4.0 (Herald, Dunham et al., [doi:10.26033/ehqs-jp27](https://doi.org/10.26033/ehqs-jp27)), extract shipped as `pysyzygos/data/occultations_pds.json` | reference line in the favorites panel (not used for the prediction) |
 | Map | Leaflet 1.9.4 (cdnjs); OpenStreetMap tiles (`--tile-url` for others) | report |
 | Reference | Occult / OWC search results, pasted as text into `owc_reference.txt` (private, not in git) | validation |
 
@@ -551,7 +550,7 @@ Occultations" (D. Herald, D. W. Dunham et al., about yearly; https://sbn.psi.edu
 
 Reliable measured sizes (codes 3-4, size not assumed) exist for 343 asteroids, median 120 km (90 % above 52 km): the
 archive improves the large asteroids, while the small typical targets (a few km) mostly have no measured size, or
-only astrometry. PyOccult ships a compact extract (`pyoccult/occultations.py`, `data/occultations_pds.json`, 387 kB:
+only astrometry. PySyzygos ships a compact extract (`pysyzygos/occultations.py`, `data/occultations_pds.json`, 387 kB:
 per asteroid the number of events and years, quality counts, the best measured profile and the shape-model diameter;
 no chords, no observer data) and shows it as a reference line with the size in the favorites panel. Using it as a
 size source (before NEOWISE) is a possible next step; Occult's own archive (D. Herald) is newer than the PDS version.
@@ -565,7 +564,7 @@ primary's and the companion's diameter, the distance (semimajor axis, km) and th
 archive (4.1) adds satellites seen in occultations (57 events of 40 asteroids: date, separation in mas, position
 angle, size), including old reports that were never confirmed (e.g. Hebe 1977, Juno 1978).
 
-PyOccult ships an extract of both (`pyoccult/binaries.py`, `data/binaries.json`, 325 numbered systems, 43 kB) and
+PySyzygos ships an extract of both (`pysyzygos/binaries.py`, `data/binaries.json`, 325 numbered systems, 43 kB) and
 shows it as reference information: "+moon" (or "+2 moons"; "+moon?" when only reported in an occultation and not in
 Johnston's list) after the asteroid in the Results and Favorites tables, a "Satellites" line in the favorites panel,
 and on the event maps (KML, report map, globe plot) a dotted **satellite zone** at the primary's shadow edge plus
@@ -594,7 +593,7 @@ All checks, with their numbers and the discussion of the differences, are in
 
 ## Part 6: Open items
 
-- **Close and double stars** (since 2026-10-06 partly handled, `pyoccult/doubles.py`): every event checks the local
+- **Close and double stars** (since 2026-10-06 partly handled, `pysyzygos/doubles.py`): every event checks the local
   catalog for neighbours within `companion_radius_arcsec` (4") that are at most 5 mag fainter; their light stays in
   the camera image when the star is covered, so the drop is recomputed with it (`mag_drop_blended`), and noted with
   a warning sign in the report when it is at least 0.1 mag smaller. With `gaia_online_check` (default on) one query
@@ -611,13 +610,13 @@ All checks, with their numbers and the discussion of the differences, are in
      since 2016) in the path uncertainty.
   3. Step events: for a known pair, the two shadows (offset by separation x distance) and the drop of each step.
 
-- **218001**: OWC lists a 1.56 mag drop and 0.51 s, PyOccult 12.97 mag and 0.25 s. The duration difference is the
-  diameter (OWC 3.56 km, PyOccult 1.77 km from H). The drop is unexplained; hypothesis (unverified): the 5.6 mag star's
+- **218001**: OWC lists a 1.56 mag drop and 0.51 s, PySyzygos 12.97 mag and 0.25 s. The duration difference is the
+  diameter (OWC 3.56 km, PySyzygos 1.77 km from H). The drop is unexplained; hypothesis (unverified): the 5.6 mag star's
   angular diameter is comparable to the shadow, making the event partial. Idea: Gaia `radius_gspphot` and
   `distance_gspphot` (angle in mas ~ 9.305 R / d_pc), a partial-coverage drop, and a flag when the star is larger than
   about 30 % of the shadow.
 - **Stellar parallax**: applied since 0.10.0 together with the light deflection (see below); the old unused
-  `geocentric_star_dir` in pyoccult/search.py did the same and is superseded by `pyoccult.astrometry.parallax_dir`.
+  `geocentric_star_dir` in pysyzygos/search.py did the same and is superseded by `pysyzygos.astrometry.parallax_dir`.
 - **`star_test`'s `observable` text column**: `if not observable(...)` tests a tuple (always true), so the text never
   says "no". Harmless today, because `handle_star` rejects unobservable events with `observable(...)[0]`.
 - **Path uncertainty (sigma)** (the ellipse is now logged and drawn, 0.14.x: `ellipses.py`, favorites panel; the error
@@ -632,11 +631,11 @@ All checks, with their numbers and the discussion of the differences, are in
   id 3000 gives the coverage message at start-up.
 - **Report**: the map uses OpenStreetMap tiles, which need the page served by a web server (a `file://` page sends no
   Referer, so the tiles are refused); `--tile-url` selects another tile server.
-- **Ideas**: `m_before` / `m_during` columns in the log; process-level parallelism by target in `pyoccult/search.py`.
+- **Ideas**: `m_before` / `m_during` columns in the log; process-level parallelism by target in `pysyzygos/search.py`.
 
 ### Gravitational light deflection and stellar parallax (built in 0.10.0, 2026-10-04)
 
-**What PyOccult does now.** The asteroid comes from `spkpos(..., 'CN', '399')`: light-time corrected, astrometric,
+**What PySyzygos does now.** The asteroid comes from `spkpos(..., 'CN', '399')`: light-time corrected, astrometric,
 with no stellar aberration and no gravitational light deflection. The star direction is the Gaia DR3 catalog
 direction, propagated with its proper motion; Gaia directions are by definition free of light deflection (the
 catalog removes it). Aberration is consistent: neither source gets it, and it would shift both the same way, so it
@@ -696,16 +695,16 @@ only twilight: events around elongation 90 deg in the dark evening or morning sk
 events for a cross-track comparison with OWC.
 
 **Occult applies it (checked 2026-10-04 on 16556).** Occult's printed star position for 16556 (elongation 65 deg)
-differed from PyOccult's (then Gaia with proper motion only) by 4.5 mas, nearly away from the Sun, as expected if
+differed from PySyzygos's (then Gaia with proper motion only) by 4.5 mas, nearly away from the Sun, as expected if
 Occult applies the light deflection and the stellar parallax; with both added (0.10.0) the difference fell to 0.9 mas,
 within Occult's 1-sigma. Details and a control case near opposition: [VERIFICATION.md](VERIFICATION.md), section 2.
 
-**Implemented in 0.10.0 (2026-10-04).** `pyoccult/astrometry.py` corrects the star direction once per candidate in
+**Implemented in 0.10.0 (2026-10-04).** `pysyzygos/astrometry.py` corrects the star direction once per candidate in
 `handle_star`, at the estimated event time (both corrections change by micro-arcseconds within the solver window):
 stellar parallax (Gaia parallax > 0) and the light deflection by the Sun, Jupiter and Saturn (GM from DE440),
 applied as star minus asteroid since the asteroid (SPICE 'CN') stays undeflected. Everything after it (time, offset,
 map, preview) uses the corrected direction; `star_ra`/`star_dec` in the log are that direction, and the log columns
-`corr_parallax_mas`, `corr_deflection_mas` give the size of each correction. Switches in pyoccult_config.py:
+`corr_parallax_mas`, `corr_deflection_mas` give the size of each correction. Switches in pysyzygos_config.py:
 `star_parallax`, `light_deflection` (both default on); the run summary records them and the report header shows them.
 Not yet in the pick screen (its ~2 km screening accuracy hides them).
 
@@ -765,14 +764,14 @@ rest.
 The pick tool would not need to change: there are only a handful of major bodies, so they would simply be listed as
 targets.
 
-**Status (0.14.0, 2026-10-08): planets and moons are built** (`pyoccult/bodies.py`; usage in README, "Planets and
+**Status (0.14.0, 2026-10-08): planets and moons are built** (`pysyzygos/bodies.py`; usage in README, "Planets and
 moons"; checks in VERIFICATION.md, section 3): Mars to Neptune, Pluto and 91 of their 458 known moons, a GUI tab
 with groups per system, D/R contact times, a results list and report layout of their own, previews with the
 system's disks. Of the items below, 1-5, 7 and 8 are done (the preview without phase and glare halo); open are 6
 (the limb ellipse: the limb is a circle of the equatorial radius, so a graze near a pole of Jupiter or Saturn may be
 a miss; rings not modelled) and the Moon (`L:Moon`: bright limb, daylight, its 30' disk). One change to the plan:
 the positions come from JPL Horizons (the same ephemeris as NAIF's satellite kernels), written into a small type 13
-kernel per search window (~1 m); NAIF's kernels are an optional download (`pyoccult setup --planet-kernels`).
+kernel per search window (~1 m); NAIF's kernels are an optional download (`pysyzygos setup --planet-kernels`).
 
 **Implementation notes (2026-10-08, from a review of the current search).** The search loop itself works unchanged
 for major bodies: corridor scan, solver (`besselian_offsets`, `star_test`), local Gaia catalog, star corrections,
@@ -822,8 +821,8 @@ apart from asteroid events. The OWC check, the pick tool and the saved picks sta
 
 ## Supplemental: related tools (notes for later)
 
-Pointed out by a tester (2026-10-11); kept here for later work. PyOccult stays an independent development: these are
-references to compare with and to learn from, not code bases it is built on. If one is ever used as a library, it is
+Pointed out by a tester (2026-10-11); kept here for later work. These are references to compare with and to learn
+from, not code bases PySyzygos is built on. If one is ever used as a library, it is
 credited in the README, the GUI's About box and CITATION.cff.
 
 **SORA, Stellar Occultation Reduction and Analysis** (Gomes-Júnior, Morgado, Benedetti-Rossi, Boufleur, Rommel,
@@ -831,17 +830,17 @@ Banda-Huarca, Kilic, Braga-Ribas, Sicardy; MNRAS 2022, [arXiv:2201.01799](https:
 https://sora.readthedocs.io/latest/modules.html). An open-source Python library on astropy from the Lucky Star team,
 "from predicting such events up to the determination of Solar System bodies' sizes, shapes, and positions"; it can
 also predict events for observers in space (e.g. JWST near the Sun-Earth L2 point). Widely used and actively
-developed. Its focus complements PyOccult's: SORA studies chosen objects in depth (prediction, light-curve fitting,
-chords, limb and ellipse fits, astrometry), PyOccult screens all asteroids for the events at an observer's site
+developed. Its focus complements PySyzygos's: SORA studies chosen objects in depth (prediction, light-curve fitting,
+chords, limb and ellipse fits, astrometry), PySyzygos screens all asteroids for the events at an observer's site
 (bulk pick, pre-screens, planning GUI). Possible uses:
 1. **A third independent validation reference** (besides OWC and Occult): predict the same events with SORA (e.g.
    (86288) 1999 UC45 on 2026-09-30 and some OWC reference sets), compare time, centre line and path width, and add the
-   results to VERIFICATION.md. SORA would run in a separate environment, so PyOccult's dependencies stay as they are.
+   results to VERIFICATION.md. SORA would run in a separate environment, so PySyzygos's dependencies stay as they are.
 2. **Analysis after an event** (open item "observation data per favorite": result, D/R times, chords): export a
    favorite's prediction and the observers' timings in a form SORA reads, or use SORA optionally where it is
    installed, instead of writing chord and shape fitting from scratch. Check its license and API before that.
 
 **Marc Buie's IDL library** (https://www2.boulder.swri.edu/~buie/idl/): an extensive, long-standing collection of
 occultation and astrometry routines in IDL. IDL is commercial (licence on request from NV5 Geospatial Software,
-https://www.nv5geospatialsoftware.com/Products/IDL), so PyOccult cannot run or depend on it; a valuable read for
+https://www.nv5geospatialsoftware.com/Products/IDL), so PySyzygos cannot run or depend on it; a valuable read for
 methods and edge cases.

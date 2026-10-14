@@ -1,7 +1,7 @@
-"""pyoccult_kstars: command building and safe failure, with a stand-in for subprocess (no KStars, no D-Bus needed)."""
+"""pysyzygos_kstars: command building and safe failure, with a stand-in for subprocess (no KStars, no D-Bus needed)."""
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import kstars as K
+from pysyzygos import kstars as K
 
 calls = []
 

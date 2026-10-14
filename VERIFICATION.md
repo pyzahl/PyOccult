@@ -1,8 +1,8 @@
-# PyOccult: verification
+# PySyzygos: verification
 
-How PyOccult's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
+How PySyzygos's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
 event plots, against its own older code paths, and with independent geometry. What is computed and how: `ABOUT.md`;
-open items: `ABOUT.md`, Part 6. Updated 2026-10-12 (PyOccult 0.18.0).
+open items: `ABOUT.md`, Part 6. Updated 2026-10-12 (version 0.18.0).
 
 Contents:
 
@@ -11,7 +11,7 @@ Contents:
   - [1.2 The observer's site, Oct 2-9 2026 (16 events)](#12-the-observers-site-oct-2-9-2026-16-events)
   - [1.3 A second site, sets A and B (OWC data of 2026-10-02, events Oct 3-6 2026; checked 2026-10-03)](#13-a-second-site-sets-a-and-b-owc-data-of-2026-10-02-events-oct-3-6-2026-checked-2026-10-03)
   - [1.4 The second site, 50 events Oct 4-7 2026 (OWC data of 2026-10-04)](#14-the-second-site-50-events-oct-4-7-2026-owc-data-of-2026-10-04)
-  - [1.5 The second site, 50 events Oct 8-11 2026 (checked 2026-10-08, PyOccult 0.14.0)](#15-the-second-site-50-events-oct-8-11-2026-checked-2026-10-08-pyoccult-0140)
+  - [1.5 The second site, 50 events Oct 8-11 2026 (checked 2026-10-08, PySyzygos 0.14.0)](#15-the-second-site-50-events-oct-8-11-2026-checked-2026-10-08-pysyzygos-0140)
 - [2. Against Occult's event plots: star positions](#2-against-occults-event-plots-star-positions)
 - [3. Internal and geometric checks](#3-internal-and-geometric-checks)
 - [4. What the differences mean](#4-what-the-differences-mean)
@@ -22,21 +22,21 @@ Contents:
 
 ### 1.1 How the comparison works
 
-An OWC search result (OWC's web page, copied as text) is saved as a reference file. `pyoccult owc-check --ref <file>`
+An OWC search result (OWC's web page, copied as text) is saved as a reference file. `pysyzygos owc-check --ref <file>`
 reads its events and its filter line (reach from the shadow, star magnitude limit, minimum duration, aperture,
-detection frames, minimum altitude), runs PyOccult's full search with the same settings at the same site for the
+detection frames, minimum altitude), runs PySyzygos's full search with the same settings at the same site for the
 asteroids and window of the list, and compares event by event: time, star, drop, duration, diameter. It runs in its
 own results database (`owc_check.db`), apart from your results. The reference sets are private (they name the site)
 and are kept with their check output, so every check can be rerun with a later version.
 
-- **Star magnitudes:** PyOccult's Gaia G equals OWC's "Star Mag (V)" column to 0.01 in every set: OWC shows Gaia G.
+- **Star magnitudes:** PySyzygos's Gaia G equals OWC's "Star Mag (V)" column to 0.01 in every set: OWC shows Gaia G.
 - **Twilight events:** OWC lists them with the Sun's altitude after the time ("☼ -7°"); the check reads it and sets
   the Sun limit to the brightest listed altitude + 1 deg (OWC shows no Sun limit).
-- **Site elevation:** OWC online computes for the site at sea level; it ignores the given elevation. PyOccult uses
+- **Site elevation:** OWC online computes for the site at sea level; it ignores the given elevation. PySyzygos uses
   the real height. A site h metres up is moved across the track by up to h x cos(star altitude): 958 m gives 0.90 km
   at altitude 20 deg, 0.68 km at 45 deg, 0.33 km at 70 deg; 29 m stays below 30 m. Times change only by fractions of
   a second. So for high sites OWC's path differs from ours by that much, and ours is the right one.
-  `pyoccult owc-check --sea-level` computes our side at elevation 0 for a like-for-like comparison. The sets below
+  `pysyzygos owc-check --sea-level` computes our side at elevation 0 for a like-for-like comparison. The sets below
   are at near-sea-level sites unless noted.
 - **Match:** same asteroid, time within 10 s; drops compared below 5 mag (above that both are total and differ only
   by the asteroid's estimated brightness), within 0.25 mag; durations within 10 % where both use the same diameter.
@@ -51,7 +51,7 @@ only by diameter (sizes from H, or OWC using another source than NEOWISE). 21800
 
 Two OWC filters: A = 25 km from shadow, G <= 15, 15 cm, 8 frames, min altitude 10 (6 events); B = 20 km, G <= 15,
 15 cm, 4 frames, min altitude 5 (10 events). Search: `owc-check` with the OWC filter and the Sun below -6. Pick:
-`pyoccult pick` blind over all asteroids with the same filter, Oct 1 + 7 d.
+`pysyzygos pick` blind over all asteroids with the same filter, Oct 1 + 7 d.
 
 | Asteroid | Set | Time diff (s) | Star G = OWC V | Drop ours / OWC | Duration ours / OWC (s) | Diameter ours / OWC-implied (km) | Pick |
 |---|---|---|---|---|---|---|---|
@@ -82,22 +82,22 @@ the site, inside our r_max + 20 km, outside OWC's 20 km from the nominal edge).
 
 20 km from shadow, G <= 16, min duration 0.2 s, 50 cm, 4 frames, min altitude 0; 9 twilight events.
 
-- PyOccult 0.9: 46 of 50 match (8 of the 9 twilight events; they need the Sun-altitude parser, fixed 2026-10-04:
+- PySyzygos 0.9: 46 of 50 match (8 of the 9 twilight events; they need the Sun-altitude parser, fixed 2026-10-04:
   before, such lines were skipped). Not found: 17871 (Sun -1, altitude 85), 484605, 54567; 281158 17.8 s off.
-- PyOccult 0.10.0 (stellar parallax and light deflection, section 2): 48 of 50 (17871 and 54567 now found: both
+- PySyzygos 0.10.0 (stellar parallax and light deflection, section 2): 48 of 50 (17871 and 54567 now found: both
   borderline). Times change by at most 0.69 s (median 0.06 s); paths move by up to 10.6 km (772902: parallax
   3.37 mas, asteroid at 5.3 AU). For the 31 events with an expected shift over 0.5 km, the path moved by exactly the
   star's angular shift times the asteroid's distance (ratio 1.00; one event 0.74, from the simplified along-track
   speed in that check).
-- PyOccult 0.14.0 (rerun 2026-10-08, the list below): 48 of 50, the same as 0.10.0. 484605 (H 17.8, ~0.8 km): the
+- PySyzygos 0.14.0 (rerun 2026-10-08, the list below): 48 of 50, the same as 0.10.0. 484605 (H 17.8, ~0.8 km): the
   same star (Gaia DR3 42300553080330752, G 12.74, in the catalog) and time (-1.2 s), but our path passes 29.0 km from
   the site, outside the 20 km reach: an orbit difference of a small asteroid. 281158 (H 17.9, ~0.9 km): 17.1 s
   later than OWC, an along-track orbit difference. Six more small asteroids differ by 2 to 9 s (🟠), all of them
   with diameters of 0.9 to 2.7 km.
 
-Full lists by star magnitude, as `pyoccult owc-check --markdown` writes them. ✅ match; 🟠 match, but the time
+Full lists by star magnitude, as `pysyzygos owc-check --markdown` writes them. ✅ match; 🟠 match, but the time
 differs by more than 1.5 s (bold); 🔴 OWC event not found, or time or drop outside the match limits; 🔵 an event only
-PyOccult lists. Δt = PyOccult minus OWC; Star G for a missing event is OWC's magnitude; Shadow dist = PyOccult's
+PySyzygos lists. Δt = PySyzygos minus OWC; Star G for a missing event is OWC's magnitude; Shadow dist = PySyzygos's
 distance of the site from the centre line; OWC-implied diameter = OWC's duration x our shadow speed.
 
 | | Asteroid | OWC time (UT) | Δt (s) | Star G | Drop ours / OWC | Duration ours / OWC (s) | Diameter ours / OWC-implied (km) | Shadow dist (km) | Result |
@@ -153,7 +153,7 @@ distance of the site from the centre line; OWC-implied diameter = OWC's duration
 | ✅ | (589) Croatia | 2026-10-05 09:31:41 | +0.4 | 15.71 | 0.41 / 0.35 | 7.40 / 6.81 | 93.62 / 86.18 | 20.1 | match |
 | ✅ | (1336) Zeelandia | 2026-10-06 05:18:23 | +0.1 | 15.90 | 0.47 / 0.46 | 3.92 / 3.94 | 21.44 / 21.54 | 8.7 | match |
 
-### 1.5 The second site, 50 events Oct 8-11 2026 (checked 2026-10-08, PyOccult 0.14.0)
+### 1.5 The second site, 50 events Oct 8-11 2026 (checked 2026-10-08, PySyzygos 0.14.0)
 
 Same filter as 1.4 (20 km from shadow, G <= 16, min duration 0.2 s, 50 cm, 4 frames, min altitude 0); 9 twilight
 events. **44 of 50 match**:
@@ -165,7 +165,7 @@ events. **44 of 50 match**:
 
 The 6 others, by cause:
 
-| Asteroid | OWC | PyOccult | Cause |
+| Asteroid | OWC | PySyzygos | Cause |
 |---|---|---|---|
 | (69085) 2003 BE2 | Oct 8 08:22:20, G 11.62 | not found | star not in the local catalog: Gaia DR3 19293959462010496 is a **2-parameter source** (position only: no parallax, proper motion or RUWE) |
 | (325516) 2009 RF60 | Oct 8 01:44:11, G 11.98 | not found | the same: Gaia DR3 91626190888697088, 2-parameter source |
@@ -235,24 +235,24 @@ The full list (484605's and 549201's kind of miss, and the 2-parameter stars, ar
 
 ## 2. Against Occult's event plots: star positions
 
-Occult's event plot prints the star's "astrometric" position. Compared with PyOccult's star direction it shows which
+Occult's event plot prints the star's "astrometric" position. Compared with PySyzygos's star direction it shows which
 corrections Occult applies.
 
 **16556 (Oct 4 2026, elongation 65 deg, morning twilight; Occult's 1-sigma (0.9 x 0.2) mas).** Occult's star position
-differed from PyOccult's (Gaia DR3 with proper motion only, version 0.9) by 4.5 mas at PA 280, nearly the direction
+differed from PySyzygos's (Gaia DR3 with proper motion only, version 0.9) by 4.5 mas at PA 280, nearly the direction
 away from the Sun (PA 286). Expected if Occult applies the light deflection (6.34 mas away from the Sun) and the
 stellar parallax (Gaia parallax 1.198 mas x sin 65.4 deg = 1.09 mas towards the Sun): 5.25 mas at PA 286; the
 residual 0.75 mas is within Occult's 1-sigma. So Occult includes both. What moves the path is the star relative to
 the asteroid (whose light is bent too, 3.71 mas): 2.63 mas differential deflection minus 1.09 mas parallax =
 1.54 mas, about 2.7 km across the track at 2.42 AU, about 1.7 of Occult's 1-sigma. Both corrections were then built
-into PyOccult 0.10.0 (`ABOUT.md`, Part 6, "Gravitational light deflection and stellar parallax"). Afterwards the star
+into PySyzygos 0.10.0 (`ABOUT.md`, Part 6, "Gravitational light deflection and stellar parallax"). Afterwards the star
 moved by 1.55 mas (predicted 1.54), and Occult's printed position minus ours (Gaia + parallax + full star deflection,
 Occult's "astrometric" place) went from 4.52 mas to 0.90 mas, within Occult's 1-sigma; the rest may be Occult's star
 catalog or its propagation (to ask the IOTA experts).
 
 **30819 (Oct 11 2026 at the observer's site, elongation 164 deg, control case near opposition).** Occult
 4.2025.6.12, JPL#55 orbit: 1-sigma (4.0 x 0.5) mas in PA 76, diameter 5.8 +/- 0.6 km; star TYC 0041-00123-1 = Gaia DR3
-2514569868519950720 (G 9.67, parallax 3.339 mas). PyOccult 0.10.0 (parallax 0.944 mas, deflection 0.008 mas
+2514569868519950720 (G 9.67, parallax 3.339 mas). PySyzygos 0.10.0 (parallax 0.944 mas, deflection 0.008 mas
 applied): offset 2.08 km (2.69 km before), the same time within 0.04 s.
 
 Occult's star position minus ours, four hypotheses (mas):
@@ -307,10 +307,10 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
      All four have full astrometry (5-parameter, RUWE 0.87-1.22) and are in the local main catalog.
   2. *Geometry from the Earth's centre* (Horizons SPK for the date, the local Gaia star with proper motion, parallax
      and light deflection, `paths.shadow_path` on WGS84): the shadow reaches the Earth in all four cases.
-  3. *The regular PyOccult search* at a test site placed on each computed centre line (dark, star above 20 deg) found
+  3. *The regular PySyzygos search* at a test site placed on each computed centre line (dark, star above 20 deg) found
      each event by itself, on that star, within 1-3 m of the centre line and at the same second:
 
-  | Event | PyOccult (test site) | Gaia DR3 star | Shadow on the Earth | Duration, drop | Path 1 sigma |
+  | Event | PySyzygos (test site) | Gaia DR3 star | Shadow on the Earth | Duration, drop | Path 1 sigma |
   |---|---|---|---|---|---|
   | Phaethon 2019-07-29 | 11:19:35.0 UT (lon -111.49, lat 37.19) | 194811405789498112, G 7.29 | 11:04-11:21 UT | 0.56 s, 8.9 mag | 0.69 km |
   | Phaethon 2021-10-03 | 16:58:44.0 UT (lon 157.34, lat 27.25) | 199543119717831424, G 12.02 | 16:46-17:12 UT | 0.75 s, 6.6 mag | 0.43 km |
@@ -329,7 +329,7 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
   it and without it (the full pick over all 464,740 asteroids): the pre-screen picks screened 3,050 and 2,417
   asteroids and gave the same 260 and 259 events, identical in every field (time, star, drop, duration, miss
   distance, supplement flags: 37 and 30 events on supplement stars), and the same 80 targets each.
-- **2-parameter stars: (4089) Galbraith, 2026-10-13** (2026-10-12): PyOccult predicted a central event at a site
+- **2-parameter stars: (4089) Galbraith, 2026-10-13** (2026-10-12): PySyzygos predicted a central event at a site
   (1.6 km) on Gaia DR3 3383655504436521856 (G 9.82, 2-parameter, ipd_frac_multi_peak 41 %: a close double, UCAC4
   573-029535/029536 2.9" apart); OWC (star U029535) put the path over 100 km away. With UCAC5's proper motion
   (-4.0, -13.0 +- 1.7 mas/yr; UCAC4: -5.6, -15.8) the path lies 206 km from the site, 7.4 s earlier, +-27 km (1 sigma)
@@ -367,12 +367,12 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 - **Stars** are always the same; G matches OWC's magnitude column to 0.01.
 - **Drops** agree within 0.25 mag below 5 mag. Larger differences come from the asteroid's brightness (H-G with
   G 0.15 here; OWC's phase law or its V conversion is unknown), up to 0.66 mag for single asteroids; above 5 mag both
-  drops are total anyway. **218001** is the open case: OWC 1.56 mag and 0.51 s, PyOccult 12.97 mag and 0.25 s. The
-  duration difference is the diameter (OWC 3.56 km, PyOccult 1.77 km from H); the drop is unexplained (hypothesis,
+  drops are total anyway. **218001** is the open case: OWC 1.56 mag and 0.51 s, PySyzygos 12.97 mag and 0.25 s. The
+  duration difference is the diameter (OWC 3.56 km, PySyzygos 1.77 km from H); the drop is unexplained (hypothesis,
   unverified: the 5.6 mag star's angular diameter makes the event partial; `ABOUT.md`, Part 6).
-- **Durations** differ where the diameters differ: OWC often has a measured or catalogued diameter where PyOccult
+- **Durations** differ where the diameters differ: OWC often has a measured or catalogued diameter where PySyzygos
   estimates one from H (marked * in the tables).
-- **Missing stars:** PyOccult's local catalog keeps only Gaia stars with a full astrometric solution (parallax,
+- **Missing stars:** PySyzygos's local catalog keeps only Gaia stars with a full astrometric solution (parallax,
   proper motion) and RUWE < 1.4. Gaia's 2-parameter sources (position only) and poorly measured stars (often
   unresolved doubles) are left out, so their events are never predicted; OWC lists them (2 of 50 in section 1.5).
   Open item: keep them in the catalog, flagged (a 2-parameter star's position error grows with the years since 2016,
@@ -380,7 +380,7 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 - **Small asteroids** (H above ~17, under ~1 km): their orbits are poorly known, and JPL's and OWC's orbits can differ
   by tens of km across the track, so an event can fall inside one reach and outside the other: 484605 (our path
   29 km from the site) and 549201 (47 km), both with OWC's within 20 km.
-- **Paths across the track:** since 0.10.0 PyOccult applies stellar parallax and light deflection as Occult does
+- **Paths across the track:** since 0.10.0 PySyzygos applies stellar parallax and light deflection as Occult does
   (section 2); for high sites OWC online is off by the site's elevation effect (1.1).
 - **More events than OWC:** the pick keeps an event if it can be observable (upper size bound); a few search events
   lie just outside OWC's listing (window edges, the nominal vs upper size).

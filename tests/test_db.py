@@ -1,9 +1,9 @@
-"""Results database (pyoccult.db): series, events, updates, exports, the one-time imports of an old hit log and
+"""Results database (pysyzygos.db): series, events, updates, exports, the one-time imports of an old hit log and
 favorites.json."""
 import sys, os, csv, json, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 import numpy as np
-from pyoccult import db
+from pysyzygos import db
 
 d = tempfile.mkdtemp()
 log = os.path.join(d, "hits_log.csv")

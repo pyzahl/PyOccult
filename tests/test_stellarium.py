@@ -1,9 +1,9 @@
-"""Stellarium pointing (pyoccult.stellarium): the Remote Control requests (location, time as JD UT with the clock
+"""Stellarium pointing (pysyzygos.stellarium): the Remote Control requests (location, time as JD UT with the clock
 stopped, J2000 view vector, field), against a small local HTTP server; and a clean failure without Stellarium."""
 import sys, os, json, threading, urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import stellarium as S, urls as U
+from pysyzygos import stellarium as S, urls as U
 
 got = []
 class H(BaseHTTPRequestHandler):

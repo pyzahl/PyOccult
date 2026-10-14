@@ -1,17 +1,17 @@
-# Contributing to PyOccult
+# Contributing to PySyzygos
 
 Additions, fixes and patches are welcome. This guide shows how to get a working copy, make a change on a branch,
-check it, and offer it for integration. It also explains how to work on PyOccult with Claude Code, the way most of
+check it, and offer it for integration. It also explains how to work on PySyzygos with Claude Code, the way most of
 it was written.
 
 ## 1. Get your own copy and a branch
 
-PyOccult lives at https://github.com/pyzahl/PyOccult. Fork it on GitHub (button "Fork"), then:
+PySyzygos lives at https://github.com/pyzahl/PySyzygos. Fork it on GitHub (button "Fork"), then:
 
 ```bash
-git clone https://github.com/<you>/PyOccult.git
-cd PyOccult
-git remote add upstream https://github.com/pyzahl/PyOccult.git     # to stay up to date with the original
+git clone https://github.com/<you>/PySyzygos.git
+cd PySyzygos
+git remote add upstream https://github.com/pyzahl/PySyzygos.git     # to stay up to date with the original
 git checkout -b my-feature                                          # one branch per change
 ```
 
@@ -24,24 +24,24 @@ git rebase upstream/main            # or: git merge upstream/main
 
 ## 2. Install and set up
 
-With uv (as in the README, "Easiest: with uv"): `uv run pyoccult setup --gmax 16 --source zenodo`, then
-`uv run pyoccult` or `uv run python tests/test_home.py`. Or with pip, as in the README (sections 1-4):
+With uv (as in the README, "Easiest: with uv"): `uv run pysyzygos setup --gmax 16 --source zenodo`, then
+`uv run pysyzygos` or `uv run python tests/test_home.py`. Or with pip, as in the README (sections 1-4):
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate           # Windows: .venv\Scripts\activate
 pip install -e .
-pyoccult setup --gmax 16 --source zenodo    # kernels + the small G <= 16 catalog (2.1 GB), enough for development
+pysyzygos setup --gmax 16 --source zenodo    # kernels + the small G <= 16 catalog (2.1 GB), enough for development
 ```
 
 Setup asks for your observing site and writes `sites.py`. That file is private and stays out of git.
 
 ## 3. Know the code before you change it
 
-The code is a standard Python package (PEP 621 `pyproject.toml`, src layout): modules in `src/pyoccult/`, imported as
-`from pyoccult import screen` (never by file path). `pip install -e .` makes your edits live at once. Commands are
-listed in `src/pyoccult/__main__.py` (`COMMANDS`): a new tool gets a module with a `main()` and an entry there. Tools
-run in the data folder (`pyoccult.home.HOME`: the project folder in a checkout), so data paths stay relative.
+The code is a standard Python package (PEP 621 `pyproject.toml`, src layout): modules in `src/pysyzygos/`, imported as
+`from pysyzygos import screen` (never by file path). `pip install -e .` makes your edits live at once. Commands are
+listed in `src/pysyzygos/__main__.py` (`COMMANDS`): a new tool gets a module with a `main()` and an entry there. Tools
+run in the data folder (`pysyzygos.home.HOME`: the project folder in a checkout), so data paths stay relative.
 
 - `README.md`: what the tools do and how to use them.
 - `ABOUT.md`: how the predictions are computed, the data sources, the validation and the open items (Part 6 is a
@@ -56,7 +56,7 @@ run in the data folder (`pyoccult.home.HOME`: the project folder in a checkout),
 folder, so it knows the structure and conventions from the first prompt:
 
 ```bash
-cd PyOccult
+cd PySyzygos
 claude                              # then describe the change you want
 ```
 
@@ -64,7 +64,7 @@ Good practice:
 
 - Work on your branch, one topic per session or branch.
 - Ask it to run the tests (below) and, for anything that changes predictions, to compare with a known result
-  (`pyoccult/owc_check.py`, see VERIFICATION.md).
+  (`pysyzygos/owc_check.py`, see VERIFICATION.md).
 - Keep `CLAUDE.md` current: when a change adds a file, a convention or a known limitation, update the matching
   section (Files, Conventions that matter, Status, Ideas not built yet) in the same branch. It is the memory for the
   next developer and the next session.
@@ -91,12 +91,12 @@ and say in the pull request what you compared it with.
 
 `.gitignore` already keeps them out; please do not force them in:
 
-- your sites and settings: `sites.py` (coordinates of your observing places), `pyoccult_config.py`, `owc_reference.txt`, `owc_refs/`, `picks/`,
+- your sites and settings: `sites.py` (coordinates of your observing places), `pysyzygos_config.py`, `owc_reference.txt`, `owc_refs/`, `picks/`,
   `favorites/` (they name your sites)
 - downloads and generated data: SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`), Gaia catalogs (`gaia_dr3_*/`),
   run outputs (`hits_log.csv`, `hits_report.html`, `maps/`, `targets.py`, ...)
 
-Never put real coordinates into tracked files (examples use New York City Hall, see `src/pyoccult/templates/sites_example.py`).
+Never put real coordinates into tracked files (examples use New York City Hall, see `src/pysyzygos/templates/sites_example.py`).
 
 ## 7. Offer it for integration
 
@@ -104,7 +104,7 @@ Never put real coordinates into tracked files (examples use New York City Hall, 
 git push origin my-feature
 ```
 
-Then open a pull request on GitHub from your branch to `pyzahl/PyOccult` `main`. In the description, say what it
+Then open a pull request on GitHub from your branch to `pyzahl/PySyzygos` `main`. In the description, say what it
 changes and why, how you tested it, and anything a reviewer should look at closely. Small, focused pull requests
 are easier to review and merge. For bigger ideas, open an issue first to agree on the approach.
 
@@ -112,5 +112,5 @@ No GitHub account? A patch file works too: `git format-patch upstream/main` and 
 
 ## 8. Licence
 
-PyOccult is licensed under GPL-3.0-or-later (see `LICENSE`). By contributing you agree that your contribution is
-licensed under the same terms. Data used by PyOccult keep their own terms (Gaia DR3: CC BY-NC 3.0 IGO).
+PySyzygos is licensed under GPL-3.0-or-later (see `LICENSE`). By contributing you agree that your contribution is
+licensed under the same terms. Data used by PySyzygos keep their own terms (Gaia DR3: CC BY-NC 3.0 IGO).

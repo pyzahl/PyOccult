@@ -1,7 +1,7 @@
-"""Known asteroid satellites (pyoccult.binaries): extract from the two PDS archives, the satellite zone, the labels."""
+"""Known asteroid satellites (pysyzygos.binaries): extract from the two PDS archives, the satellite zone, the labels."""
 import sys, os, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import binaries as B
+from pysyzygos import binaries as B
 
 d = tempfile.mkdtemp()
 # Johnston's compilation: fixed-width table, layout in its PDS4 label (1-based field_location)

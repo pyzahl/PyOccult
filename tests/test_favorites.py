@@ -1,7 +1,7 @@
-"""pyoccult_favorites: add (with copies of map and preview), duplicates, status/note, remove, lookup in a hits log."""
+"""pysyzygos_favorites: add (with copies of map and preview), duplicates, status/note, remove, lookup in a hits log."""
 import os, sys, tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import favorites as F
+from pysyzygos import favorites as F
 
 tmp = tempfile.mkdtemp()
 maps, fav = os.path.join(tmp, "maps"), os.path.join(tmp, "favorites")
@@ -47,7 +47,7 @@ assert F.cleanup("2050-01-01", fav)[1].startswith("no favorites before")
 page = F.write_page(fav)
 html = open(page, encoding="utf-8").read()
 assert 'class="favrow" data-key="70141_20990103T0707"' in html and 'id="favall"' in html and "favsetst" in html
-from pyoccult import report as R
+from pysyzygos import report as R
 assert 'class="mapbtn favbtn"' not in html, "no star buttons on the favorites page"
 import re
 assert not re.search(r"[,\s(]sel\s*=", R.FAVPAGE_JS if hasattr(R, "FAVPAGE_JS") else ""), \
@@ -83,7 +83,7 @@ assert F.shape_text(F.load(fav)[0]) == "axes 18.2 x 10.5 x 8.9 km · rotation 5.
 est = dict(F.load(fav)[0], record=dict(rec, size_source="H only, albedo assumed"))
 assert F.size_text(est).endswith("* estimate, uncertain by a factor ~1.7"), F.size_text(est)
 # preview and globe plot kept apart (report lookup, favorite copies, filling in later globes)
-from pyoccult import report as R
+from pysyzygos import report as R
 assert R.size_estimated({"size_src": "H only, albedo assumed"}) and not R.size_estimated({"size_src": "SBDB diameter"})
 from datetime import datetime, timezone
 when = datetime(2026, 10, 3, 2, 53, 7, tzinfo=timezone.utc)

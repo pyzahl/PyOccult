@@ -1,7 +1,7 @@
-"""Sensor list (pyoccult.cameras): sizes from pixels x pixel size, labels for the Site tab's list."""
+"""Sensor list (pysyzygos.cameras): sizes from pixels x pixel size, labels for the Site tab's list."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import cameras as C
+from pysyzygos import cameras as C
 
 names = [s[0] for s in C.SENSORS]
 assert len(names) == len(set(names)), "one entry per sensor"

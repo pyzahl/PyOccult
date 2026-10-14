@@ -1,5 +1,5 @@
 import sys, math, re, os, tempfile, numpy as np, pandas as pd
-sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src')); from pyoccult import corridor as C
+sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..', 'src')); from pysyzygos import corridor as C
 rng = np.random.default_rng(7)
 AU = C.AU_KM
 
@@ -39,7 +39,7 @@ ra, dec = C._radec(sv)
 cat = pd.DataFrame(dict(source_id=np.arange(N)+1, ra=ra, dec=dec, parallax=rng.uniform(0.1,10,N), pmra=rng.normal(0,15,N), pmdec=rng.normal(0,15,N),
                         phot_g_mean_mag=rng.uniform(8,20,N), ruwe=rng.uniform(0.8,1.3,N)))
 hp = rng.choice(N, 40, replace=False); cat.loc[hp,'pmra'] = rng.choice([-1,1],40)*rng.uniform(2000,6000,40)   # high-pm stars
-class FakeLocal:                           # stand-in for pyoccult_gaia_local.LocalGaia: same call, cap applied
+class FakeLocal:                           # stand-in for pysyzygos_gaia_local.LocalGaia: same call, cap applied
     calls = []
     def corridor_stars(self, plan, include_high_pm=True):
         FakeLocal.calls.append(plan['mag_cap'])

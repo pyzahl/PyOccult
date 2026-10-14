@@ -1,10 +1,10 @@
-"""Shadow elements (pyoccult.shadowtrack) and global pre-screen files (pyoccult.prescreen): the quadratic fit, the
+"""Shadow elements (pysyzygos.shadowtrack) and global pre-screen files (pysyzygos.prescreen): the quadratic fit, the
 ground track on a synthetic geometry (star along +x, no Earth rotation), the superset margins (a track crossing a
 small box between two samples), and the sorted global file with its window and star-limit selection. No SPICE."""
 import sys, os, json, sqlite3, tempfile
 import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
-from pyoccult import shadowtrack as ST, prescreen as PS
+from pysyzygos import shadowtrack as ST, prescreen as PS
 
 # the fit: an exact quadratic is recovered, with no misfit
 half = np.array([600.0, 3600.0])
@@ -64,7 +64,7 @@ for c in range(3):
     con.execute("INSERT INTO chunks VALUES (?, ?)", (len(e), e.tobytes()))
 con.commit()
 out = os.path.join(d, "t.global.npy")
-from pyoccult import gaia_local as GL                        # Windows: nothing may be mapped when renamed (WinError 32)
+from pysyzygos import gaia_local as GL                        # Windows: nothing may be mapped when renamed (WinError 32)
 real_replace, mapped = GL.replace_file, []
 def checked_replace(src, dst, *a, **k):
     if os.path.exists("/proc/self/maps") and os.path.abspath(src) in open("/proc/self/maps").read():
