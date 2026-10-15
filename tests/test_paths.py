@@ -140,6 +140,23 @@ p3 = run_case("grazing pass (axis 5 km inside the limb; +8 km limit line is outs
 # 4) misses the Earth completely
 p4 = run_case("complete miss", xi0=-30000.0, eta0=20000.0, vxi=6.0, veta=0.0, expect_empty=True)
 
+# 5) the observer's closest approach (ET0) near the end of the track: the axis is 6000 km past the Earth's centre at
+#    ET0, so a span centred on ET0 (1.3 Earth radii, as before) missed the first part of the crossing; the whole
+#    crossing from limb to limb must be there (Phaethon 2019-07-29: the path started 3 minutes late)
+p5 = run_case("observer near the end of the track", xi0=6000.0, eta0=1000.0, vxi=6.0, veta=0.0)
+first, last = p5['center'][0][0] - ET0, p5['center'][-1][0] - ET0
+step5 = 100.0 / 6.0
+x_limb = np.sqrt(A**2 - 1000.0**2 / (1 - (1 - (C/A)**2) * np.cos(star_dec)**2))   # roughly where the axis meets the limb
+print(f"   centre line {first:+.0f} .. {last:+.0f} s; the axis enters near {(-x_limb - 6000) / 6:+.0f} s, leaves near "
+      f"{(x_limb - 6000) / 6:+.0f} s")
+assert first <= (-x_limb - 6000) / 6 + 2 * step5 + 60, "the path starts late"    # +60 s: limb shape, rough
+assert last >= (x_limb - 6000) / 6 - 2 * step5 - 60, "the path ends early"
+# explicit half_span: still centred on et_best (as before)
+m5 = load_module()
+make_stub(6000.0, 1000.0, 6.0, 0.0)
+e5 = m5.shadow_path('4272', STAR, ET0, 2.0, 6.0, half_span=0.0, step=1.0)
+assert e5['center'] and abs(e5['center'][0][0] - ET0) < 1e-9, "an explicit span must stay on et_best"
+
 # KML for the grazing case: well-formed, and lines with <2 points are dropped
 m = load_module()
 m.write_shadow_kml(p3, '/tmp/graze.kml', 'Graze & <test>', observer=(-74.006, 40.713))

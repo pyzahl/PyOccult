@@ -394,8 +394,10 @@ Occult's printed place by 1.9 mas from ours; it agrees to 0.3 mas.
 
 **Found on the way (PySyzygos):** the event's path file and KML start only at 11:06:49 (Occult: 11:03:40): the path's
 time span is centred on the time at the observer's site, here near the end of the track, so its first three minutes
-were cut. And the whole-Earth view failed for a search window ending soon after the event (it asks for the
-asteroid's position a day later). Both to fix.
+were cut. Fixed after this comparison: the span is now centred on the shadow axis's closest approach to the Earth's
+centre, and the path runs 11:03:44-11:21:17 (Occult 11:03:40-11:21:22; the ends are within one sample step, about
+9 s here). And the whole-Earth view failed for a search window ending soon after the event (it asks for the
+asteroid's position a day later): to fix.
 
 ---
 

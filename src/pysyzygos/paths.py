@@ -40,7 +40,9 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
     Samples where a line does not touch the Earth (shadow off the disk, or a limit line beyond the
     terminator) are skipped, so lines can have different lengths and may be empty.
     half_span / step (s) default to values derived from the shadow speed: the span covers about
-    1.3 Earth radii of along-track motion on each side, the step about 100 km of along-track motion.
+    1.3 Earth radii of along-track motion on each side of the axis's closest approach to the Earth's centre (not of
+    et_best, the observer's, which can be near one end of the track), the step about 100 km of along-track motion.
+    An explicit half_span is centred on et_best.
     """
     from pysyzygos import earth                          # WGS84: points on its surface, height 0 (as Occult)
     a, b, c = earth.A_KM, earth.A_KM, earth.C_KM
@@ -54,15 +56,23 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
         p1, _ = spice.spkpos(tid, et + 0.5, 'J2000', 'CN', '399')
         return (M @ (p1 - p0))[:2]
 
-    speed = np.linalg.norm(axis_velocity(et_best))
+    v_best = axis_velocity(et_best)
+    speed = np.linalg.norm(v_best)
     if speed < 1e-6:
         raise ValueError("shadow does not move on the fundamental plane")
-    if half_span is None:
-        half_span = 1.3 * a / speed
     if step is None:
         step = max(1.0, min(60.0, 100.0 / speed))
+    k0 = 0
+    if half_span is None:
+        # et_best is the closest approach at the observer's site, which can lie near one end of the track: centre
+        # the span on the axis's closest approach to the Earth's centre instead (whole steps, so et_best stays on
+        # the grid); 1.3 Earth radii either side of it cover the whole crossing
+        ast_best, _ = spice.spkpos(tid, et_best, 'J2000', 'CN', '399')
+        xy = (M @ ast_best)[:2]
+        k0 = int(round(-(xy @ v_best) / speed ** 2 / step))
+        half_span = 1.3 * a / speed
     n_steps = int(np.ceil(half_span / step))
-    ets = et_best + step * np.arange(-n_steps, n_steps + 1)
+    ets = et_best + step * (k0 + np.arange(-n_steps, n_steps + 1))
 
     offsets = {'center': 0.0, 'edge_plus': r_km, 'edge_minus': -r_km,
                'sigma1_plus': r_km + sigma3_km / 3.0, 'sigma1_minus': -(r_km + sigma3_km / 3.0),
