@@ -271,7 +271,9 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 
 ---
 
-## 3. Against Occult's geodetic path: (3200) Phaethon, 2019-07-29 ** PRELIMINARY RESULTS -- PENDING DETAILS FROM OCCULT RUN **
+## 3. Against Occult's geodetic path: (3200) Phaethon, 2019-07-29
+
+**PRELIMINARY RESULTS -- PENDING DETAILS FROM OCCULT RUN**
 
 A whole path, not only one event time: Occult's listing of the shadow's centre line and limits on the Earth, compared
 point by point with PySyzygos's path at the same instants. Both computed on the same day (2026-10-14), so both use the
