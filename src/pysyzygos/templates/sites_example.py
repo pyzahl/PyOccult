@@ -4,7 +4,7 @@
 #
 # Required: lat, lon (geodetic degrees, longitude east-positive, west is negative), ele (metres).
 # Optional (defaults in pysyzygos_config.py):
-#   view      min_alt (deg, lowest usable star altitude, default 10), max_sun_alt (deg, default -6),
+#   view      min_alt (deg, lowest usable star altitude, default 10), max_sun_alt (deg, default 0; twilight events marked),
 #             reach_km (km you can travel from here, default max_shadow_dist)
 #   equipment for OWC's General Observability Criterion, StarMag < 5 log10(aperture_cm)
 #             + 2.5 log10(MaxDuration / frames) + 8.5 + mag_adjust:

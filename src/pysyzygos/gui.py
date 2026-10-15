@@ -30,7 +30,7 @@ SITE_KEYS = [  # key, label, default, step  (optional site keys, see sites_examp
     ("sensor_w_mm", "Sensor width (mm)", 5.6, 0.1), ("sensor_h_mm", "Sensor height (mm)", 3.2, 0.1),
     ("frames", "Detection frames", 4, 1),
     ("extinction", "Extinction (mag/airmass)", 0.0, 0.05), ("min_alt", "Min. star altitude (°)", 10.0, 1),
-    ("max_sun_alt", "Max. Sun altitude (°)", -6.0, 1), ("reach_km", "Reach (km)", None, 5),
+    ("max_sun_alt", "Max. Sun altitude (°)", 0.0, 1), ("reach_km", "Reach (km)", None, 5),
     ("min_dur_s", "Min. duration (s)", 0.4, 0.05), ("max_exp_s", "Longest exposure (s)", 0.64, 0.01),
 ]
 

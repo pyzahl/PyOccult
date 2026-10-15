@@ -277,6 +277,9 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   (pck00010 is ~0.4 m off): paths.shadow_path (surfpt/recgeo: height 0 on WGS84, Occult's default), screen.Site,
   search.observer_j2000 / plane offsets, globe. Changed 2026-10-11: paths moved 0.3 m median, <= 3.6 m.
 - Target ids are strings of the asteroid number ('218001'); the SPK is aliased with `boddef` in `fetch_target_orbit`.
+- Sun limit default 0 deg (2026-10-15; was -6); events with the Sun above `report.TWILIGHT_SUN_ALT` (-12) are marked
+  "☼ −8°" after the star magnitude (`twilight_text`/`twilight_mark`; report rows, Markdown, exports.event_shown and
+  pick_shown: keep them in step).
 - `observable()` returns a tuple `(ok, star_alt, sun_alt)`; always index it. `if not observable(...)` is always False.
 - `mag_drop` is the change in combined brightness (`m_ast - m_before`), never smaller than `m_ast - m_star`.
 - Drop of at least `d` needs the star no fainter than `m_ast + 2.5*log10(1/(10^(0.4 d) - 1))` (2.54 mag for 0.1).

@@ -656,7 +656,7 @@ can also describe its view and its equipment; keys it leaves out take the defaul
 | Key | Default | Meaning |
 |---|---|---|
 | `min_alt` | 10 | lowest usable star altitude, deg (trees, houses, haze) |
-| `max_sun_alt` | -6 | the Sun must be below this, deg (try -12 for faint stars) |
+| `max_sun_alt` | 0 | the Sun must be below this, deg. Events with the Sun above -12 deg (twilight) are marked next to the star magnitude, e.g. "☼ −8°": only bright stars are seen then. Set -12 or lower to leave twilight out (faint stars, small telescopes) |
 | `reach_km` | `max_shadow_dist` | how far you can travel from this site, km |
 | `aperture_cm` | 25 | telescope aperture, cm |
 | `frames` | 4 | detection frames: video frames the event must cover |
@@ -1140,6 +1140,9 @@ The GUI builds and shows the report after every search; this section is about th
 The events are kept in the results database `pysyzygos.db`; after each search the current results list is also
 written as `hits_log.csv` (planets and moons: `bodies_log.csv`), a plain-text copy to review or use elsewhere.
 `pysyzygos report` turns it into a one-page event list with the columns OWC users expect (asteroid, event time UT, star mag, mag drop, max duration, altitude with compass direction, Moon distance, shadow distance from the centre line) plus **Chance** (the probability that the shadow covers your site, from the shadow distance, the shadow radius and the 1-sigma path uncertainty of JPL Horizons; it falls as the shadow distance grows and is a rough guide for far-future events, whose uncertainty is large) and a **Map** button for each event. Standard library only, no install needed.
+Next to the star magnitude, **☼ −8°** marks a twilight event: the Sun is above −12° at the site at the event time
+(hover for civil or nautical twilight). Only bright stars are seen then; the default Sun limit (0°) keeps these
+events, a site's `max_sun_alt` of −12 or lower leaves them out.
 The page header shows the site, its equipment, the magnitude and observing limits, the statistics of the run with the
 saved pick its targets came from, and the Earth orientation data it used (from `hits_log.runs.jsonl`); each event's
 calculation time is in `hits_log.csv` (`calc_s`). The **Preview** button shows the event preview: the star field

@@ -323,6 +323,7 @@ def build_event(r, lat, lon, kml_dir, out_dir):
                 compass=compass(az) if az is not None else "", az=az, moon=moon,
                 miss=miss, margin=margin, rad=rad, kml=kml, kml_abs=kml_abs, preview=preview,
                 m_ast=num(r.get("m_ast")), m_before=num(r.get("m_before")), calc=num(r.get("calc_s")),
+                sun=num(r.get("sun_alt")),
                 margin_mag=num(r.get("mag_margin")), airmass=num(r.get("airmass")), ext=num(r.get("extinction_mag")),
                 size_src=(r.get("size_source") or "").strip(), utc=r["best_utc"].strip(),
                 drop_blend=num(r.get("mag_drop_blended")), dhint=(r.get("double_hint") or "").strip(),
@@ -399,6 +400,7 @@ a.owc{display:inline-block;margin-top:2px;padding:0 6px;border-radius:6px;font-s
 sup.bin{color:#0891b2;font-weight:600;margin-left:3px;cursor:help;white-space:nowrap}
 span.dbl{color:#b26a00;font-weight:600;cursor:help;white-space:nowrap}
 span.sflag{color:#b26a00;font-size:85%;cursor:help;white-space:nowrap}
+span.twi{color:#8a6d00;font-size:85%;cursor:help;white-space:nowrap}
 span.swarn{color:#fff;background:#c62828;font-weight:700;font-size:85%;padding:0 4px;border-radius:3px;cursor:help;white-space:nowrap}
 sup.est{color:var(--muted);font-weight:700;margin-left:2px;cursor:help}
 .notes{color:var(--muted);font-size:.85rem;margin-top:16px}
@@ -735,6 +737,28 @@ def star_uncertain(e):
     return s if s is not None and s > max(r or 0.0, 1.0) else None
 
 
+TWILIGHT_SUN_ALT = -12.0          # Sun above this at the site (nautical/civil twilight): marked next to the star
+
+
+def twilight_text(sun_alt):
+    """'☼ -8°' when the Sun is above TWILIGHT_SUN_ALT at the event (twilight; the star must be bright enough to
+    see), else ''. sun_alt: degrees or None."""
+    if sun_alt is None or sun_alt <= TWILIGHT_SUN_ALT:
+        return ""
+    return f"\u263c {sun_alt:.0f}\u00b0".replace("-", "\u2212")
+
+
+def twilight_mark(e):
+    """twilight_text as a small HTML mark after the star magnitude, with a hover text."""
+    t = twilight_text(e.get("sun"))
+    if not t:
+        return ""
+    kind = "civil twilight" if e["sun"] > -6 else "nautical twilight"
+    tip = (f"Twilight: the Sun is {e['sun']:.1f} deg high at the site at the event ({kind}). Only bright enough stars "
+           f"can be seen against the sky; check your camera's limit in twilight.")
+    return f' <span class="twi" title="{esc(tip)}">{t}</span>'
+
+
 def star_mark(e):
     """After the star magnitude: a red '⚠ star ±150 km' when the star's position is too uncertain for this path
     (2-parameter star without a proper motion, ...), else the small '⚑ RUWE 1.65' for a supplement star; empty for a
@@ -778,7 +802,7 @@ def html_row_body(e):
         f'{esc(contact_text(e["utc"]))}</td>'
         f'<td title="{esc(e.get("r_utc") or "")} UTC">{contact_text(e.get("r_utc"))}</td>'
         f'<td class="num" data-s="{s(dur)}">{dur_txt}</td>'
-        f'<td class="num" data-s="{s(e["mag"])}">{fmt(e["mag"])}{star_mark(e)}</td>'
+        f'<td class="num" data-s="{s(e["mag"])}">{fmt(e["mag"])}{star_mark(e)}{twilight_mark(e)}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
         f'<td data-s="{s(moon["sep"], 1) if moon else ""}" title="{moon_tip}">{esc(moon_text(e))}</td>'
         f"{shadow_cell(e)}" + chance_cell(e) + f"{map_cell(e)}</tr>")
@@ -832,7 +856,7 @@ def html_row(e):
         f'<td class="num" data-s="{s(e["mag"])}" title="{mag_tip}">'
         + (f'<a href="{esc(VIZIER_GAIA)}{urllib.parse.quote(str(e["star"]))}" target="_blank" rel="noopener" '
            f'title="Gaia DR3 {esc(e["star"])} in VizieR. {mag_tip}">{fmt(e["mag"])}</a>' if e.get("star") else fmt(e["mag"]))
-        + star_mark(e) + '</td>'
+        + star_mark(e) + twilight_mark(e) + '</td>'
         f'<td class="num" data-s="{s(e["drop"])}" title="{drop_tip}">{fmt(e["drop"])}{double_mark(e)}</td>'
         f'<td class="num" data-s="{s(e["dur"])}">{fmt(e["dur"])}</td>'
         f'<td data-s="{s(e["alt"], 1)}" title="{alt_tip}">{esc(alt_text(e))}</td>'
@@ -962,6 +986,7 @@ def to_markdown(events, meta):
         dbl = (" \u26a0" + (f" {e['drop_blend']:.2f}" if e.get("drop_blend") is not None else "")) if e.get("dhint") else ""
         sf = (f" \u26a0 star \u00b1{star_uncertain(e):.0f} km ({e['sflag']})" if star_uncertain(e)
               else f" \u2691 {e['sflag']}" if e.get("sflag") else "")
+        sf += f" {twilight_text(e.get('sun'))}" if twilight_text(e.get("sun")) else ""
         out.append(f"| {e['label']}{star} | {fmt_time(e['when'])} | {fmt(e['mag'])}{sf} | {fmt(e['drop'])}{dbl} | {fmt(e['dur'])} "
                    f"| {alt_text(e)} | {moon_text(e)} | {off} | {chance_text(e)} | {fmt(e['calc'])} | {kml} |")
     if any(size_estimated(e) for e in events):

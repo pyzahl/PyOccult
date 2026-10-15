@@ -87,7 +87,9 @@ def event_shown(e):
         + (f" {tag}" if tag else "") + (" *" if R.size_estimated(e) else ""),
         event_time=R.fmt_time(e["when"]), event_utc=e["utc"], gaia_id=e["star"], kind=e["kind"],
         star_mag=R.fmt(e["mag"]) + (f" \u26a0 star \u00b1{R.star_uncertain(e):.0f} km" if R.star_uncertain(e)
-                                    else f" \u2691 {e['sflag']}" if e.get("sflag") else ""),
+                                    else f" \u2691 {e['sflag']}" if e.get("sflag") else "")
+        + (f" {R.twilight_text(e.get('sun'))}" if R.twilight_text(e.get("sun")) else ""),
+        sun_alt=None if e.get("sun") is None else round(e["sun"], 1),
         star_flag=e.get("sflag") or "", star_sigma_km=None if e.get("star_sigma") is None else round(e["star_sigma"], 1),
         mag_drop=drop, max_dur=R.fmt(e["dur"]), altitude=R.alt_text(e),
         moon_dist=R.moon_text(e), shadow_dist=shadow_text(e), chance=R.chance_text(e),
@@ -166,6 +168,13 @@ def pick_shown(r, targets):
     s["star_flag"] = flag
     if flag:                                                     # no proper motion at all: the strong warning sign
         s["star_mag"] = f"{s['star_mag']} {'\u26a0' if 'NO proper motion' in flag else '\u2691'} {flag}"
+    from pysyzygos.report import twilight_text                       # Sun above -12 deg at the site: twilight
+    try:
+        twi = twilight_text(float(r["sun_alt"])) if r.get("sun_alt") not in (None, "") else ""
+    except ValueError:
+        twi = ""
+    if twi:
+        s["star_mag"] = f"{s['star_mag']} {twi}"
     return s
 
 

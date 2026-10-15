@@ -6,6 +6,24 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Twilight mark**: events with the Sun above -12 deg at the site get "☼ −8°" next to the star magnitude (Results
+  and Planets & Moons pages, Markdown, favorites, CSV exports with a new `sun_alt` value, the GUI Pick table; hover:
+  civil or nautical twilight). Only bright stars are seen in twilight (`report.twilight_text`, `TWILIGHT_SUN_ALT`).
+
+### Changed
+- **Default Sun limit 0 deg** (was -6) for sites without their own `max_sun_alt` (config template, GUI Site tab,
+  pick, pre-screens): twilight events of bright stars are kept and marked instead of dropped. Prompted by
+  (3200) Phaethon on 2019-07-29 (G 7.3 star, Sun at -8 to -13 deg where it was observed), which a -12 deg limit hid.
+  Sites that set `max_sun_alt` keep their value.
+
+### Fixed
+- **Shadow paths (KML, path files, whole-Earth view) cut off at one end** when the event's time at the observer's
+  site lies near one end of the track: the path's time span was centred on that time and covered 1.3 Earth radii of
+  motion either side, so the other end could be missing (Phaethon 2019-07-29: the path started 3 minutes late, found
+  in the comparison with Occult, VERIFICATION.md section 3). The span is now centred on the shadow axis's closest
+  approach to the Earth's centre (`paths.shadow_path`; an explicit `half_span` stays centred on the given time).
+
 ## [1.0.0] "New Horizons" - 2026-10-14
 
 PyOccult is now **PySyzygos**. *Syzygos* is Greek for "yoked together", the root of *syzygy*: three celestial bodies

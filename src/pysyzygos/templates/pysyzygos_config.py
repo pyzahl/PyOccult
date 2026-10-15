@@ -57,7 +57,8 @@ ELE = site["ele"]                                  # elevation, m
 
 # view
 MIN_STAR_ALT = site.get("min_alt", 10.0)           # deg, lowest usable star altitude (trees, houses, haze)
-MAX_SUN_ALT = site.get("max_sun_alt", -6.0)        # deg, the Sun must be below this (try -12 for faint stars)
+MAX_SUN_ALT = site.get("max_sun_alt", 0.0)         # deg, the Sun must be below this; events with the Sun above -12
+                                                   # are marked as twilight (☼ -8°); -12 or lower for faint stars only
 max_shadow_dist = site.get("reach_km", max_shadow_dist)   # km, travel distance from the site (default: search setup)
 ALT_MARGIN = 3.0                                   # early gate is looser than the final one, never rejects a real event
 

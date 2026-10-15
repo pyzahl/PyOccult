@@ -41,4 +41,14 @@ assert got[0][:3] == ["Gaia", "Two", "target_id"] and "star" not in got[0] and g
 # the pick table's values
 s = X.pick_shown(dict(number="5523", name="5523 Luminet", H="13.456", star_mag="10.04", D_est="True", utc="x"), ["5523"])
 assert s["target"] == "✓" and s["H"] == "13.46" and s["name"] == "5523 Luminet *"
+assert s["star_mag"] == "10.04"                                     # no Sun altitude: no twilight mark
+# twilight: the Sun above -12 deg at the site is marked next to the star magnitude (report, CSV, pick table)
+from pysyzygos import report as R
+assert R.twilight_text(None) == "" and R.twilight_text(-18) == "" and R.twilight_text(-12.0) == ""
+assert R.twilight_text(-8.2) == "☼ −8°" and R.twilight_text(1.0) == "☼ 1°"
+assert "civil" in R.twilight_mark(dict(sun=-3.0)) and "nautical" in R.twilight_mark(dict(sun=-8.0))
+assert R.twilight_mark(dict(sun=-15.0)) == ""
+t = X.pick_shown(dict(number="3200", name="3200 Phaethon", star_mag="7.29", sun_alt="-8.2", utc="x"), [])
+assert t["star_mag"] == "7.29 ☼ −8°", t["star_mag"]
+assert X.pick_shown(dict(number="1", star_mag="9.0", sun_alt="-20", utc="x"), [])["star_mag"] == "9.00"
 print("EXPORTS TESTS PASSED")

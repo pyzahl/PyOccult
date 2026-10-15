@@ -200,7 +200,7 @@ def main(argv=None):
     ap.add_argument("--ele", type=float, default=c("ele", 0.0), help="site height, m")
     ap.add_argument("--reach", type=float, default=c("reach", 20.0), help="km you can travel from the site (max_shadow_dist)")
     ap.add_argument("--min-alt", type=float, default=c("min_alt", 10.0), help="minimum star altitude, deg")
-    ap.add_argument("--max-sun-alt", type=float, default=c("sun", -6.0), help="Sun must be below this, deg")
+    ap.add_argument("--max-sun-alt", type=float, default=c("sun", 0.0), help="Sun must be below this, deg")
     ap.add_argument("--min-drop", type=float, default=c("min_drop", 0.1), help="smallest useful magnitude drop")
     ap.add_argument("--cam-limit", type=float, default=c("cam_limit", 15.0), help="faintest star, G (bright-star index)")
     ap.add_argument("--aperture", type=float, default=c("aperture", 25.0), help="telescope aperture, cm")

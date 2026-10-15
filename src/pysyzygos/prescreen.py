@@ -814,7 +814,7 @@ def main(argv=None):
         g = lambda k, d: getattr(C, k, d)
         cfg = dict(sites=[(v["lat"], v["lon"]) for v in getattr(C, "sites", {}).values() if "lat" in v],
                    lat=C.LAT, lon=C.LON, ele=g("ELE", 0.0), reach=g("max_shadow_dist", 20.0), min_alt=g("MIN_STAR_ALT", 10.0),
-                   max_sun_alt=g("MAX_SUN_ALT", -6.0), site=g("site_name", None), catalog=g("gaia_local_dir", "gaia_dr3_g16"),
+                   max_sun_alt=g("MAX_SUN_ALT", 0.0), site=g("site_name", None), catalog=g("gaia_local_dir", "gaia_dr3_g16"),
                    cache=C.cache_path, hmax=g("pick_hmax", 17.0), cam_limit=g("pick_cam_limit", 16.0))
     except (ImportError, AttributeError):
         pass
@@ -874,7 +874,7 @@ def main(argv=None):
     q.add_argument("--cam-limit", type=float, default=c("cam_limit", 16.0), help="faintest star, G")
     q.add_argument("--reach", type=float, default=c("reach", 20.0), help="km")
     q.add_argument("--min-alt", type=float, default=c("min_alt", 10.0))
-    q.add_argument("--max-sun-alt", type=float, default=c("max_sun_alt", -6.0))
+    q.add_argument("--max-sun-alt", type=float, default=c("max_sun_alt", 0.0))
     q.add_argument("--numbers", action="store_true", help="print the asteroid numbers")
     a = ap.parse_args(argv)
     if a.cmd == "list":
