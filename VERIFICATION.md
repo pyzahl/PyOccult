@@ -2,7 +2,7 @@
 
 How PySyzygos's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
 event plots, against its own older code paths, and with independent geometry. What is computed and how: `ABOUT.md`;
-open items: `ABOUT.md`, Part 6. Updated 2026-10-12 (version 0.18.0).
+open items: `ABOUT.md`, Part 6. Updated 2026-10-14 (version 1.0.0).
 
 Contents:
 
@@ -13,8 +13,9 @@ Contents:
   - [1.4 The second site, 50 events Oct 4-7 2026 (OWC data of 2026-10-04)](#14-the-second-site-50-events-oct-4-7-2026-owc-data-of-2026-10-04)
   - [1.5 The second site, 50 events Oct 8-11 2026 (checked 2026-10-08, PySyzygos 0.14.0)](#15-the-second-site-50-events-oct-8-11-2026-checked-2026-10-08-pysyzygos-0140)
 - [2. Against Occult's event plots: star positions](#2-against-occults-event-plots-star-positions)
-- [3. Internal and geometric checks](#3-internal-and-geometric-checks)
-- [4. What the differences mean](#4-what-the-differences-mean)
+- [3. Against Occult's geodetic path: (3200) Phaethon, 2019-07-29](#3-against-occults-geodetic-path-3200-phaethon-2019-07-29)
+- [4. Internal and geometric checks](#4-internal-and-geometric-checks)
+- [5. What the differences mean](#5-what-the-differences-mean)
 
 ---
 
@@ -45,7 +46,7 @@ and are kept with their check output, so every check can be rerun with a later v
 
 20 km reach, G <= 15, 25 cm, 4 frames. All 16 found with the same stars; times within 5.4 s (13 within 3 s). Drops
 agree within 0.25 mag below 5 mag. Durations agree within 10 % wherever both use the same diameter; 4 events differ
-only by diameter (sizes from H, or OWC using another source than NEOWISE). 218001 is the open case (section 4).
+only by diameter (sizes from H, or OWC using another source than NEOWISE). 218001 is the open case (section 5).
 
 ### 1.3 A second site, sets A and B (OWC data of 2026-10-02, events Oct 3-6 2026; checked 2026-10-03)
 
@@ -174,7 +175,7 @@ The 6 others, by cause:
 | (20370) 1998 KR29 | drop 5.14 | drop 4.48 | asteroid brightness; the star is also a close pair (Gaia: two peaks in 64 % of scans; companion G 18.9 at 2.8") |
 | (28336) 1999 DZ4 | drop 3.37 | drop 3.11 | asteroid brightness |
 
-The full list (484605's and 549201's kind of miss, and the 2-parameter stars, are discussed in section 4):
+The full list (484605's and 549201's kind of miss, and the 2-parameter stars, are discussed in section 5):
 
 | | Asteroid | OWC time (UT) | Δt (s) | Star G | Drop ours / OWC | Duration ours / OWC (s) | Diameter ours / OWC-implied (km) | Shadow dist (km) | Result |
 |---|---|---|---:|---:|---|---|---|---:|---|
@@ -270,7 +271,135 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 
 ---
 
-## 3. Internal and geometric checks
+## 3. Against Occult's geodetic path: (3200) Phaethon, 2019-07-29
+
+A whole path, not only one event time: Occult's listing of the shadow's centre line and limits on the Earth, compared
+point by point with PySyzygos's path at the same instants. Both computed on the same day (2026-10-14), so both use the
+same JPL orbit solution. (Occult was run by an IOTA colleague; their listing and plot are kept privately in
+`owc_refs/occult_paths/` with the comparison scripts.)
+
+**The two predictions**
+
+| | Occult | PySyzygos |
+|---|---|---|
+| Version, date | Occult v4.2026.8.29, "Prediction of 2026 Oct 15.0" | 1.0.0, 2026-10-14 |
+| Orbit | "JPL#1016+Ephem" | JPL solution #1016 (SBDB solution date 2026-10-14), Horizons SPK |
+| Star | HIP 24973, Mv 7.3; "astrometric" RA 5h20m54.7283s, Dec +40°53'05.373" | Gaia DR3 194811405789498112, G 7.29 (= HIP 24973), propagated, + parallax 3.78 mas, + light deflection 7.39 mas (star minus asteroid) |
+| Size | D 5.0 ± 0.4 km (DAMIT), 7.2 mas | D 6.25 km (SBDB), r 3.125 km |
+| Path | "at MSL": 732 points every 1.45 s, 11:03:39.82-11:21:22.40 UT, centre, path limits, error limits | WGS84 ellipsoid, height 0 (`paths.shadow_path`, as for the KML) |
+| Other | 1 km = 0.092 s, 1 mas = 0.064 s; max duration 0.46 s; 1-sigma (0.9 x 0.2) mas in PA 99; Phaethon's parallax 9.233" | regular search at a test site on the path (lon -111.49, lat 37.19, height 0): 11:19:35.031 UT, 0.217 km from the centre line, 0.56 s |
+
+Phaethon was 0.95 AU from the Earth: 1 mas = 0.69 km in the fundamental plane (Occult: 5.0 km = 7.2 mas, the same).
+
+**Method.** For each of Occult's 732 times (UTC -> TDB with the SPICE leap-second kernel), PySyzygos's shadow axis
+was computed at exactly that instant with the same function that draws its maps (`paths.shadow_path`, star direction
+and radius of the search's event; the event's debug path file, `debug_save_paths = True`). Two comparisons:
+
+1. *On the ground*: Occult's centre point minus ours, split along and across our ground track (our ground velocity
+   at that instant); along-track also in seconds.
+2. *In the fundamental plane* (through the Earth's centre, perpendicular to the star; x east, y north): Occult's
+   ground point, turned to J2000 with the Earth orientation at that instant, projected into the plane, minus our shadow
+   axis there. Unlike the ground differences, these are not stretched where the star is low. A difference in the star
+   or asteroid direction is a constant offset here; a difference in the Earth's rotation is not (it depends on where
+   the point is), so a least-squares fit separates the two.
+
+**On the ground (selected rows; Occult minus PySyzygos; across: positive to the left of the motion)**
+
+| UT | Star alt | Across (km) | Along (km) | Along (s) | Path width Occult / ours (km) | In the plane x, y (km) | (mas) |
+|---|---|---|---|---|---|---|---|
+| 11:03:39.82 | 4 | +0.283 | +4.026 | +0.027 | 37.09 / 44.44 | -0.459, +0.153 | -0.66, +0.22 |
+| 11:04:21.98 | 21 | +0.444 | +0.462 | +0.017 | 8.06 / 9.69 | -0.541, +0.038 | -0.78, +0.05 |
+| 11:06:28.44 | 42 | +0.583 | +0.354 | +0.024 | 6.01 / 7.41 | -0.680, +0.010 | -0.99, +0.01 |
+| 11:08:34.90 | 54 | +0.648 | +0.397 | +0.032 | 5.68 / 7.05 | -0.755, +0.007 | -1.09, +0.01 |
+| 11:10:41.36 | 62 | +0.705 | +0.462 | +0.041 | 5.54 / 6.92 | -0.817, +0.001 | -1.18, +0.00 |
+| 11:12:47.83 | 65 | +0.712 | +0.445 | +0.040 | 5.51 / 6.89 | -0.774, -0.062 | -1.12, -0.09 |
+| 11:14:54.29 | 61 | +0.710 | +0.560 | +0.048 | 5.57 / 6.94 | -0.788, -0.037 | -1.14, -0.05 |
+| 11:17:00.75 | 51 | +0.660 | +0.700 | +0.054 | 5.65 / 7.10 | -0.757, +0.001 | -1.10, +0.00 |
+| 11:19:07.21 | 37 | +0.546 | +0.926 | +0.056 | 6.10 / 7.61 | -0.664, +0.060 | -0.96, +0.09 |
+| 11:20:31.52 | 23 | +0.482 | +1.422 | +0.056 | 7.46 / 9.19 | -0.604, +0.087 | -0.88, +0.13 |
+| 11:21:22.40 | 3 | +0.294 | +6.790 | +0.036 | 38.04 / 44.59 | -0.411, +0.085 | -0.60, +0.12 |
+
+All 732 points: across +0.283 to +0.730 km (mean +0.615), along +0.016 to +0.062 s (mean +0.042 s). With the star
+above 20 deg (681 points): across +0.426 to +0.730 km (mean +0.631), largest distance 1.74 km (it grows towards the
+ends of the track only because the ground speed does: 0.04 s there are kilometres along the track).
+
+**Fit in the fundamental plane (all 732 points)**
+
+| Model | Result | Residual rms (max) |
+|---|---|---|
+| constant offset | x -0.724 km (-1.05 mas), y +0.023 km (+0.03 mas) | 70 m (313 m) |
+| constant offset + Earth rotation | x -0.658 ± 0.005 km, y +0.003 ± 0.003 km, rotation = UT1 -202 ± 14 ms | 66 m (289 m) |
+| the same, star above 20 deg (681 points) | x -0.689 ± 0.005 km, y +0.002 ± 0.003 km, UT1 -147 ± 13 ms | 55 m |
+
+A time offset cannot be fitted separately: over 18 minutes the shadow moves on a nearly straight line in the plane,
+so a time offset and a constant offset along the motion are the same. The residual of 55-70 m is about the
+listing's rounding (whole arcseconds, about 30 m on the ground, stretched where the star is low; times to 0.01 s).
+
+**The star corrections decide it.** The same comparison with PySyzygos's star corrections switched off
+(`star_parallax`, `light_deflection`); every variant leaves the same 70 m rms around a constant offset, only its size
+changes:
+
+| PySyzygos star direction | Across, star > 20 deg (km) | Along (s) | Constant offset in the plane x, y (mas) |
+|---|---|---|---|
+| Gaia + parallax + deflection (default) | +0.43 to +0.73 | +0.016 to +0.062 | -1.05, +0.03 |
+| Gaia + deflection | +2.21 to +2.51 | +0.14 to +0.31 | -4.73, +0.92 |
+| Gaia + parallax | -3.18 to -2.73 | -0.43 to -0.21 | +6.13, -1.71 |
+| Gaia only | -1.32 to -0.96 | -0.18 to -0.09 | +2.45, -0.82 |
+
+So Occult applies both, as found from its star positions in section 2.
+
+**Occult's printed star position** ("astrometric") minus PySyzygos's (mas):
+
+| PySyzygos star direction | RA x cos(Dec) | Dec |
+|---|---|---|
+| Gaia only (propagated to the date) | +6.86 | -1.94 |
+| Gaia + parallax | +10.53 | -2.83 |
+| Gaia + deflection | -0.32 | -0.19 |
+| Gaia + parallax + deflection | +3.36 | -1.08 |
+
+Occult's printed place is Gaia DR3 propagated plus the light deflection, without the stellar parallax, to within its
+printing precision (about 1 mas); the parallax then enters its path geometry, since the path agrees only with it.
+(For 16556 in section 2, Occult's printed place fitted Gaia + parallax + deflection; whether its printing has changed
+since or the parallax was small there, 1.1 mas against 3.8 mas here, is open.) The deflection is "star minus
+asteroid" in both: Phaethon's own light is bent too, by the Sun 1.93 mas (x -1.929, y +0.470 mas in the plane;
+the star's 9.105 mas: x -9.105, y +2.217; Jupiter and Saturn below 0.001 mas). Deflecting only the star would move
+Occult's printed place by 1.9 mas from ours; it agrees to 0.3 mas.
+
+**What the difference is**
+
+- **Same geometry to about 1 mas.** Apart from one constant offset of 0.66-0.72 km (about 1.0 mas) east-west in the
+  fundamental plane, Occult's centre line and PySyzygos's agree to the listing's rounding along the whole track, from
+  3 deg star altitude on one side of the Earth to 3 deg on the other. That covers the shadow geometry, the projection
+  onto the Earth, the ellipsoid and the time scales. The offset is about Occult's 1-sigma path uncertainty
+  (0.9 x 0.2 mas) and PySyzygos's (path 1 sigma 0.69 km).
+- **Where the 1 mas comes from (open).** Not the star: Occult's printed place equals ours to 0.3 mas. Most likely the
+  asteroid's position: Occult reports "JPL#1016+Ephem", which suggests that it propagates JPL's orbital elements
+  itself, while PySyzygos takes JPL Horizons' own ephemeris of the solution (an SPK file). For Phaethon (perihelion
+  0.14 AU, where general relativity and the solution's non-gravitational terms matter) 1 mas between two
+  propagations is plausible. To be checked with Occult's geocentric position of Phaethon at one instant, or the
+  event's elements, and with a second event of a main-belt asteroid in a different geometry.
+- **Earth rotation (indication).** The fitted rotation equals UT1 -147 to -202 ms (formal error 13-14 ms; the
+  formal errors are optimistic, as rounding residuals are correlated). UT1 - UTC on 2019-07-29 was -162 ms (IERS
+  Bulletin B). So Occult's Earth rotation for this past date appears to differ from the measured one by about
+  UT1 - UTC, as if it rotated the Earth with UTC; PySyzygos uses the measured Earth orientation (NAIF's high-precision
+  Earth orientation file with IERS data). It adds at most about 75 m east-west (0.16 s of the Earth's rotation at the
+  equator) and improves the fit only from 70 to 66 m rms, so it is an indication, not a finding; to ask the Occult
+  side.
+- **Earth model.** PySyzygos computes on the WGS84 ellipsoid at height 0. Occult's listing is "at MSL" (mean sea level,
+  the geoid): if that means height 0 on the geoid rather than on the ellipsoid, a point moves by the geoid height
+  divided by the tangent of the star's altitude towards the star's azimuth: geoid heights are tens of metres, so
+  tens of metres at most where the star is not low. Below what this comparison can resolve.
+- **Path width** differs only by the diameter: Occult 5.5 km where PySyzygos has 6.9 km at 64 deg star altitude, that
+  is 5.0 km (DAMIT) against 6.25 km (SBDB) across the track.
+
+**Found on the way (PySyzygos):** the event's path file and KML start only at 11:06:49 (Occult: 11:03:40): the path's
+time span is centred on the time at the observer's site, here near the end of the track, so its first three minutes
+were cut. And the whole-Earth view failed for a search window ending soon after the event (it asks for the
+asteroid's position a day later). Both to fix.
+
+---
+
+## 4. Internal and geometric checks
 
 - **Corridor search vs the old windows search** (23 asteroids, 20 days, 200 km reach): all 40 old hits with G <= 18
   found, within 1.4 ms and 0.8 m (after the solver fix of 2026-10-01); 10 more real hits. The other old hits were on
@@ -320,7 +449,8 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
   Three given times lie on the computed tracks (the 2019 Phaethon test site in Utah/Arizona at 11:19:35 matches
   ~11:20, where that event was observed). **The Phaethon 2021-10-03 "17:30 UT" does not fit**: no other Gaia star down
   to G 17 lies within 14" of Phaethon then, and with the only candidate the shadow left the Earth at 17:12 (closest
-  approach 16:59): the given time is probably rounded or wrong (to be checked at its source). This is a consistency
+  approach 16:59): the given time is probably rounded or wrong (to be checked at its source). The 2019 Phaethon path
+  was later compared point by point with Occult's (section 3). This is a consistency
   check (corridor search, exact solver, WGS84 ground track, star corrections agree for very close objects); an
   absolute check needs the observers' positions and timings (open).
 - **Whole-Earth pre-screen on another computer** (2026-10-11, Apple M4, 32 GB, macOS, 8 workers): a 30-day
@@ -359,7 +489,7 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 
 ---
 
-## 4. What the differences mean
+## 5. What the differences mean
 
 - **Times** agree within a few seconds (mostly under 2 s). Larger differences are small asteroids (under ~3 km):
   2 to 9 s for six of them and 17 s for 281158 (H 17.9) in section 1.4, 4.5 s for 86427 in 1.5. That is the
@@ -381,6 +511,7 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
   by tens of km across the track, so an event can fall inside one reach and outside the other: 484605 (our path
   29 km from the site) and 549201 (47 km), both with OWC's within 20 km.
 - **Paths across the track:** since 0.10.0 PySyzygos applies stellar parallax and light deflection as Occult does
-  (section 2); for high sites OWC online is off by the site's elevation effect (1.1).
+  (section 2); for high sites OWC online is off by the site's elevation effect (1.1). A whole path compared with
+  Occult's (section 3: Phaethon 2019, same orbit solution) agrees to about 1 mas, with 55-70 m rms around that.
 - **More events than OWC:** the pick keeps an event if it can be observable (upper size bound); a few search events
   lie just outside OWC's listing (window edges, the nominal vs upper size).

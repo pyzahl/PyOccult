@@ -765,7 +765,7 @@ The pick tool would not need to change: there are only a handful of major bodies
 targets.
 
 **Status (0.14.0, 2026-10-08): planets and moons are built** (`pysyzygos/bodies.py`; usage in README, "Planets and
-moons"; checks in VERIFICATION.md, section 3): Mars to Neptune, Pluto and 91 of their 458 known moons, a GUI tab
+moons"; checks in VERIFICATION.md, section 4): Mars to Neptune, Pluto and 91 of their 458 known moons, a GUI tab
 with groups per system, D/R contact times, a results list and report layout of their own, previews with the
 system's disks. Of the items below, 1-5, 7 and 8 are done (the preview without phase and glare halo); open are 6
 (the limb ellipse: the limb is a circle of the equatorial radius, so a graze near a pole of Jupiter or Saturn may be

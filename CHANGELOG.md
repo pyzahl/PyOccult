@@ -72,7 +72,7 @@ in the GUI, pick timings, and a debug file of each event's geodetic path.
   on WGS84 (as Occult's default output, for exact comparisons), and sites, the observer and the globe plot convert
   with it too. Before, the SPICE kernel's Earth radii (pck00010, ~0.4 m off WGS84) were used: paths move by 0.3 m
   (median), up to ~3.6 m near the limb.
-- Documentation: VERIFICATION.md section 3 with four near-Earth asteroid events (Phaethon 2019 and 2021,
+- Documentation: VERIFICATION.md section 4 (then 3) with four near-Earth asteroid events (Phaethon 2019 and 2021,
   Apophis 2021 x2): found by the regular search on the right Gaia stars within 1-3 m of the computed centre
   lines; one given time (Phaethon 2021-10-03 "17:30 UT") does not fit any star. README: installing and
   updating the supplement's proper motions; all setup options in one table.
