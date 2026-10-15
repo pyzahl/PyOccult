@@ -275,7 +275,7 @@ sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 
 A whole path, not only one event time: Occult's listing of the shadow's centre line and limits on the Earth, compared
 point by point with PySyzygos's path at the same instants. Both computed on the same day (2026-10-14), so both use the
-same JPL orbit solution. (Occult was run by an IOTA colleague; their listing and plot are kept privately in
+same JPL orbit solution. (Occult was run by Steve Preston, IOTA; his listing and plot are kept privately in
 `owc_refs/occult_paths/` with the comparison scripts.)
 
 **The two predictions**
