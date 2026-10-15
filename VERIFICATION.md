@@ -401,6 +401,14 @@ centre, and the path runs 11:03:44-11:21:17 (Occult 11:03:40-11:21:22; the ends 
 9 s here). And the whole-Earth view failed for a search window ending soon after the event (it asks for the
 asteroid's position a day later): to fix.
 
+
+Open points:
+
+- Does the "astrometric" star position in the plot header include the star's parallax, or is parallax applied only in the path computation? That's the direct answer to the contradiction.
+- Is there an option to switch stellar parallax or light deflection on or off? If so, a listing with one of them off would be an excellent second test: our matching variant should then agree just as well.
+- For past dates, does Occult rotate the Earth with UT1 (measured, from IERS) or with UTC? That's the −162 ms indication.
+- Can Occult give Phaethon's geocentric RA/Dec at one instant, e.g. 2019-07-29 11:10:00 UT, or the event's elements (Export Elements A–G)? That separates the remaining 1 mas into star and asteroid.
+
 ---
 
 ## 4. Internal and geometric checks
