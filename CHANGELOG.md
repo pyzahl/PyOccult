@@ -4,8 +4,6 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
-## [Unreleased]
-
 ## [1.1.0] "Beyond Horizons" - 2026-10-15
 
 More accurate paths, found in a whole-path comparison with Occult ((3200) Phaethon 2019-07-29, VERIFICATION.md
