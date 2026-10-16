@@ -643,13 +643,29 @@ anyway (other orbits; OWC times to 0.1 s).
 State of version 1.1.1 (2026-10-16: light deflection of the asteroid, Gaia proper-motion bias and the
 light time from each observer all fixed or added; sections 3 and 4).
 
-- **Geometry against Occult: the same to the listing's rounding across the track.** A whole path, (3200) Phaethon on
-  2019-07-29 with the same JPL orbit solution and the same Gaia star (section 3): across the track -0.03 to
-  +0.03 km at all 732 points, which is Occult's rounding to whole arcseconds (24-31 m); along the track Occult's
-  shadow is 11 ms later (0.15 km), a small systematic beyond its 0.01 s rounding but far below the uncertainty of the
-  prediction itself (path 1 sigma 0.69 km from JPL's orbit; Occult's 1 sigma (0.9 x 0.2) mas, ~0.6 km; the event lasts
-  0.46 s). In the fundamental plane: 0.17 mas, 42 m rms. Open: the 11 ms, and a second object in another geometry
-  (a main-belt asteroid with the star high) as an independent check.
+- **Geometry against Occult: the same to the listing's rounding across the track, 11 ms apart along it.** A whole
+  path, (3200) Phaethon on 2019-07-29 with the same JPL orbit solution and the same Gaia star (section 3): across the
+  track -0.03 to +0.03 km at all 732 points, which is Occult's rounding to whole arcseconds (24-31 m); along the track
+  Occult's shadow is 11 ms later (0.15 km; in the fundamental plane 0.17 mas, 42 m rms around it).
+- **What the remaining 11 ms is measured against** (Paolo Tanga, Gaia/OCA): two programs computing the same orbit
+  solution and the same star should agree at the level of their numerical precision, whatever the uncertainty of the
+  prediction; the 1-sigma path (0.69 km here) and even the ephemeris uncertainty propagated by JPL (Horizons, 1 sigma
+  0.91 x 0.17 mas for Phaethon then) are the wrong yardstick for it. So the 11 ms (0.17 mas) is an implementation
+  difference still to be found, not noise: it is beyond Occult's 0.01 s rounding over 732 points and constant along the
+  track. Ruled out so far: the orbit (osculating elements vs SPK: 8 mm), the Besselian elements' hourly cubic
+  interpolation (emulated: < 1 m), the Earth orientation (0.2 m against astropy/IERS), the star (Occult's printed place
+  equals ours to its rounding; ours equals the Gaia archive's propagation to 0.002 mas). Open: how Occult reads its
+  Horizons positions (Horizons' ephemerides for observers leave out light deflection and are printed rounded) and the
+  details of its elements.
+- **Phaethon is a hard case** for this kind of comparison (Paolo Tanga): an asteroid with non-gravitational forces in
+  its orbit solution (possibly variable along the orbit) and close approaches to the Earth is more sensitive to the
+  details of the propagation. The next comparisons use well-observed main-belt asteroids without non-gravitational
+  terms (JPL solutions checked: none). Candidates from the picks of 2026-10-16 (orbit condition code 0, measured
+  diameter, main-catalog star G < 12, star above 40 deg): **(4209) Briggs, 2026-10-20 00:47 UTC** (9,102
+  observations over 56 years, D 31 km, star G 9.9 at 86 deg altitude at Test site 3, where the per-observer light time
+  matters most; ephemeris 1 sigma 1.87 x 0.11 mas), (1007) Pawlowia, 2026-10-22 01:11 UTC (119-year arc, D 18 km,
+  G 10.3), (557) Violetta, 2026-10-26 02:11 UTC (121 years, D 23 km, G 11.3), (16156) 2000 AP39, 2026-10-23
+  04:56 UTC (star at 79 deg, Test site 2). Both sides should compute on the same day.
 - **Found and fixed through that comparison** (each affected every prediction):
   - the asteroid's own light deflection (formula for a source at a finite distance; up to ~1 km across the track,
     most near opposition; section 3, update 2026-10-15);
@@ -658,10 +674,15 @@ light time from each observer all fixed or added; sections 3 and 4).
   - added: the bias of Gaia DR3's proper motions of stars brighter than G 13 (up to ~0.8 mas in 2026);
   - the shadow path's time span (paths cut off at one end) and the Earth orientation checked independently (0.2 m
     against astropy/IERS, section 4).
-- **What Occult and PySyzygos share, confirmed:** Gaia DR3 star with proper motion, stellar parallax and light
-  deflection (the star's and the asteroid's, star minus asteroid), JPL Horizons orbits (Occult's osculating elements
-  at mid-event and PySyzygos's integrated SPK agree to 8 mm over the event), UT1 - UTC from IERS, a WGS84 path at
-  height 0 ("at MSL" in Occult; the geoid's tens of metres are below what was resolved).
+- **What Occult and PySyzygos share, confirmed:** Gaia DR3 star with proper motion (with Gaia's bright-star bias
+  correction), stellar parallax and light deflection (the star's and the asteroid's, star minus asteroid), JPL
+  Horizons orbits (Occult's osculating elements at mid-event and PySyzygos's integrated SPK agree to 8 mm over the
+  event), UT1 - UTC from IERS, a WGS84 path at height 0 ("at MSL" in Occult; the geoid's tens of metres are below
+  what was resolved). PySyzygos takes Horizons' SPK (state vectors) and applies the light deflection itself, so the
+  observer ephemerides' lack of it does not concern it.
+- **Star positions at the numerical level:** PySyzygos's propagation equals the Gaia archive's own (EPOCH_PROP_POS)
+  to <= 0.002 mas, and with the radial velocities of fast nearby stars to <= 0.025 mas (section 4), as Paolo Tanga
+  expected.
 - **Times against OWC** agree within a few seconds (mostly under 2 s; rerun 2026-10-16: median 0.70 s at Test site 1, 0.45 s at Test site 2, unchanged by the fixes above, which move times by tenths of a second
   and paths by up to 0.4 km). Larger differences are small asteroids (under ~3 km): 2 to 9 s for six of them and
   17 s for 281158 (H 17.9) in section 1.4, 4.5 s for 86427 in 1.5. That is the along-track part of the orbit
