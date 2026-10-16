@@ -115,7 +115,9 @@ def header_info(run, lat, lon):
         out.append(("Astrometry", f"stellar parallax {'on' if c.get('star_parallax') else 'off'}, light deflection by "
                                   f"Sun, Jupiter, Saturn {'on' if c.get('light_deflection') else 'off'}"
                                   + (f", Gaia bright-star proper-motion bias {'on' if c['gaia_pm_bias'] else 'off'}"
-                                     if "gaia_pm_bias" in c else "")))
+                                     if "gaia_pm_bias" in c else "")
+                                  + (f", radial velocity of fast stars {'on' if c['star_rv'] else 'off'}"
+                                     if "star_rv" in c else "")))
     if run.get("earth_pck"):
         out.append(("Earth orientation", earth_pck_text(run["earth_pck"], run)))
     return out

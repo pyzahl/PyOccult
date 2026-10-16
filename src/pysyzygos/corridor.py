@@ -220,18 +220,23 @@ def gaia_pm(df, pm_bias=True):
     return gaia_pm_bias(pmra, pmdec, df["ra"].to_numpy(float), df["dec"].to_numpy(float), g)
 
 
-def propagate_exact(df, utc_time, pm_bias=True):
+def propagate_exact(df, utc_time, pm_bias=True, rv=True):
     """Astropy space motion for the surviving stars only (same recipe as fetch_and_propagate_stars). Adds
     ra_YYYYMMDD / dec_YYYYMMDD. df must have ra, dec, parallax, pmra, pmdec (and phot_g_mean_mag for the
-    proper-motion bias correction, gaia_pm)."""
+    proper-motion bias correction, gaia_pm; source_id for the radial velocity of fast nearby stars, starrv, which
+    adds the perspective acceleration: up to 75 mas by 2026 for Barnard's star; 0 for the others)."""
     import astropy.units as u
     from astropy.coordinates import SkyCoord
     from astropy.time import Time
     t = Time(utc_time, scale="utc")
     plx = np.clip(df["parallax"].fillna(0.0).to_numpy(), 0.01, None)
     pmra, pmdec = gaia_pm(df, pm_bias)
+    v_r = np.zeros(len(df))
+    if rv and "source_id" in df:
+        from pysyzygos.starrv import rv_for
+        v_r = rv_for(df["source_id"].to_numpy())
     sc = SkyCoord(ra=df["ra"].values * u.deg, dec=df["dec"].values * u.deg, distance=(1000.0 / plx) * u.pc,
-                  pm_ra_cosdec=pmra * u.mas / u.yr, pm_dec=pmdec * u.mas / u.yr,
+                  pm_ra_cosdec=pmra * u.mas / u.yr, pm_dec=pmdec * u.mas / u.yr, radial_velocity=v_r * u.km / u.s,
                   obstime=Time("2016-01-01T12:00:00", scale="tcb"), frame="icrs")
     new = sc.apply_space_motion(new_obstime=t)
     out = df.copy()

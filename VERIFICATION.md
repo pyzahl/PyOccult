@@ -600,6 +600,15 @@ anyway (other orbits; OWC times to 0.1 s).
   star, 3.3 km from the centre line, 1.17 s, drop 5.24 mag, flagged "RUWE 1.65". The same check showed that no
   catalogued small body (JPL SB Identification, numbered or not) came near any star brighter than G 16 in that
   field at the time of the unexplained 3.5 s dip of a reference star a minute later (nearest: 44" from a G 15.5 star).
+- **Star propagation against the Gaia archive** (2026-10-16, suggested by Paolo Tanga): PySyzygos's propagation
+  (`corridor.propagate_exact`, astropy space motion from Gaia's epoch 2016.0) against the archive's own
+  `EPOCH_PROP_POS` (ADQL): HIP 24973 to 2019-07-29 differs by < 0.0001 mas; the 12 fastest Gaia stars with G < 16
+  (up to 10.4"/yr, Barnard's star first) to 2026-10-16, both without radial velocity, by <= 0.002 mas. The local
+  catalog has no radial velocities, and for nearby fast stars the perspective acceleration they cause had grown to
+  1-75 mas by 2026 (Barnard's star 74.8 mas): since 2026-10-16 the 164,602 stars where it exceeds 0.01 mas within
+  20 years take their Gaia DR3 radial velocity from `data/gaia_dr3_rv_fast.npy` (`starrv.py`). With it, 20 stars
+  (the 12 fastest and 8 others from the table) agree with the archive (with radial velocity) to <= 0.025 mas
+  (median 0.0002 mas), against up to 74.8 mas without.
 - **Earth orientation against astropy** (2026-10-16): the same ground points (WGS84, height 0) turned into the
   celestial frame by SPICE (NAIF's `earth_latest_high_prec.bpc`: IAU 1976 precession, IAU 1980 nutation with the
   IERS nutation corrections, UT1, polar motion; ITRF93 -> J2000) and by astropy (IERS data, IAU 2006/2000A through

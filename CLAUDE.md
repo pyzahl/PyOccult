@@ -198,6 +198,12 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   sign apart), parse_header (JPL#, RA/Dec, Dia), shadow_path at Occult's times, plane offsets via spkcpo per point,
   fit_plane (const; + rotation), markdown -> compare_<UTC stamp>.md/.csv. `export`: shadow_path at 1.45 s in Occult's
   layout (fmt_dms/fmt_ut). GUI: Favorites checkbox `pc_chk` (gui_state path_check), block `f_pc`, dialog. Bodies: not yet.
+- `pysyzygos/starrv.py` (2026-10-16): Gaia DR3 radial velocities of fast nearby stars (data/gaia_dr3_rv_fast.npy,
+  164,602 stars with pm x |rv| x parallax > 24445: > 0.01 mas within 20 yr), `rv_for(ids)` (0 if unknown) ->
+  `corridor.propagate_exact(df, utc, pm_bias, rv)` SkyCoord radial_velocity (perspective acceleration; Barnard 75 mas
+  by 2026); config `star_rv`; windows mode takes the archive's radial_velocity. Archive anonymous async jobs cap at
+  50000 rows (Gaia.ROW_LIMIT does not lift it): split queries by source_id ranges. Checked: equal to the archive's
+  EPOCH_PROP_POS to <= 0.002 mas without, <= 0.025 mas with radial velocity.
 - `pysyzygos/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
   list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
 - `pysyzygos/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi

@@ -662,7 +662,10 @@ All checks, with their numbers and the discussion of the differences, are in
 **What PySyzygos does now.** The asteroid comes from `spkpos(..., 'CN', '399')`: light-time corrected, astrometric,
 with no stellar aberration and no gravitational light deflection. The star direction is the Gaia DR3 catalog
 direction, propagated with its proper motion (for stars brighter than G 13 corrected for Gaia's bright-star frame
-spin, Cantat-Gaudin & Brandt 2021, A&A 649, A124: up to 80 micro-arcsec/yr; `gaia_pm_bias`, since 2026-10-15);
+spin, Cantat-Gaudin & Brandt 2021, A&A 649, A124: up to 80 micro-arcsec/yr; `gaia_pm_bias`, since 2026-10-15) and,
+for nearby fast stars, with Gaia DR3's radial velocity (perspective acceleration, up to 75 mas by 2026 for Barnard's
+star; `starrv.py`, `star_rv`, since 2026-10-16; the propagation equals the Gaia archive's EPOCH_PROP_POS to
+<= 0.002 mas without and <= 0.025 mas with radial velocity, VERIFICATION.md section 4);
 Gaia directions are by definition free of light deflection (the
 catalog removes it). Aberration is consistent: neither source gets it, and it would shift both the same way, so it
 cancels. Light deflection does not cancel: the star's light and the asteroid's reflected light are bent by

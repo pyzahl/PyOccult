@@ -19,3 +19,10 @@ from 90 N and 0 E, int16 centimetres) sampled from GeographicLib's EGM96 15-minu
 `URL_EGM96_GEOID`); bilinear interpolation: 0.12 m rms, at most 3 m against the 15-minute grid. Used to turn site
 elevations above mean sea level into heights above the ellipsoid (`geoid.py`). Rebuilt with
 `python -m pysyzygos.geoid build <egm96-15.pgm>`.
+
+`gaia_dr3_rv_fast.npy`: Gaia DR3 radial velocities (source_id, rv, rv_error; sorted by source_id) of the 164,602 stars
+where the radial velocity moves the position by more than 0.01 mas within 20 years of Gaia's epoch (pm x |rv| x
+parallax > 24445 mas/yr x km/s x mas): the perspective acceleration of nearby fast stars, which the local catalog
+(no radial velocities) would otherwise miss. From the Gaia archive (ESA/Gaia/DPAC; query in `starrv.QUERY`, run in
+16 source_id ranges below the 50000-row cap for anonymous jobs, 2026-10-16). Rebuilt with
+`python -m pysyzygos.starrv build <csv>`.

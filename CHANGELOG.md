@@ -6,6 +6,17 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Radial velocities of fast nearby stars** in their propagation (perspective acceleration). The local catalog has
+  no radial velocities; for nearby fast stars the missing term grows to tens of mas by 2026 (Barnard's star 75 mas,
+  others 1-64 mas), tens of km on the ground at typical asteroid distances. `data/gaia_dr3_rv_fast.npy` holds Gaia
+  DR3's radial velocity for every star where it moves the position by more than 0.01 mas within 20 years
+  (164,602 stars; `starrv.py`, built from a Gaia archive query), used by `corridor.propagate_exact` (config
+  `star_rv`, default on; shown in the report header). Checked against the Gaia archive's own propagation
+  (EPOCH_PROP_POS): equal to <= 0.002 mas without and <= 0.025 mas with radial velocity (without the table the
+  fastest stars were up to 74.8 mas off). Prompted by Paolo Tanga's suggestion
+  to compare with the archive.
+
 ### Documentation
 - ABOUT.md 2.2, "Time scales": how UTC, TDB and UT1 are handled, and why the end of leap seconds (CGPM 2026: UTC
   continuous from 2027-05-20) needs no change.
