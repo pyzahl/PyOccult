@@ -4,6 +4,20 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
+## [Unreleased]
+
+### Fixed
+- **The asteroid as each observer sees it: light time from the observer, not from the Earth's centre.** An observer
+  closer to the asteroid by z = R sin(star altitude) receives its light z/c sooner (up to 21 ms), and in that time the
+  asteroid moves with its barycentric velocity; equivalently, in the Earth's frame the shadow runs along the star's
+  aberrated direction. PySyzygos used the geocentric light time for every site, which put the shadow up to
+  (v/c) R sin(alt), about 0.4-0.9 km for typical velocities, off at the surface: zero at the limb, largest with the
+  star high. Site solver (`search.besselian_offsets`: SPICE `spkcpo` with the site fixed in ITRF93, 'CN') and path
+  lines (`paths.shadow_path`: per ground point, the axis moved by the asteroid's barycentric velocity x the point's
+  light-time difference). Found in the comparison with Occult's Phaethon path: across the track the two paths now
+  agree within +-30 m (before +0.17 to +0.47 km), what is left is a constant 11 ms along the track
+  (VERIFICATION.md section 3). Checked against a hand-iterated light time with real SPICE (0.0000 m).
+
 ## [1.1.0] "Beyond Horizons" - 2026-10-15
 
 More accurate paths, found in a whole-path comparison with Occult ((3200) Phaethon 2019-07-29, VERIFICATION.md

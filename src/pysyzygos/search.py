@@ -493,16 +493,18 @@ def besselian_offsets(et, star_vector, observer_geo, asteroid_target):
     y_axis = np.cross(z_axis, x_axis)
     M = np.vstack((x_axis, y_axis, z_axis))
 
-    # Asteroid relative to Earth's center (399), light time only, no stellar aberration
-    ast_pos, _ = spice.spkpos(str(asteroid_target), et, 'J2000', 'CN', '399')
-
-    # Observer, geocentric J2000 (lon/lat in radians, alt in km)
+    # Asteroid relative to the observer, with the light time from the observer (not from the Earth's centre: an
+    # observer closer to the asteroid by z = R sin(star altitude) gets its light z/c sooner, up to 21 ms, while the
+    # asteroid moves with its barycentric velocity; in the Earth's frame that is the aberration of the shadow's
+    # direction, up to ~0.6 km at the surface; found against Occult, VERIFICATION.md section 3). 'CN', no stellar
+    # aberration: aberration shifts the star and the asteroid alike. Observer fixed in ITRF93 (lon/lat in radians,
+    # alt in km).
     from pysyzygos import earth                           # WGS84 (GPS) geodetic coordinates
     obs_itrf = spice.georec(observer_geo['lon'], observer_geo['lat'],
                             observer_geo['alt'], earth.A_KM, earth.F)
-    obs_j2000 = spice.pxform('ITRF93', 'J2000', et) @ obs_itrf
+    state, _ = spice.spkcpo(str(asteroid_target), et, 'J2000', 'OBSERVER', 'CN', obs_itrf, '399', 'ITRF93')
 
-    d = M @ (ast_pos - obs_j2000)
+    d = M @ np.asarray(state[:3])
     return d[0], d[1]
 
 

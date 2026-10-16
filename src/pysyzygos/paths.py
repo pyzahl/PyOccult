@@ -15,6 +15,9 @@ from xml.sax.saxutils import escape
 AU_KM = 149597870.7
 
 
+C_KM_S = 299792.458                     # km/s
+
+
 def plane_basis(star_vector):
     """Fundamental-plane axes in J2000: x east, y north, z toward the star (same as besselian_offsets)."""
     z = star_vector / np.linalg.norm(star_vector)
@@ -89,13 +92,23 @@ def shadow_path(target_id, star_dir, et_best, r_km, sigma3_km, half_span=None, s
         axis_pt = ast0 - (ast0 @ z_ax) * z_ax                           # shadow axis point in the plane through the geocentre
         R = spice.pxform('J2000', 'ITRF93', et)
         R1 = spice.pxform('J2000', 'ITRF93', et + 1.0)
+        # each ground point gets the asteroid's light dtau = (|A| - |A - P|)/c sooner than the geocentre (up to 21 ms),
+        # so it sees the asteroid dtau later on its orbit: the axis moves by the asteroid's BARYCENTRIC velocity
+        # (across the star direction) x dtau (as search.besselian_offsets, which takes the light time from the site)
+        dist0 = float(np.linalg.norm(ast0))
+        v_bary = np.asarray(spice.spkezr(tid, et - dist0 / C_KM_S, 'J2000', 'NONE', '0')[0][3:])
+        v_perp = v_bary - (v_bary @ z_ax) * z_ax
 
         for name, off in offsets.items():
             # start 2 Earth radii out on the star side of the plane and look along -z (the light direction);
             # the first surface intersection is the star-facing side of the Earth
-            vertex = axis_pt + off * n3 + 2.0 * a * z_ax
+            shift = np.zeros(3)
             try:
-                point = spice.surfpt(R @ vertex, R @ (-z_ax), a, b, c)
+                for _ in range(3):                                      # geocentric light time first, then the point's
+                    vertex = axis_pt + shift + off * n3 + 2.0 * a * z_ax
+                    point = spice.surfpt(R @ vertex, R @ (-z_ax), a, b, c)
+                    p_j = R.T @ point
+                    shift = v_perp * (dist0 - float(np.linalg.norm(ast0 - p_j))) / C_KM_S
             except NotFoundError:
                 continue                                                # this line misses the Earth at this time
             lon, lat, _ = spice.recgeo(point, a, flat)

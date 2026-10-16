@@ -439,8 +439,8 @@ The same comparison after the corrections (all 732 points; across: star above 20
 
 Open: the remaining 0.5 mas (0.34 km east-west), and the Earth-rotation term of the fit, unchanged at UT1 -202 ms
 (it cannot come from the star). Occult applies UT1 - UTC from IERS data (Steve Preston), so it is not UTC for UT1;
-PySyzygos's Earth orientation agrees with astropy/IERS to 0.2 m here (section 4), so it is most likely an artefact
-of the fit (it takes up the offset's change along the track, see below). Also open: Occult's printed
+PySyzygos's Earth orientation agrees with astropy/IERS to 0.2 m here (section 4); it was the light-time error
+found next (update 2026-10-16 below), which the fit took up as a rotation. Also open: Occult's printed
 "astrometric" star place includes parallax and deflection (Steve Preston), but it agrees with neither Gaia +
 parallax + the star's full deflection (+1.5 / -0.7 mas off, beyond its rounding of about 0.6 mas) nor the other
 combinations as well as with Gaia + the asteroid-relative deflection without parallax (+0.2 / -0.3 mas). A
@@ -473,6 +473,53 @@ rms 66 m. Compared with 1.0.0 (first table) the difference across the track is a
 the time difference is a third. The remaining offset in the plane is not quite constant along the track: -0.04 to
 -0.11 mas at the two ends (star at 3-4 deg) and -0.54 to -0.63 mas in the middle (star at 54-65 deg); with
 1.0.0 it was -0.6 at the ends and -1.2 in the middle.
+
+**Update 2026-10-16: the light time from each observer (a PySyzygos error, fixed).** That remaining offset grew with
+the star's altitude: zero at the limb, largest with the star high. So does the distance z = R sin(star altitude) by
+which a point on the Earth is closer to the asteroid than the Earth's centre (up to 6378 km). Such a point receives
+the light that grazed the asteroid z/c sooner (up to 21 ms), so it sees the asteroid that much later on its orbit;
+in the Solar System's frame, where the star's rays are parallel, the asteroid moves in that time with its
+barycentric velocity (in the Earth's frame: the shadow runs along the star's aberrated direction). PySyzygos took the
+asteroid with the light time from the Earth's centre for every site, off by (v/c) R sin(alt) at the surface, about
+0.4-0.9 km for typical velocities. Fixed: the site solver takes the asteroid as the site sees it (SPICE `spkcpo`,
+light time from the site; checked against a hand-iterated light time with real SPICE: 0.0000 m, the old way 45-437 m
+off at three sites), and the path lines move the axis per ground point by the asteroid's barycentric velocity times
+that point's light-time difference (`tests/test_paths.py`, with an Earth velocity in the stand-in). Using the velocity
+relative to the Earth instead (a first test) does not remove the pattern; the barycentric one does. Occult does it
+this way (same points as above, Occult minus PySyzygos, plane offsets against the axis as each point sees it):
+
+| UT | Star alt | Across (km) | Along (km) | Along (s) | Path width Occult / ours (km) | In the plane x, y (km) | (mas) |
+|---|---|---|---|---|---|---|---|
+| 11:03:39.82 | 4 | -0.001 | +0.897 | +0.006 | 37.09 / 44.11 | -0.040, +0.047 | -0.06, +0.07 |
+| 11:04:21.98 | 21 | +0.009 | -0.229 | -0.008 | 8.06 / 9.69 | +0.049, -0.074 | +0.07, -0.11 |
+| 11:06:28.44 | 42 | +0.002 | -0.186 | -0.012 | 6.01 / 7.41 | +0.085, -0.108 | +0.12, -0.16 |
+| 11:08:34.90 | 54 | -0.003 | -0.164 | -0.013 | 5.68 / 7.05 | +0.096, -0.114 | +0.14, -0.16 |
+| 11:10:41.36 | 62 | +0.017 | -0.147 | -0.013 | 5.54 / 6.92 | +0.077, -0.121 | +0.11, -0.18 |
+| 11:12:47.83 | 65 | +0.013 | -0.226 | -0.020 | 5.51 / 6.89 | +0.130, -0.185 | +0.19, -0.27 |
+| 11:14:54.29 | 61 | +0.024 | -0.190 | -0.016 | 5.57 / 6.94 | +0.097, -0.160 | +0.14, -0.23 |
+| 11:17:00.75 | 51 | +0.014 | -0.160 | -0.012 | 5.65 / 7.10 | +0.075, -0.119 | +0.11, -0.17 |
+| 11:19:07.21 | 37 | -0.021 | -0.137 | -0.008 | 6.10 / 7.61 | +0.066, -0.057 | +0.10, -0.08 |
+| 11:20:31.52 | 23 | +0.015 | -0.036 | -0.001 | 7.46 / 9.19 | +0.002, -0.025 | +0.00, -0.04 |
+| 11:21:22.40 | 3 | +0.011 | -0.210 | -0.001 | 38.04 / 45.35 | +0.003, -0.020 | +0.01, -0.03 |
+
+All 732 points: **across -0.027 to +0.032 km (mean +0.006 km)**: across the track the two paths coincide within the
+listing's rounding. Along the track Occult's shadow is 0.011 s later (mean; -0.021 to +0.007 s; 0.15 km at 10.8 km/s
+in the plane). Fit in the plane: constant offset x +0.10, y -0.14 mas (0.12 km), rms 42 m (before 70 m), largest
+residual 152 m (before 313 m); the Earth-rotation term is gone (it had taken up this effect). The offset points
+against the shadow's motion (direction -0.60, +0.80 in the plane), so it is a pure timing difference of about 11 ms.
+
+| PySyzygos | Offset in the plane x, y (mas) | Across (km) | Along (s) | rms |
+|---|---|---|---|---|
+| 1.0.0 | -1.05, +0.03 | +0.43 to +0.73 | +0.016 to +0.062 | 70 m |
+| 1.1.0 (deflection, proper-motion bias) | -0.50, -0.12 | +0.17 to +0.47 | -0.004 to +0.027 | 70 m |
+| light time from each observer | **+0.10, -0.14** | **-0.03 to +0.03** | **-0.021 to +0.007** | **42 m** |
+
+(Across ranges with the star above 20 deg for the first two rows, all points for the last.) Open: the 11 ms along the
+track. The regression against OWC (section 1, rerun 2026-10-16 with the sites the lists were made for) is unchanged:
+Rocky Point 15 of 16 (only 218001's drop, as before), the second site 45 of 50 (69085 now found through the
+supplement); |time - OWC| median 0.70 s and 0.45 s, the same as with 1.1.0. The fix moves those events' times by
+-0.32 to +0.18 s and their paths' distance from the site by up to 0.38 km, below what separates PySyzygos from OWC
+anyway (other orbits; OWC times to 0.1 s).
 
 ---
 
@@ -560,7 +607,7 @@ the time difference is a third. The remaining offset in the plane is not quite c
   (3 microradians = 0.6" = 19 m on the ground), a conservative bound; the underlying IERS data are good to well
   under 1 mas (a few cm). Scale: 1 mas of Earth orientation is 3 cm on the ground, 1 ms of UT1 about 46 cm at the
   equator. So the Earth-rotation term of -0.15 to -0.20 s in the Occult path fit (section 3) is not a property of
-  PySyzygos's Earth orientation.
+  PySyzygos's Earth orientation; it was the light-time error found next (section 3, update 2026-10-16).
 - **Planets and moons** (0.14.0):
   - Ephemeris: the kernel built from Horizons vectors (SPK type 13, 20 min steps) reproduces Horizons to ~1 m;
     NAIF's `jup365.bsp` and Horizons agree to millimetres at sample times.

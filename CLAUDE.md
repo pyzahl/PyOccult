@@ -268,6 +268,10 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
 
 ## Conventions that matter
 - Asteroid position: `spkpos(id, et, 'J2000', 'CN', '399')`. Earth centre is 399, not 3. `CN` is astrometric (matches Gaia).
+  For a site (solver, `besselian_offsets`) the asteroid is taken with the light time FROM THE SITE:
+  `spkcpo(id, et, 'J2000', 'OBSERVER', 'CN', site_itrf, '399', 'ITRF93')`; path lines move the axis per ground point by
+  the asteroid's barycentric velocity x (|A| - |A - P|)/c (2026-10-16; geocentric light time for all sites was up to
+  ~0.6 km off at the surface, found against Occult). Scans (corridor, pick, pre-screens) stay geocentric (km margins).
 - Star direction (0.10.0): `pysyzygos.astrometry.corrected_star_dir` in `handle_star`, once per candidate at et_guess:
   Gaia (propagated) + stellar parallax + light deflection by Sun/Jupiter/Saturn as star MINUS asteroid (asteroid stays
   SPICE 'CN'). Switches `star_parallax`, `light_deflection` (off = old results exactly). Log `star_ra/star_dec` are the

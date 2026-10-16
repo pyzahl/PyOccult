@@ -96,12 +96,21 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   deflection and stellar parallax" in Part 6), so star and asteroid
   directions share one frame. "J2000.0" as a time is only the origin of ET (2000-01-01 12:00 TDB). Apparent positions
   (TETE, true equator and equinox of date) appear only in displays (favorites, globe).
-- Asteroid: `spkpos(target, et, 'J2000', 'CN', '399')`. 399 is the Earth's centre (3 would be the Earth-Moon
-  barycentre). `CN` is converged light time without stellar aberration: astrometric, like Gaia positions.
-- Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), rotated ITRF93 to J2000 with
-  `pxform('ITRF93', 'J2000', et)`. Longitude east-positive, geodetic, radians.
-- Offsets `(dx, dy)` = the first two components of `M @ (r_asteroid - r_observer)`, km east and north. Miss distance =
-  `hypot(dx, dy)`.
+- Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), fixed in ITRF93.
+  Longitude east-positive, geodetic, radians.
+- Asteroid as the observer sees it: `spkcpo(target, et, 'J2000', 'OBSERVER', 'CN', site_itrf, '399', 'ITRF93')`, the
+  asteroid at et minus the light time from the observer (not from the Earth's centre), relative to the observer at et.
+  `CN` is converged light time without stellar aberration: astrometric, like Gaia positions. Aberration is left out
+  on purpose: it shifts the star and the asteroid by the same amount, so the occultation condition (both in the same
+  direction) is the same with or without it. The light time must be the observer's own: an observer closer to the
+  asteroid by z = R sin(star altitude) gets its light z/c sooner (up to 21 ms), during which the asteroid moves with
+  its barycentric velocity; with the Earth-centre light time for everyone (up to 1.1.0) the shadow was up to
+  (v/c) R sin(alt), ~0.4-0.9 km, off at the surface (in the Earth's frame: the shadow runs along the star's aberrated
+  direction). The path lines (`paths.shadow_path`) apply the same per ground point. Elsewhere (scans, pick,
+  pre-screens) the asteroid is geocentric, `spkpos(target, et, 'J2000', 'CN', '399')` (399 = the Earth's centre;
+  3 would be the Earth-Moon barycentre); their margins are many km.
+- Offsets `(dx, dy)` = the first two components of `M @ (r_asteroid - r_observer)` (that `spkcpo` vector), km east and
+  north. Miss distance = `hypot(dx, dy)`.
 
 ### 2.3 Star magnitude cap and corridor width: `plan_corridor`
 

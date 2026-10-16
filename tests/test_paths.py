@@ -8,6 +8,9 @@ A, C = 6378.137, 6356.7523142           # WGS84-like: oblate Earth
 OMEGA = 7.2921159e-5                    # rad/s
 ET0 = 8.45e8
 D_AST = 1.6e8                           # km
+V_EARTH = np.array([12.0, -25.0, 9.0])  # km/s, the Earth's barycentric velocity in the stand-in (not zero, so the test
+                                        # sees whether the asteroid's barycentric or relative velocity is used)
+C_KMS = 299792.458
 star_ra, star_dec = np.radians(70.0), np.radians(10.0)
 STAR = np.array([np.cos(star_dec)*np.cos(star_ra), np.cos(star_dec)*np.sin(star_ra), np.sin(star_dec)])
 
@@ -25,6 +28,11 @@ def make_stub(xi0, eta0, vxi, veta):
     def spkpos(tid, et, frame, corr, obs):
         t = et - ET0
         return D_AST * z + (xi0 + vxi*t) * x + (eta0 + veta*t) * y, 0.0
+
+    def spkezr(tid, et, frame, corr, obs):            # barycentric state: velocity = relative + the Earth's
+        assert (frame, corr, obs) == ('J2000', 'NONE', '0')
+        v = vxi * x + veta * y + V_EARTH
+        return np.concatenate([np.zeros(3), v]), 0.0
 
     def pxform(frm, to, et):                         # ITRF = Rz(+theta) * J2000, theta = OMEGA*(et-ET0)
         th = OMEGA * (et - ET0)
@@ -59,7 +67,7 @@ def make_stub(xi0, eta0, vxi, veta):
 
     def et2utc(et, fmt, prec): return "2026-10-03T07:07:33"
 
-    for f in (spkpos, pxform, bodvrd, surfpt, recgeo, et2utc):
+    for f in (spkpos, spkezr, pxform, bodvrd, surfpt, recgeo, et2utc):
         setattr(s, f.__name__, f)
     ex = types.ModuleType('spiceypy.utils.exceptions'); ex.NotFoundError = NotFoundError
     ut = types.ModuleType('spiceypy.utils'); ut.exceptions = ex
@@ -109,8 +117,14 @@ def run_case(label, xi0, eta0, vxi, veta, r=2.0, s3=6.0, expect_empty=False, exp
             t = et - ET0
             R = s.pxform('J2000', 'ITRF93', et)
             p_j2000 = R.T @ geodetic_to_xyz(lon, lat)
-            # (1) ground point must lie on the offset shadow axis: its plane coordinates equal the axis + off*n
-            want = np.array([xi0 + vxi*t, eta0 + veta*t]) + off*nrm
+            # (1) ground point must lie on the offset shadow axis as that point sees it: its own light time is
+            #     dtau = (|A| - |A - P|)/c shorter than the geocentre's, and in that time the asteroid moves with its
+            #     barycentric velocity (relative + the Earth's), across the star direction
+            A_ = s.spkpos('4272', et, 'J2000', 'CN', '399')[0]
+            P_ = s.pxform('ITRF93', 'J2000', et) @ geodetic_to_xyz(lon, lat)
+            dtau = (np.linalg.norm(A_) - np.linalg.norm(A_ - P_)) / C_KMS
+            vb = vxi * x + veta * y + V_EARTH
+            want = np.array([xi0 + vxi*t, eta0 + veta*t]) + off*nrm + dtau * np.array([vb @ x, vb @ y])
             got = np.array([p_j2000 @ x, p_j2000 @ y])
             worst_plane = max(worst_plane, np.linalg.norm(got - want))
             # (2) must be the star-facing side
