@@ -10,6 +10,7 @@ address (version.__url__).
 
 # --- NAIF SPICE kernels (kernels.py)
 URL_NAIF_LSK = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/naif0012.tls"                 # leap seconds
+URL_NAIF_LSK_DIR = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/lsk/"    # listing: a newer naifNNNN.tls?
 URL_NAIF_DE440 = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440.bsp"         # planets
 URL_NAIF_PCK = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/pck00010.tpc"                # body constants
 URL_NAIF_SATELLITES = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/"  # + jup365.bsp (optional)

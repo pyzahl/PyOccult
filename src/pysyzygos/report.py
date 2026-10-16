@@ -190,8 +190,10 @@ def precess_j2000(ra, dec, jd):
 
 
 def alt_az(ra_deg, dec_deg, when, lat_deg, lon_deg):
-    """Altitude and azimuth (deg, from north through east) of a J2000 position. UT1 taken as UTC; no
-    nutation/aberration (error well under 0.1 deg) - fine for a compass direction."""
+    """Altitude and azimuth (deg, from north through east) of a J2000 position. Only for records without the search's
+    star_az (before 2026-10-16; the search computes it with SPICE and the measured UT1). Here UT1 is taken as UTC (under
+    0.01 deg today; with leap seconds ending in 2027 UT1 - UTC grows, ~0.25 deg after a century) and nutation and
+    aberration are left out (well under 0.1 deg): fine for a compass direction."""
     jd = julian_date(when)
     ra, dec = precess_j2000(math.radians(ra_deg), math.radians(dec_deg), jd)
     T = (jd - 2451545.0) / 36525.0

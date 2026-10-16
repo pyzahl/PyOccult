@@ -16,6 +16,66 @@ EARTH_HISTORIC_GLOB = "earth_1962_*_combined.bpc"
 EARTH_HISTORIC_RE = re.compile(r"earth_1962_\d{6}_\d{4}_combined\.bpc")
 
 
+# Leap seconds: NAIF's leap-second kernel. naif0012.tls has every leap second up to the last one (end of 2016); a new
+# one (naif0013.tls, ...) would come only with a new leap second (none announced; leap seconds end with 2027-05-20,
+# CGPM 2026). The newest local naifNNNN.tls is used; refresh_lsk looks for a newer one on NAIF's server, at most once
+# per earth_pck_max_age days (with the Earth orientation refresh).
+LSK = "naif0012.tls"
+LSK_RE = re.compile(r"naif(\d{4})\.tls")
+LSK_MARKER = ".lsk_checked"                       # when NAIF's leap-second directory was last looked at
+
+
+def lsk_file(folder="."):
+    """The newest local leap-second kernel (path): naifNNNN.tls with the highest NNNN, else LSK."""
+    try:
+        names = [n for n in os.listdir(folder) if LSK_RE.fullmatch(n)]
+    except OSError:
+        names = []
+    return os.path.join(folder, max(names, key=lambda n: int(LSK_RE.fullmatch(n)[1])) if names else LSK)
+
+
+def _curl(url, out=None, timeout=60):
+    """Text of url (out None) or a download to out (via .part); None/False on any failure."""
+    try:
+        if out is None:
+            r = subprocess.run(["curl", "-s", "-f", "-L", "-A", "Mozilla/5.0", "--max-time", str(timeout), url],
+                               capture_output=True, check=True)
+            return r.stdout.decode("utf-8", errors="replace")
+        subprocess.run(["curl", "-s", "-f", "-L", "-A", "Mozilla/5.0", "--max-time", str(timeout), url, "-o", out + ".part"],
+                       check=True)
+        os.replace(out + ".part", out)
+        return True
+    except (subprocess.CalledProcessError, OSError):
+        if out is not None and os.path.exists(out + ".part"):
+            os.remove(out + ".part")
+        return None if out is None else False
+
+
+def refresh_lsk(folder=".", max_age_days=7, fetch=_curl):
+    """Look for a newer leap-second kernel on NAIF's server (at most once per max_age_days; offline: nothing) and
+    download it next to the old one. Returns the new file's name, or None. Never raises."""
+    marker = os.path.join(folder, LSK_MARKER)
+    try:
+        if max_age_days >= 0 and os.path.isfile(marker) and \
+                (datetime.now().timestamp() - os.path.getmtime(marker)) < max_age_days * 86400:
+            return None
+        listing = fetch(U.URL_NAIF_LSK_DIR)
+        if not listing:
+            return None                                   # offline: try again next time (marker not touched)
+        nums = [int(n) for n in LSK_RE.findall(listing)]
+        Path(marker).touch()
+        have = int(LSK_RE.fullmatch(os.path.basename(lsk_file(folder)))[1])
+        if not nums or max(nums) <= have:
+            return None
+        name = f"naif{max(nums):04d}.tls"
+        if fetch(U.URL_NAIF_LSK_DIR + name, os.path.join(folder, name)):
+            print(f"* new leap-second kernel from NAIF: {name} (used from now on)")
+            return name
+    except Exception as e:                                # never stop a run for this
+        print(f"(leap-second kernel check skipped: {str(e)[:120]})")
+    return None
+
+
 def historic_earth_pck(folder="."):
     """The newest local historic Earth orientation file (path), or None."""
     files = sorted(glob.glob(os.path.join(folder, EARTH_HISTORIC_GLOB)))
@@ -183,6 +243,7 @@ def download_kernels(earth_pck_max_age=7):
                     continue
                 return False
                 
+    refresh_lsk(".", earth_pck_max_age)                  # a newer leap-second kernel? (weekly, with the Earth file)
     print("✅ All kernels verified and downloaded cleanly via curl.")
 
     return True

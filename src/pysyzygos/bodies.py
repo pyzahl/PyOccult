@@ -327,8 +327,9 @@ def phase_correct(sats, date, kernels="."):
     (G = 0.5): H = mag - 5 log10(r delta) + 2.5 log10((1-G) phi1 + G phi2), with each system's phase angle from
     SPICE (de440: Sun - system barycentre - Earth). Estimated values (h_est) are already H."""
     import spiceypy as spice
-    for k in ("naif0012.tls", "de440.bsp"):
-        spice.furnsh(os.path.join(kernels, k))
+    from pysyzygos.kernels import lsk_file
+    for k in (lsk_file(kernels), os.path.join(kernels, "de440.bsp")):
+        spice.furnsh(k)
     et = spice.str2et(date)
     alpha = {}
     for system in SYSTEMS:

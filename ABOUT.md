@@ -102,11 +102,12 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   against atomic time (the same model as Occult: UT1 from IERS EOP data since 1962, polar motion since 1846). So the
   end of leap seconds (CGPM 2026 draft resolution: UTC continuous from 2027-05-20, a leap hour possible in the far
   future) needs no change: without new leap seconds `naif0012.tls` stays valid (UTC = TAI - 37 s), and UT1 - UTC may
-  grow beyond 0.9 s (about a minute per century) without affecting the geometry. Two small points (2026-10-16): a
-  last leap second announced before the change would come as a new kernel file name, and `kernels.py` asks for
-  `naif0012.tls` by name; and the report's `alt_az` (altitude and compass direction for records without them, display
-  only) takes UT1 as UTC, which is under 0.01 deg off today and would reach ~0.25 deg after a century without leap
-  seconds.
+  grow beyond 0.9 s (about a minute per century) without affecting the geometry. Should a last leap second come
+  before the change, NAIF publishes it as a new file (naif0013.tls, ...): `kernels.refresh_lsk` looks at NAIF's
+  leap-second directory with the weekly Earth orientation refresh and fetches a newer file, and the newest local
+  naifNNNN.tls is loaded (`kernels.lsk_file`). The star's azimuth (the report's compass direction) is computed by the
+  search with SPICE and the measured UT1 (record `star_az`, since 2026-10-16; equal to astropy/IERS to 0.0001 deg);
+  the report's own `alt_az`, which takes UT1 as UTC, remains only for older records.
 - **Observer:** `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), fixed in ITRF93.
   Longitude east-positive, geodetic, radians. The height is above the ellipsoid: sites.py's `ele` (above mean sea
   level) plus `geoid_m`, the EGM96 geoid's height there (`geoid.py`, a 0.5 deg grid; filled in when a site is saved),

@@ -20,7 +20,7 @@ star files. Afterwards `pysyzygos setup` sets everything up again (with --all it
 from pysyzygos.version import __version__
 import argparse, glob, os, shutil, sys, tempfile
 
-KERNEL_FILES = ("naif0012.tls", "de440.bsp", "pck00010.tpc", "earth_latest_high_prec.bpc")
+KERNEL_FILES = ("naif*.tls", ".lsk_checked", "de440.bsp", "pck00010.tpc", "earth_latest_high_prec.bpc")
 NAIF_FILES = ("jup365.bsp", "sat441.bsp", "nep097.bsp", "plu060.bsp", "mar099.bsp")   # bodies.NAIF_KERNELS
 DOWNLOADS = KERNEL_FILES + NAIF_FILES + ("earth_1962_*_combined.bpc", "data/ObsCodes.html", "jpl_asteroids_spice.csv",
                                          "sbdb_cache.json", "owc_cache.json")

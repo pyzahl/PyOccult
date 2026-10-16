@@ -7,6 +7,13 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- **Leap seconds:** the newest local leap-second kernel (naifNNNN.tls) is used, and NAIF's leap-second directory is
+  checked with the weekly Earth orientation refresh: should a last leap second come before leap seconds end
+  (2027-05-20), its new file is fetched by itself (`kernels.lsk_file`, `refresh_lsk`; `.lsk_checked`; offline:
+  nothing happens).
+- **The star's azimuth in the event record** (`star_az`, at the end): computed by the search with SPICE and the
+  measured UT1 (equal to astropy/IERS to 0.0001 deg); the report's compass direction uses it. Its own `alt_az`
+  (UT1 taken as UTC, no nutation; 0.003 deg off for Phaethon 2019) remains only for older records.
 - **Radial velocities of fast nearby stars** in their propagation (perspective acceleration). The local catalog has
   no radial velocities; for nearby fast stars the missing term grows to tens of mas by 2026 (Barnard's star 75 mas,
   others 1-64 mas), tens of km on the ground at typical asteroid distances. `data/gaia_dr3_rv_fast.npy` holds Gaia

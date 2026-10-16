@@ -30,8 +30,9 @@ from pysyzygos.kernels import KERNELS
 
 def load_kernels(spice, folder="."):
     from pysyzygos.kernels import EARTH_PCK, historic_earth_pck
+    from pysyzygos.kernels import LSK, lsk_file
     for k in KERNELS:
-        p = os.path.join(folder, k)
+        p = lsk_file(folder) if k == LSK else os.path.join(folder, k)          # the newest leap-second kernel
         if not os.path.isfile(p):
             raise FileNotFoundError(f"{p} missing: run  pysyzygos setup --no-gaia  (downloads the kernels)")
         if k == EARTH_PCK and historic_earth_pck(folder):   # before 2000: the historic file, loaded first (lower rank)

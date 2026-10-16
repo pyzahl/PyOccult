@@ -234,7 +234,9 @@ def show_status(d=None):
     elif APPROX in open("sites.py").read():
         print("  WARNING: the site position in sites.py is approximate (from your IP address or a place name);"
               " replace it with your exact position (GPS, map) before observing.")
+    from pysyzygos.kernels import LSK, lsk_file
     for k in KERNELS:
+        k = os.path.basename(lsk_file(".")) if k == LSK else k                # the newest leap-second kernel
         print(f"  {k:28s} {'ok' if os.path.isfile(k) else 'missing'}")
     from pysyzygos import kernels as KK
     h = KK.historic_earth_pck(".")

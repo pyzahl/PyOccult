@@ -352,6 +352,10 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   search.py start-up: window start before the latest's start -> fetch it; `window_coverage(spans, et0, et1)` checks
   the whole window (start, gaps); the end check stays on the latest file only (no silent century predictions).
   pick: same fetch. setup `--historic-earth`, status line, cleanup pattern. tests/test_kernels_coverage.py.
+- Leap seconds (2026-10-16): `kernels.lsk_file(folder)` = newest local naifNNNN.tls (use it, never the literal
+  name); `refresh_lsk` checks URL_NAIF_LSK_DIR at most every earth_pck_max_age days (marker .lsk_checked, gitignored),
+  called at the end of download_kernels; never raises. Record `star_az` (search.az_deg, SPICE/UT1) feeds the report's
+  compass; report.alt_az (UT1 = UTC) only for older records.
 - Earth PCK coverage: `pck_comment_dates` reads "Creation date" and "UTC Epoch of last datum" (end of measured EOP)
   from the file's comment block; `pckcov` gives the end of the prediction. Run summary key `earth_pck`; a search window
   past the end exits at start-up.

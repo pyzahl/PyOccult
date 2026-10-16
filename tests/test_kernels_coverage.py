@@ -33,4 +33,27 @@ assert [os.path.basename(p) for p in K.earth_kernels(d)] == ["earth_1962_260806_
 assert K.historic_earth_pck(tempfile.mkdtemp()) is None and K.earth_kernels(tempfile.mkdtemp())[-1].endswith(K.EARTH_PCK)
 assert K.EARTH_HISTORIC_RE.fullmatch("earth_1962_260806_2126_combined.bpc") and not K.EARTH_HISTORIC_RE.fullmatch(
     "earth_2026_260806_2126_predict.bpc")
+
+# leap seconds: the newest local naifNNNN.tls is used; NAIF's directory is looked at at most once per interval and a
+# newer file is downloaded next to the old one (stand-in for the server: fetch(url) -> listing, fetch(url, out) -> file)
+d = tempfile.mkdtemp()
+assert os.path.basename(K.lsk_file(d)) == K.LSK                                   # none yet: the default name
+for n in ("naif0011.tls", "naif0012.tls", "naif0012.tls.part", "notes.tls"):
+    open(os.path.join(d, n), "w").close()
+assert os.path.basename(K.lsk_file(d)) == "naif0012.tls"
+calls = []
+def fake(url, out=None, listing='<a href="naif0011.tls">x</a> <a href="naif0012.tls">y</a> <a href="naif0013.tls">z</a>'):
+    calls.append((url, out))
+    if out is None:
+        return listing
+    open(out, "w").write("LSK")
+    return True
+assert K.refresh_lsk(d, 7, fetch=fake) == "naif0013.tls" and os.path.basename(K.lsk_file(d)) == "naif0013.tls"
+assert calls[-1][0].endswith("/lsk/naif0013.tls")
+n = len(calls)
+assert K.refresh_lsk(d, 7, fetch=fake) is None and len(calls) == n                 # checked recently: no request
+os.remove(os.path.join(d, K.LSK_MARKER))
+assert K.refresh_lsk(d, 7, fetch=lambda u, o=None: None) is None                    # offline: nothing, no marker
+assert not os.path.exists(os.path.join(d, K.LSK_MARKER))
+assert K.refresh_lsk(d, 7, fetch=fake) is None and os.path.basename(K.lsk_file(d)) == "naif0013.tls"   # nothing newer
 print("KERNEL COVERAGE TESTS PASSED")

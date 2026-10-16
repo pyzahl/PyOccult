@@ -35,7 +35,7 @@ def star_test(loc, utc, span, ra, dec, tid, r, reach):
     return None if calls['star_test'] % 3 == 0 else dict(best_utc=utc, best_et=et, min_distance=40.0, observable="yes")
 ns.update(star_test=star_test,
           window_is_observable=lambda et, span, geo, t: (calls.__setitem__('gate', calls['gate']+1) or int(et) % 5 != 0),
-          is_new_hit=lambda t, s, et: True, observable=lambda et, sd, geo: (True, 45.0, -20.0),
+          is_new_hit=lambda t, s, et: True, observable=lambda et, sd, geo: (True, 45.0, -20.0), az_deg=lambda et, d, geo: 123.0,
           apparent_mag_HG=lambda et, t, H, G: 15.0,
           event_metrics=lambda et, sd, geo, t, r, ms, ma: dict(speed_kms=12.0, chord_km=20.0, duration_s=1.5, mag_drop=0.8),
           moon_info=lambda et, sd, geo: dict(moon_sep_deg=40.0),
@@ -64,5 +64,6 @@ need = {"target_id","best_utc","min_distance","r_min_km","r_max_km","size_source
 assert need <= set(log.columns), need - set(log.columns)
 print(log.iloc[0][["target_id","star","mag","min_distance","mag_drop","max_duration_s"]].to_dict())
 assert (log.calc_s >= 0).all() and (log.airmass > 1).all() and (log.extinction_mag > 0).all()
+assert (log.star_az == 123.0).all(), "the star's azimuth must be in the record (report compass)"
 assert ns["RUN"]["hits"] == n and ns["RUN"]["solves"] == calls["star_test"] and ns["RUN"]["candidates"] == len(sub)
 print("PATCH SMOKE TEST PASSED")

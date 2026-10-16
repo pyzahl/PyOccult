@@ -2,6 +2,7 @@
 *.bsp
 *.bpc
 *.tls
+/.lsk_checked
 *.tpc
 gaia_dr3_*/
 jpl_asteroids_spice.csv

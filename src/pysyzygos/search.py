@@ -64,7 +64,8 @@ if download_kernels(config.earth_pck_max_age):
     try:
         print (f'* PySyzygos {__version__}: loading compute kernels *')
         # Load all required kernels
-        spice.furnsh("naif0012.tls")       # Leapseconds
+        from pysyzygos.kernels import lsk_file
+        spice.furnsh(lsk_file("."))        # Leapseconds (the newest local naifNNNN.tls)
         spice.furnsh("pck00010.tpc")       # Planetary constants
         spice.furnsh("de440.bsp")          # Major planets base
         from pysyzygos import kernels as K
@@ -603,6 +604,16 @@ def sun_alt_deg(et, obs_geo):
 def alt_deg(et, direction, obs_geo):
     return np.degrees(np.arcsin(_up_j2000(et, obs_geo) @ (direction / np.linalg.norm(direction))))
 
+def az_deg(et, direction, obs_geo):
+    """Azimuth (deg, from north through east) of a J2000 direction at the site: the local east and north turned to
+    J2000 with the Earth's real rotation (UT1, polar motion), as alt_deg."""
+    lon, lat = obs_geo['lon'], obs_geo['lat']
+    R = spice.pxform('ITRF93', 'J2000', et)
+    east = R @ np.array([-np.sin(lon), np.cos(lon), 0.0])
+    north = R @ np.array([-np.sin(lat)*np.cos(lon), -np.sin(lat)*np.sin(lon), np.cos(lat)])
+    d = direction / np.linalg.norm(direction)
+    return float(np.degrees(np.arctan2(d @ east, d @ north)) % 360.0)
+
 
 def observable(et, star_dir, obs_geo, min_star_alt=config.MIN_STAR_ALT, max_sun_alt=config.MAX_SUN_ALT):
     star_alt = alt_deg(et, star_dir, obs_geo)
@@ -997,6 +1008,7 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
     record.update(star_kind=kind_, star_ruwe=float(ruwe_) if ruwe_ is not None else float("nan"),
                   star_flag=gaia_local.star_flag(kind_, ruwe_), ast_sigma1_km=ast_sigma1,
                   star_sigma_mas=s_mas if s_mas else float("nan"), star_sigma_km=s_km if s_km else float("nan"))
+    record.update(star_az=az_deg(res['best_et'], star_dir, obs_geo))     # the report's compass direction (exact UT1)
     print(f"* hit: {record['target_name']} at {record['best_utc'][:19]} UT"
           + (f"  (star: {record['star_flag']}" + (f"; path +-{s_km:.0f} km 1-sigma from the star" if s_km else "")
              + ")" if record["star_flag"] else ""))
