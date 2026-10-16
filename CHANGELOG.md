@@ -6,6 +6,10 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Documentation
+- ABOUT.md 2.2, "Time scales": how UTC, TDB and UT1 are handled, and why the end of leap seconds (CGPM 2026: UTC
+  continuous from 2027-05-20) needs no change.
+
 ### Added
 - **Path verification against Occult** (`pysyzygos path-check`, GUI Favorites with the "Path verification"
   checkbox): for a favorite, compute our geodetic path fresh (the search for that event only, today's orbit; path and

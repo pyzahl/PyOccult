@@ -96,6 +96,17 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   deflection and stellar parallax" in Part 6), so star and asteroid
   directions share one frame. "J2000.0" as a time is only the origin of ET (2000-01-01 12:00 TDB). Apparent positions
   (TETE, true equator and equinox of date) appear only in displays (favorites, globe).
+- **Time scales.** The computation runs in TDB (SPICE's ET); UTC appears only at input and output, converted with
+  NAIF's leap-second kernel `naif0012.tls` (all leap seconds to the last one, end of 2016: TAI - UTC = 37 s). The
+  Earth's rotation does not come from UTC: NAIF's Earth orientation file holds IERS's measured UT1 and polar motion
+  against atomic time (the same model as Occult: UT1 from IERS EOP data since 1962, polar motion since 1846). So the
+  end of leap seconds (CGPM 2026 draft resolution: UTC continuous from 2027-05-20, a leap hour possible in the far
+  future) needs no change: without new leap seconds `naif0012.tls` stays valid (UTC = TAI - 37 s), and UT1 - UTC may
+  grow beyond 0.9 s (about a minute per century) without affecting the geometry. Two small points (2026-10-16): a
+  last leap second announced before the change would come as a new kernel file name, and `kernels.py` asks for
+  `naif0012.tls` by name; and the report's `alt_az` (altitude and compass direction for records without them, display
+  only) takes UT1 as UTC, which is under 0.01 deg off today and would reach ~0.25 deg after a century without leap
+  seconds.
 - Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), fixed in ITRF93.
   Longitude east-positive, geodetic, radians. The height is above the ellipsoid: sites.py's `ele` (above mean sea
   level) plus `geoid_m`, the EGM96 geoid's height there (`geoid.py`, a 0.5 deg grid; filled in when a site is saved),
