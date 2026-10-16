@@ -6,6 +6,19 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Site heights above sea level corrected to the WGS84 ellipsoid.** Elevations from maps, Open-Meteo and most GPS
+  displays are above mean sea level (the geoid), but the geometry needs the height above the ellipsoid; they differ by
+  -107 to +85 m (the test sites: -32 to +48 m), which moved the path relative to a site by that over tan(star
+  altitude) (about 85 m at 20 deg). Each site's geoid height (EGM96, NGA, public domain; `geoid.py` with a 0.5 deg grid
+  in `data/egm96_30min.npy`, 0.12 m rms against the 15-minute grid) is looked up once when the site is saved and kept
+  in sites.py as `geoid_m`; the config adds it (`ELE = ele + geoid_m`, also with older user config files). GUI Site
+  tab: "Elevation is above sea level / above WGS84 ellipsoid" (MPC observatory codes set the latter: `ele_ref`);
+  `pysyzygos setup --geoid` fills in all sites; `setup --status` and the report header show the heights. Existing
+  sites keep their old behaviour until saved once (the GUI saves an edited or older site before a run). Prompted by
+  Occult's author (site elevations are given above mean sea level). Shared sites.py reading and writing:
+  `sitesfile.py`.
+
 ### Fixed
 - `gaia supplement-pm` (and `setup --supplement`) rerun: its record in the supplement's catalog.json counted only that
   run's new matches, so a rerun on a finished supplement reported "0 from UCAC5, 0 from UCAC4" and `setup --status`

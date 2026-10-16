@@ -54,6 +54,9 @@ URL_OPENMETEO_ELEVATION = "https://api.open-meteo.com/v1/elevation"
 URL_OPENMETEO_GEOCODING = "https://geocoding-api.open-meteo.com/v1/search"
 URL_OPENMETEO_FORECAST = "https://api.open-meteo.com/v1/forecast"               # used for the time zone only
 URL_IPINFO = "https://ipinfo.io/json"                                           # approximate position from the IP
+# EGM96 geoid, 15-minute grid in GeographicLib's PGM format (NGA's EGM96, public domain); the source of
+# data/egm96_30min.npy (`python -m pysyzygos.geoid build`; not downloaded at run time)
+URL_EGM96_GEOID = "https://sourceforge.net/projects/geographiclib/files/geoids-distrib/egm96-15.tar.bz2/download"
 
 # --- maps in the report and favorites pages
 URL_OSM_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"               # report --tile-url default

@@ -23,5 +23,12 @@ if not os.path.isfile(USER):
 
 _ns = runpy.run_path(TEMPLATE)
 _ns.update(runpy.run_path(USER))
+# heights: sites.py's ele is above mean sea level; the geometry needs the WGS84 ellipsoid (+ geoid_m, filled in when the
+# site is saved). Done here, after both files: older user files set ELE = site["ele"] themselves; a different ELE
+# chosen in the user file is kept.
+_site = _ns.get("site") if isinstance(_ns.get("site"), dict) else {}
+if "ele" in _site and _ns.get("ELE") == _site["ele"]:
+    _ns["ELE_MSL"], _ns["GEOID_M"] = _site["ele"], float(_site.get("geoid_m", 0.0) or 0.0)
+    _ns["ELE"] = _ns["ELE_MSL"] + _ns["GEOID_M"]
 globals().update({k: v for k, v in _ns.items() if not k.startswith("__")})
-del _ns
+del _ns, _site

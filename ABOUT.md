@@ -97,7 +97,11 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   directions share one frame. "J2000.0" as a time is only the origin of ET (2000-01-01 12:00 TDB). Apparent positions
   (TETE, true equator and equinox of date) appear only in displays (favorites, globe).
 - Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), fixed in ITRF93.
-  Longitude east-positive, geodetic, radians.
+  Longitude east-positive, geodetic, radians. The height is above the ellipsoid: sites.py's `ele` (above mean sea
+  level) plus `geoid_m`, the EGM96 geoid's height there (`geoid.py`, a 0.5 deg grid; filled in when a site is saved),
+  unless the site's height is above the ellipsoid already (`ele_ref="ellipsoid"`, e.g. MPC codes). Before
+  2026-10-16 `ele` was used as an ellipsoid height, off by the geoid (-107 to +85 m; for the test sites -32 to +48 m),
+  which moves the path relative to the site by that over tan(star altitude).
 - Asteroid as the observer sees it: `spkcpo(target, et, 'J2000', 'OBSERVER', 'CN', site_itrf, '399', 'ITRF93')`, the
   asteroid at et minus the light time from the observer (not from the Earth's centre), relative to the observer at et.
   `CN` is converged light time without stellar aberration: astrometric, like Gaia positions. Aberration is left out

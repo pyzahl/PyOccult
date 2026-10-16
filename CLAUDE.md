@@ -185,6 +185,12 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   lon > 180 -> -360). GUI Site tab: number fields drop text, so a `paste` js_handler (PASTE_JS) emits non-numeric
   clipboard text to `on_paste` (fills lat/lon/ele, moves marker, looks up elevation). Verified in headless Chrome
   over CDP (scratch script; no Playwright installed). `tests/test_geo_parse.py`.
+- `pysyzygos/geoid.py` (2026-10-16): EGM96 geoid height N (data/egm96_30min.npy, 0.5 deg, int16 cm, bilinear; build
+  from GeographicLib's egm96-15.pgm, URL_EGM96_GEOID). sites.py `ele` is above MSL; `geoid_m` (filled by `fill` when
+  saved: GUI via `sitesfile.save_sites`, `setup --geoid`, new sites in setup) is added by config.py AFTER both config
+  files (ELE = ele + geoid_m, also when the user file sets ELE = site["ele"]); `ele_ref: "ellipsoid"` (MPC codes,
+  GUI select) -> geoid_m 0. Run summary site: ele (MSL, for KStars/Stellarium), geoid_m, ele_wgs84, ele_ref.
+  `pysyzygos/sitesfile.py`: load_sites/save_sites (moved from gui.py). tests/test_geoid.py.
 - `pysyzygos/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
   list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
 - `pysyzygos/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi

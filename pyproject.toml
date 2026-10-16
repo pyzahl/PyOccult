@@ -44,7 +44,7 @@ pysyzygos = "pysyzygos.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-pysyzygos = ["*.svg", "*.png", "data/*.json", "data/*.md", "templates/*.py"]
+pysyzygos = ["*.svg", "*.png", "data/*.json", "data/*.md", "data/*.npy", "templates/*.py"]
 
 [tool.setuptools.dynamic]
 version = { attr = "pysyzygos.version.__version__" }

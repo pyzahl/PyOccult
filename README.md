@@ -650,12 +650,13 @@ sites = {
 default_site = "home"
 ```
 
-`lat`, `lon` (geodetic degrees, longitude east-positive, west is negative) and `ele` (metres) are required. Each site
+`lat`, `lon` (geodetic degrees, longitude east-positive, west is negative) and `ele` (metres above mean sea level) are required. Each site
 can also describe its view and its equipment; keys it leaves out take the defaults from `pysyzygos_config.py`:
 
 | Key | Default | Meaning |
 |---|---|---|
 | `min_alt` | 10 | lowest usable star altitude, deg (trees, houses, haze) |
+| `ele_ref`, `geoid_m` | `"msl"`, filled in | `ele` is above mean sea level (maps, Open-Meteo, most GPS displays); the computation needs the height above the WGS84 ellipsoid and adds `geoid_m`, the geoid's height there (EGM96, -107 to +85 m), which the GUI fills in when a site is saved and `pysyzygos setup --geoid` for all sites. `ele_ref="ellipsoid"` for a height already above the ellipsoid (MPC observatory codes, GPS set to ellipsoid height): `geoid_m` 0. A site h metres off in height moves the path by h / tan(star altitude) relative to it |
 | `max_sun_alt` | 0 | the Sun must be below this, deg. Events with the Sun above -12 deg (twilight) are marked next to the star magnitude, e.g. "☼ −8°": only bright stars are seen then. Set -12 or lower to leave twilight out (faint stars, small telescopes) |
 | `reach_km` | `max_shadow_dist` | how far you can travel from this site, km |
 | `aperture_cm` | 25 | telescope aperture, cm |

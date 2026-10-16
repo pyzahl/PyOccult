@@ -135,6 +135,7 @@ def _manual():
 
 def _write_sites(lat, lon, ele, label, approx):
     from datetime import date
+    from pysyzygos import geoid
     note = (f"  # {APPROX} ({label}): replace with your exact position" if approx else f"  # {label}")
     with open("sites.py", "w") as f:
         f.write(f"""# Your observing sites (not in git). Layout and optional keys: see src/pysyzygos/templates/sites_example.py.
@@ -143,6 +144,7 @@ def _write_sites(lat, lon, ele, label, approx):
 
 sites = {{
     "home": dict(lat={lat:.5f}, lon={lon:.5f}, ele={ele or 0:.0f}, name="Home",{note}
+                 geoid_m={geoid.height(lat, lon):.1f},  # geoid above the WGS84 ellipsoid (EGM96); ele is above sea level
                  aperture_cm=25, min_alt=10),
 }}
 
@@ -216,7 +218,14 @@ def show_status(d=None):
     print(f"  data folder                  {home.describe()}")
     with open("sites.py") as f:
         example = f.read() == open(EXAMPLE).read() if os.path.isfile(EXAMPLE) else False
-    print(f"  site {config.site_name!r:26s} {config.LAT:.4f} {config.LON:.4f}, {config.ELE:g} m, "
+    s = config.site
+    if s.get("ele_ref") == "ellipsoid":
+        height = f"{s['ele']:g} m (WGS84)"
+    elif "geoid_m" in s:
+        height = f"{s['ele']:g} m MSL {s['geoid_m']:+.1f} m geoid"
+    else:
+        height = f"{s['ele']:g} m (no geoid height yet: pysyzygos setup --geoid)"
+    print(f"  site {config.site_name!r:26s} {config.LAT:.4f} {config.LON:.4f}, {height}, "
           f"{config.pick_aperture_cm:g} cm, stars G <= {config.MAG_MIN:g}" + ("   <- example site" if example else ""))
     if example:
         print("  WARNING: sites.py is still the example; enter your own site" + (" (see above)" if SITES_CREATED else ":"))
@@ -425,7 +434,19 @@ def main():
                          "before 2000 fetches it by itself when online")
     ap.add_argument("--home", metavar="FOLDER", help="use FOLDER as the data folder from now on (saved as a setting; "
                                                      "files are not moved)")
+    ap.add_argument("--geoid", action="store_true",
+                    help="look up each site's geoid height (EGM96) and save it in sites.py (geoid_m); sites.py's "
+                         "elevations are above sea level, the computation adds it (comments in sites.py are not kept)")
     a = ap.parse_args()
+    if a.geoid:
+        from pysyzygos import sitesfile
+        sites, default = sitesfile.load_sites()
+        sitesfile.save_sites(sites, default, by="pysyzygos setup --geoid")
+        for name, s in sites.items():
+            ref = "height above the ellipsoid" if s.get("ele_ref") == "ellipsoid" else "geoid"
+            print(f"  {name:28s} ele {s['ele']:g} m, {ref} {s['geoid_m']:+.1f} m -> {s['ele'] + s['geoid_m']:.1f} m above WGS84")
+        print("saved sites.py")
+        sys.exit(0)
     if a.status:
         show_status(catalog_target(a.gmax, a.dir)[0] if (a.gmax is not None or a.dir) else None)
         sys.exit(0)

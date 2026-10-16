@@ -55,7 +55,9 @@ site = sites[site_name]
 
 LAT = site["lat"]                                  # latitude, deg
 LON = site["lon"]                                  # longitude, deg, negative is west
-ELE = site["ele"]                                  # elevation, m
+ELE_MSL = site["ele"]                              # elevation, m, as in sites.py (above mean sea level)
+GEOID_M = site.get("geoid_m", 0.0)                 # geoid above the WGS84 ellipsoid there (sites.py, filled when saved)
+ELE = ELE_MSL + GEOID_M                            # height above the WGS84 ellipsoid, m: what the geometry uses
 
 # view
 MIN_STAR_ALT = site.get("min_alt", 10.0)           # deg, lowest usable star altitude (trees, houses, haze)

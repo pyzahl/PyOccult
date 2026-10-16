@@ -9,7 +9,7 @@ It listens on this computer only (127.0.0.1), because it can start programs. Eve
 not changed. Saving a site rewrites sites.py (comments in it are not kept).
 """
 from pysyzygos.version import __version__, __codename__, __author__, __copyright__, __license__, __url__
-import argparse, asyncio, csv, json, math, os, pprint, re, runpy, sys, time
+import argparse, asyncio, csv, json, math, os, re, sys, time
 
 from pysyzygos import home
 from pysyzygos.home import HOME as ROOT, PKG                      # ROOT: the data folder (sites.py, maps/, ...)
@@ -60,21 +60,7 @@ def save_ui_state(**kw):
         pass
 
 
-def load_sites():
-    path = "sites.py" if os.path.isfile("sites.py") else os.path.join(PKG, "templates", "sites_example.py")
-    g = runpy.run_path(path)
-    return {k: dict(v) for k, v in g["sites"].items()}, g["default_site"]
-
-
-def save_sites(sites, default_site):
-    text = ("# Your observing sites (not in git). Layout and optional keys: see src/pysyzygos/templates/sites_example.py.\n"
-            "# pysyzygos_config.py uses `default_site`, or the site named in the environment variable PYSYZYGOS_SITE.\n"
-            f"# Written by the PySyzygos GUI on {time.strftime('%Y-%m-%d %H:%M')}.\n\n"
-            f"sites = {pprint.pformat(sites, sort_dicts=False, width=110)}\n\ndefault_site = {default_site!r}\n")
-    tmp = "sites.py.tmp"
-    with open(tmp, "w") as f:
-        f.write(text)
-    os.replace(tmp, "sites.py")
+from pysyzygos.sitesfile import load_sites, save_sites       # sites.py (saving fills each site's geoid height)
 
 
 def mag_limit(s):
@@ -303,6 +289,11 @@ def index():
                         lat = ui.number("Latitude (°)", format="%.5f", step=0.0001).tooltip(paste_tip)
                         lon = ui.number("Longitude (°, east +)", format="%.5f", step=0.0001).tooltip(paste_tip)
                         ele = ui.number("Elevation (m)", format="%.0f", step=1).tooltip(paste_tip)
+                        ele_ref = ui.select({"msl": "above sea level", "ellipsoid": "above WGS84 ellipsoid"},
+                                            value="msl", label="Elevation is").tooltip(
+                            "Maps, Open-Meteo and most GPS displays give the height above mean sea level; PySyzygos "
+                            "adds the geoid's height there (EGM96, saved in sites.py as geoid_m). MPC observatory "
+                            "codes (and GPS set to ellipsoid height) give it above the WGS84 ellipsoid already.")
                     fields = {}
                     with ui.grid(columns=3).classes("w-full"):
                         for key, label, default, step in SITE_KEYS:
@@ -570,6 +561,7 @@ def index():
         s = sites[name]
         state["name"] = name
         lat.value, lon.value, ele.value, desc.value = s["lat"], s["lon"], s["ele"], s.get("name", name)
+        ele_ref.value = s.get("ele_ref", "msl")
         mpc.value = str(s.get("mpc_code", "") or "")
         for key, _, default, _ in SITE_KEYS:
             if key == "sensor_w_mm":
@@ -595,6 +587,8 @@ def index():
     def collect():
         s = dict(lat=float(lat.value or 0), lon=float(lon.value or 0), ele=float(ele.value or 0),
                  name=desc.value or state["name"])
+        if ele_ref.value == "ellipsoid":
+            s["ele_ref"] = "ellipsoid"                            # else above sea level: geoid_m added when saved
         if (mpc.value or "").strip():
             s["mpc_code"] = mpc.value.strip()
         for key, _, default, _ in SITE_KEYS:
@@ -603,7 +597,8 @@ def index():
                 continue
             s[key] = int(v) if key == "frames" else float(v)
         s["sensor_mm"] = (float(fields["sensor_w_mm"].value or 5.6), float(fields["sensor_h_mm"].value or 3.2))
-        return s
+        from pysyzygos import geoid
+        return geoid.fill(s)                              # geoid_m as saving would set it (an older file differs)
 
     def pick_mag_default(s):
         """Faintest star for the pick: the site's telescope limit, capped at the selected catalog's G limit."""
@@ -632,6 +627,7 @@ def index():
         el = await run.io_bound(geo.elevation, ll["lat"], ll["lng"])
         if el is not None:
             ele.value = round(el)
+            ele_ref.value = "msl"                                 # Open-Meteo: above sea level
 
     m.on("map-click", on_click)
 
@@ -678,6 +674,7 @@ def index():
             return
         x = occ[e.value]
         set_position(x["lat"], x["lon"], x["ele"] if x["ele_ok"] else None)
+        ele_ref.value = "ellipsoid" if x["ele_ok"] else "msl"     # MPC parallax constants: height above WGS84
         m.set_center((x["lat"], x["lon"]))
         desc.value, mpc.value = x["name"], x["code"]
         auto = f"{x['code']} {x['name'].split(',')[0].strip()}"

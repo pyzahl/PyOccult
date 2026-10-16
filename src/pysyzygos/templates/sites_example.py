@@ -2,7 +2,9 @@
 # pysyzygos_config.py uses `default_site`, or the site named in the environment variable PYSYZYGOS_SITE:
 #     PYSYZYGOS_SITE=field ./pysyzygos.py
 #
-# Required: lat, lon (geodetic degrees, longitude east-positive, west is negative), ele (metres).
+# Required: lat, lon (geodetic degrees, longitude east-positive, west is negative), ele (metres above mean sea level,
+# as maps give it; ele_ref="ellipsoid" for a height above the WGS84 ellipsoid, e.g. from an MPC code). geoid_m (the
+# geoid's height above the ellipsoid there, EGM96) is filled in by the GUI and by `pysyzygos setup --geoid`.
 # Optional (defaults in pysyzygos_config.py):
 #   view      min_alt (deg, lowest usable star altitude, default 10), max_sun_alt (deg, default 0; twilight events marked),
 #             reach_km (km you can travel from here, default max_shadow_dist)
