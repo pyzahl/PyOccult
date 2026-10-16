@@ -582,8 +582,8 @@ def event_info(entry):
 
 
 def title_text(entry):
-    """'369152 (2008 SJ52) occults Gaia DR3 3160985089639151616 around 2026-10-12 04:58:57 UT at Camp (40.8699,
-    -72.8620, 29 m)'."""
+    """'369152 (2008 SJ52) occults Gaia DR3 3160985089639151616 around 2026-10-12 04:58:57 UT at Site (40.0000,
+    -73.0000, 30 m)'."""
     r, site = entry["record"], entry.get("site") or {}
     where = site.get("name", "?")
     if site.get("lat") is not None and site.get("lon") is not None:

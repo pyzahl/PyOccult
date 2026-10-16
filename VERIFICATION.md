@@ -2,16 +2,17 @@
 
 How PySyzygos's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
 event plots, against its own older code paths, and with independent geometry. What is computed and how: `ABOUT.md`;
-open items: `ABOUT.md`, Part 6. Updated 2026-10-16 (version 1.1.1).
+open items: `ABOUT.md`, Part 6. Updated 2026-10-16 (version 1.1.1). The observing sites are named Test site 1, 2, 3
+(real sites, not named here).
 
 Contents:
 
 - [1. Against OWC search results](#1-against-owc-search-results)
   - [1.1 How the comparison works](#11-how-the-comparison-works)
-  - [1.2 The observer's site, Oct 2-9 2026 (16 events)](#12-the-observers-site-oct-2-9-2026-16-events)
-  - [1.3 A second site, sets A and B (OWC data of 2026-10-02, events Oct 3-6 2026; checked 2026-10-03)](#13-a-second-site-sets-a-and-b-owc-data-of-2026-10-02-events-oct-3-6-2026-checked-2026-10-03)
-  - [1.4 The second site, 50 events Oct 4-7 2026 (OWC data of 2026-10-04)](#14-the-second-site-50-events-oct-4-7-2026-owc-data-of-2026-10-04)
-  - [1.5 The second site, 50 events Oct 8-11 2026 (checked 2026-10-08, PySyzygos 0.14.0)](#15-the-second-site-50-events-oct-8-11-2026-checked-2026-10-08-pysyzygos-0140)
+  - [1.2 Test site 1, Oct 2-9 2026 (16 events)](#12-test-site-1-oct-2-9-2026-16-events)
+  - [1.3 Test site 2, sets A and B (OWC data of 2026-10-02, events Oct 3-6 2026; checked 2026-10-03)](#13-test-site-2-sets-a-and-b-owc-data-of-2026-10-02-events-oct-3-6-2026-checked-2026-10-03)
+  - [1.4 Test site 2, 50 events Oct 4-7 2026 (OWC data of 2026-10-04)](#14-test-site-2-50-events-oct-4-7-2026-owc-data-of-2026-10-04)
+  - [1.5 Test site 2, 50 events Oct 8-11 2026 (checked 2026-10-08, PySyzygos 0.14.0)](#15-test-site-2-50-events-oct-8-11-2026-checked-2026-10-08-pysyzygos-0140)
 - [2. Against Occult's event plots: star positions](#2-against-occults-event-plots-star-positions)
 - [3. Against Occult's geodetic path: (3200) Phaethon, 2019-07-29](#3-against-occults-geodetic-path-3200-phaethon-2019-07-29)
 - [4. Internal and geometric checks](#4-internal-and-geometric-checks)
@@ -42,13 +43,13 @@ and are kept with their check output, so every check can be rerun with a later v
 - **Match:** same asteroid, time within 10 s; drops compared below 5 mag (above that both are total and differ only
   by the asteroid's estimated brightness), within 0.25 mag; durations within 10 % where both use the same diameter.
 
-### 1.2 The observer's site, Oct 2-9 2026 (16 events)
+### 1.2 Test site 1, Oct 2-9 2026 (16 events)
 
 20 km reach, G <= 15, 25 cm, 4 frames. All 16 found with the same stars; times within 5.4 s (13 within 3 s). Drops
 agree within 0.25 mag below 5 mag. Durations agree within 10 % wherever both use the same diameter; 4 events differ
 only by diameter (sizes from H, or OWC using another source than NEOWISE). 218001 is the open case (section 5).
 
-### 1.3 A second site, sets A and B (OWC data of 2026-10-02, events Oct 3-6 2026; checked 2026-10-03)
+### 1.3 Test site 2, sets A and B (OWC data of 2026-10-02, events Oct 3-6 2026; checked 2026-10-03)
 
 Two OWC filters: A = 25 km from shadow, G <= 15, 15 cm, 8 frames, min altitude 10 (6 events); B = 20 km, G <= 15,
 15 cm, 4 frames, min altitude 5 (10 events). Search: `owc-check` with the OWC filter and the Sun below -6. Pick:
@@ -79,7 +80,7 @@ stars. The B pick lists 30 events in Oct 1-7 against OWC's 10; the extras were n
 keeps an event if it CAN be observable: upper size bound, OWC applies the nominal size; e.g. 56450 passes 24 km from
 the site, inside our r_max + 20 km, outside OWC's 20 km from the nominal edge).
 
-### 1.4 The second site, 50 events Oct 4-7 2026 (OWC data of 2026-10-04)
+### 1.4 Test site 2, 50 events Oct 4-7 2026 (OWC data of 2026-10-04)
 
 20 km from shadow, G <= 16, min duration 0.2 s, 50 cm, 4 frames, min altitude 0; 9 twilight events.
 
@@ -154,7 +155,7 @@ distance of the site from the centre line; OWC-implied diameter = OWC's duration
 | ✅ | (589) Croatia | 2026-10-05 09:31:41 | +0.4 | 15.71 | 0.41 / 0.35 | 7.40 / 6.81 | 93.62 / 86.18 | 20.1 | match |
 | ✅ | (1336) Zeelandia | 2026-10-06 05:18:23 | +0.1 | 15.90 | 0.47 / 0.46 | 3.92 / 3.94 | 21.44 / 21.54 | 8.7 | match |
 
-### 1.5 The second site, 50 events Oct 8-11 2026 (checked 2026-10-08, PySyzygos 0.14.0)
+### 1.5 Test site 2, 50 events Oct 8-11 2026 (checked 2026-10-08, PySyzygos 0.14.0)
 
 Same filter as 1.4 (20 km from shadow, G <= 16, min duration 0.2 s, 50 cm, 4 frames, min altitude 0); 9 twilight
 events. **44 of 50 match**:
@@ -251,7 +252,7 @@ moved by 1.55 mas (predicted 1.54), and Occult's printed position minus ours (Ga
 Occult's "astrometric" place) went from 4.52 mas to 0.90 mas, within Occult's 1-sigma; the rest may be Occult's star
 catalog or its propagation (to ask the IOTA experts).
 
-**30819 (Oct 11 2026 at the observer's site, elongation 164 deg, control case near opposition).** Occult
+**30819 (Oct 11 2026 at Test site 3, elongation 164 deg, control case near opposition).** Occult
 4.2025.6.12, JPL#55 orbit: 1-sigma (4.0 x 0.5) mas in PA 76, diameter 5.8 +/- 0.6 km; star TYC 0041-00123-1 = Gaia DR3
 2514569868519950720 (G 9.67, parallax 3.339 mas). PySyzygos 0.10.0 (parallax 0.944 mas, deflection 0.008 mas
 applied): offset 2.08 km (2.69 km before), the same time within 0.04 s.
@@ -516,7 +517,7 @@ against the shadow's motion (direction -0.60, +0.80 in the plane), so it is a pu
 
 (Across ranges with the star above 20 deg for the first two rows, all points for the last.) Open: the 11 ms along the
 track. The regression against OWC (section 1, rerun 2026-10-16 with the sites the lists were made for) is unchanged:
-the observer's site 15 of 16 (only 218001's drop, as before), the second site 45 of 50 (69085 now found through the
+Test site 1 15 of 16 (only 218001's drop, as before), Test site 2 45 of 50 (69085 now found through the
 supplement); |time - OWC| median 0.70 s and 0.45 s, the same as with 1.1.0. The fix moves those events' times by
 -0.32 to +0.18 s and their paths' distance from the site by up to 0.38 km, below what separates PySyzygos from OWC
 anyway (other orbits; OWC times to 0.1 s).
@@ -533,7 +534,7 @@ anyway (other orbits; OWC times to 0.1 s).
 - **Pick screen** (blind, 465k asteroids, Oct 1 + 8 d, 20 km reach): all 13 OWC reference events with H < 17 among its
   39 events; the 14th (819762, H 18.45) with `--all`; times within 5 s, drops and durations as the search.
 - **Orbits of the pick** (integrated from SBDB elements): 102 asteroids against JPL Horizons, worst 0.01".
-- **Pre-screens** (0.16.0, 2026-10-10; `ABOUT.md` 3.7), all at the observer's site unless stated:
+- **Pre-screens** (0.16.0, 2026-10-10; `ABOUT.md` 3.7), all at Test site 2 unless stated:
   - Region pre-screen (500 km around the site, Oct 10 + 20 d, built with the first version): the pick with it found
     38 of the full pick's 39 events, identical in star and time (0.0 s), screening 10273 of 464740 asteroids in
     ~10 s. The 39th lay 19 min after the window end, beyond the build's orbit grid; the grid now reaches 12 h beyond.
@@ -649,8 +650,7 @@ light time from each observer all fixed or added; sections 3 and 4).
   deflection (the star's and the asteroid's, star minus asteroid), JPL Horizons orbits (Occult's osculating elements
   at mid-event and PySyzygos's integrated SPK agree to 8 mm over the event), UT1 - UTC from IERS, a WGS84 path at
   height 0 ("at MSL" in Occult; the geoid's tens of metres are below what was resolved).
-- **Times against OWC** agree within a few seconds (mostly under 2 s; rerun 2026-10-16: median 0.70 s at the
-  observer's site, 0.45 s at the second site, unchanged by the fixes above, which move times by tenths of a second
+- **Times against OWC** agree within a few seconds (mostly under 2 s; rerun 2026-10-16: median 0.70 s at Test site 1, 0.45 s at Test site 2, unchanged by the fixes above, which move times by tenths of a second
   and paths by up to 0.4 km). Larger differences are small asteroids (under ~3 km): 2 to 9 s for six of them and
   17 s for 281158 (H 17.9) in section 1.4, 4.5 s for 86427 in 1.5. That is the along-track part of the orbit
   difference between JPL Horizons and OWC's orbits.

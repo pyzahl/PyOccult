@@ -210,7 +210,7 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   setGPSLocation(site) -> setLocalTime (KStars local time: re-read `tz` from location(), it follows DST of the shown
   date) -> setRaDecJ2000 (RA in hours) -> setTracking -> setApproxFOV. `set_location` (GUI Results checkbox,
   `KSTARS_OPT`): move KStars to the site (message names the old place) or keep it (warn if > 50 km). KStars ignores
-  the tz passed to setGPSLocation and picks its own (Long Island got -6): label only, UT is right. GUI routes `/api/kstars/status|show`; the report's
+  the tz passed to setGPSLocation and picks its own (a US Eastern-time site got -6): label only, UT is right. GUI routes `/api/kstars/status|show`; the report's
   hidden `.ksbtn` buttons appear only if the status call succeeds (not from file://). Verified with KStars 3.6.2.
 - `pysyzygos/exports.py` (2026-10-08): GUI CSV downloads. Columns from `csv_exports.py` in HOME (template
   `templates/csv_exports.py`, copied at first use; user EXPORTS dict per table over the template's): lists of
@@ -254,7 +254,8 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   adding sets there; never delete them.
 - `VERIFICATION.md` (2026-10-08): all validation (OWC sets, Occult star positions, internal/geometric checks, what the
   differences mean); ABOUT Part 5 is a summary with a link. New OWC reference sets: add the numbers there (sites
-  unnamed: "the observer's site", "a second site") and the details to `owc_refs/README.md` Full lists:
+  unnamed: "Test site 1", "Test site 2", "Test site 3", ...; the key to the real sites only in owc_refs/README.md)
+  and the details to `owc_refs/README.md` Full lists:
   `pysyzygos owc-check --markdown <set>.list.md` (`--compare-only --hits <saved csv>` for a stored run); markers ✅ 🟠
   (|dt| > WARN_T 1.5 s) 🔴 🔵.
 - `pysyzygos/cleanup.py` (`pysyzygos cleanup`, 2026-10-11): deletes downloads, PySyzygos's own cache files
@@ -306,8 +307,8 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   in chunks (50 events / 1000 source_ids, far below the cap; a chunk reaching 2000 rows is reported), because the
   async job's status polling hung for minutes in 2026-10 while sync answered in ~5 s.
 - GUI numbers always with the decimal point: Firefox localises `type=number` inputs by the element's/page's `lang`
-  (no lang: the browser locale, German -> "46,99023"). gui.main: head script `document.documentElement.lang='en'`,
-  `ui.number.default_props("lang=en")`, `ui.run(language="en-US")`; paste: a single "46,99023" -> "46.99023".
+  (no lang: the browser locale, German -> "45,12345"). gui.main: head script `document.documentElement.lang='en'`,
+  `ui.number.default_props("lang=en")`, `ui.run(language="en-US")`; paste: a single "45,12345" -> "45.12345".
   Verified 2026-10-12 (Firefox lang=de shows a comma, lang=en a point; CDP: all number inputs lang=en).
 - Console output must never crash on a character: `__main__.safe_console()` sets stdout/stderr `errors="replace"`
   (Windows cp1252 consoles crashed on "✅", 2026-10-11); GUI runs get PYTHONUTF8=1 / PYTHONIOENCODING=utf-8 (the log

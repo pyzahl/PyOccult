@@ -433,7 +433,7 @@ and tests only the events whose box can reach it: 14-26 % of the events at the s
 site over 20 days (the 39th, 19 min after the window, is why the grid now reaches beyond it); whole Earth, 4 days,
 all asteroids with H < 17: the pick with it gave the same 12 events as the full pick (14 s against 210 s); the site
 test kept 40 of 2039 asteroids including all 39 with events; the index and the region test never dropped an event the
-exact site test keeps (the observer's site at three settings, 20 random sites in a 500 km box, sites in Iceland,
+exact site test keeps (Test site 2 at three settings, 20 random sites in a 500 km box, sites in Iceland,
 Sydney, Svalbard and Tierra del Fuego).
 
 **Storage.** Region pre-screens: one SQLite file (`events`: number, star, Earth-centre time, G, asteroid magnitude,
@@ -472,7 +472,7 @@ supplement) took at most ~5 min; a 30-day whole-Earth pre-screen with the supple
 of 40 targets for 20 days 94.5 s (start-up 13.5 + asteroid data 38.5 + search 24.7 s).
 
 Split into phases (the pick prints `timing: total … = start-up + asteroid list + kernels + pre-screen + screen +
-output`), on the author's desktop, Camp, 6 days, G <= 13, 4 workers, warm caches (cold in brackets):
+output`), on the author's desktop, Test site 2, 6 days, G <= 13, 4 workers, warm caches (cold in brackets):
 
 | Phase | Full pick | Pick with a whole-Earth pre-screen |
 |---|---|---|
@@ -706,7 +706,7 @@ shrinks.
   includes light deflection (to be confirmed); then OWC paths of events away from opposition would differ from ours
   by the amounts above.
 
-**Real events.** For an OWC search at the second site (50 events, Oct 4-7 2026, with twilight events) the expected
+**Real events.** For an OWC search at Test site 2 (50 events, Oct 4-7 2026, with twilight events) the expected
 shift was computed for every event: 16556 at elongation 65 deg (morning twilight) 4.6 km, 22336 at 79 deg (evening
 twilight) 3.1 km, four events at 87-92 deg about 2.3 km, and below 0.1 km from elongation 150 deg on. So it is not
 only twilight: events around elongation 90 deg in the dark evening or morning sky shift by about 2 km. These are the

@@ -135,9 +135,9 @@ in the GUI, pick timings, and a debug file of each event's geodetic path.
   updating the supplement's proper motions; all setup options in one table.
 
 ### Fixed
-- GUI number fields always use the decimal point (46.99023): Firefox formatted them by the browser's language
-  (German: 46,99023), unlike the values, logs and reports. The page now declares English (`lang`) and every number
-  field carries `lang="en"`; a pasted number with a decimal comma (46,99023) is converted.
+- GUI number fields always use the decimal point (45.12345): Firefox formatted them by the browser's language
+  (German: 45,12345), unlike the values, logs and reports. The page now declares English (`lang`) and every number
+  field carries `lang="en"`; a pasted number with a decimal comma (45,12345) is converted.
 - (4089) Galbraith on 2026-10-13: a predicted "hit" 1.6 km from a site was on a G 9.8 2-parameter Gaia star (a
   resolved double, no proper motion) whose 2016 position was used unchanged; OWC put the path over 100 km away. With
   UCAC5's proper motion the path lies 206 km away (±27 km); without a proper motion the event is now shown with its
@@ -514,7 +514,7 @@ satellites, earlier occultations; plus the camera list, the data folder setting 
   (the rerun fetches it) and stops early when the first files all fail.
 - Pick tool: events near sunrise or sunset (or near the altitude limit) could be lost. A candidate was kept only if
   the asteroid was visible at the sample of its Earth-centre time estimate, but the event at the site can be 10-40 min
-  from it (e.g. 539175 on 2026-10-09: estimate 06:00 UT with the Sun at +4 deg at Seewis, real event 05:26 UT with
+  from it (e.g. 539175 on 2026-10-09: estimate 06:00 UT with the Sun at +4 deg at Test site 3, real event 05:26 UT with
   the Sun at -1.6 deg). A candidate is now kept if the asteroid is visible anywhere in its solver window, as in the
   search; the exact star and Sun altitude at the solved time are checked as before.
 - GUI Site tab: after picking a second MPC observatory, the proposed site name kept the first one, so **Add site**
