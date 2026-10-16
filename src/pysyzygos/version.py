@@ -6,7 +6,9 @@ existing files or results (and update CITATION.cff's version with it). The code 
 Every version increase gets its entry in CHANGELOG.md.
 """
 __version__ = "1.1.0"
-__codename__ = "New Horizons"      # JPL Horizons orbits; and New Horizons' target Arrokoth was first shaped by occultations
+__codename__ = "Beyond Horizons"   # since 1.1.0 (before: "New Horizons", JPL Horizons orbits; New Horizons' target
+                                   # Arrokoth was first shaped by occultations): still JPL Horizons orbits, now with the
+                                   # astrometry checked beyond them against Occult, whole paths across the globe
 __author__ = "Percy Zahl (pyzahl)"
 __copyright__ = "(C) 2026 Percy Zahl"
 __license__ = "GPL-3.0-or-later"

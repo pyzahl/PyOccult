@@ -6,13 +6,15 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
-## [1.1.0] "New Horizons" - 2026-10-15
+## [1.1.0] "Beyond Horizons" - 2026-10-15
 
 More accurate paths, found in a whole-path comparison with Occult ((3200) Phaethon 2019-07-29, VERIFICATION.md
 section 3): the light deflection of the asteroid is now computed with the formula for a source at a finite distance
 (it was off by up to ~1 km across the track, most near opposition), and Gaia's proper motions of bright stars are
 corrected for their known bias. Also: paths that were cut off at one end are complete, and twilight events of bright
 stars are kept and marked (default Sun limit 0 deg).
+New code name "Beyond Horizons" (before: "New Horizons"): the orbits still come from JPL Horizons, and the
+astrometry is now checked beyond them, whole paths across the globe against an independent program.
 
 ### Added
 - **Twilight mark**: events with the Sun above -12 deg at the site get "☼ −8°" next to the star magnitude (Results

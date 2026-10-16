@@ -33,7 +33,7 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
 - `pysyzygos/config.py`: loader. Runs `templates/pysyzygos_config.py` (defaults), then the user's `HOME/pysyzygos_config.py`
   (gitignored; copied from the template if missing) into this module's globals, so older user files get new keys.
   Puts HOME on sys.path (sites.py, targets.py) and templates/ (sites_example for old config copies).
-- `pysyzygos/version.py`: the one place for `__version__` and `__codename__` ("New Horizons"; changes at major
+- `pysyzygos/version.py`: the one place for `__version__` and `__codename__` ("Beyond Horizons" since 1.1.0, before "New Horizons"; changes at major
   milestones), `__author__`, `__copyright__`, `__license__`, `__url__` (GUI About box). Releases: GitHub tag `vX.Y.Z` (matching
   `__version__`) -> Zenodo DOI automatically; concept DOI 10.5281/zenodo.23149371 (README badge, CITATION.cff `doi`);
   v1.0.0 (first as PySyzygos) = 10.5281/zenodo.23381498; Zenodo followed the GitHub rename by itself.
