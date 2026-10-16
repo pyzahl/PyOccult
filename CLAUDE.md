@@ -38,6 +38,7 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   `__version__`) -> Zenodo DOI automatically; concept DOI 10.5281/zenodo.23149371 (README badge, CITATION.cff `doi`);
   v1.0.0 (first as PySyzygos) = 10.5281/zenodo.23381498; Zenodo followed the GitHub rename by itself.
   v1.1.0 = 10.5281/zenodo.23407110 (2026-10-16; the webhook timed out while Zenodo was down, archived later).
+  v1.2.0 was released as tag `v1.2.01` (2026-10-16; tag v1.2.0 points one commit too early, at 1.1.1 code).
   Every version increase gets a
   `CHANGELOG.md` entry (Keep a Changelog style, newest first) (semver; keep CITATION.cff `version` and the README line in step);
   every module imports it, tools have `--version`, GUI header, run summary/report, picks and favorites record it.

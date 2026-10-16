@@ -6,6 +6,8 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [1.2.0] "Beyond Horizons" - 2026-10-16
 
+Released as tag `v1.2.01`: the tag `v1.2.0` was set one commit too early (still version 1.1.1, without the globe fix).
+
 ### Added
 - **Offline use** (GUI tab **System**, `pysyzygos offline on|off|copy|status|remove`): copies of the pick's asteroid
   list (compressed, 103 MB -> 34 MB for H < 17), of the searches' orbit files and of the size cache in the data
@@ -709,7 +711,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
-[1.2.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.2.0
+[1.2.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.2.01
 [1.1.1]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.1
 [1.1.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.0.0
