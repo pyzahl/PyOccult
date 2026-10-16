@@ -17,7 +17,7 @@ during an occultation. Up to version 0.18 it was called PyOccult.
 - [Part 1: The tools and how they fit together](#part-1-the-tools-and-how-they-fit-together)
 - [Part 2: The prediction (pysyzygos/search.py)](#part-2-the-prediction-pysyzygossearchpy)
   - [2.1 Pipeline (corridor mode, the default)](#21-pipeline-corridor-mode-the-default)
-  - [2.2 Fundamental (Besselian) plane: besselian_offsets](#22-fundamental-besselian-plane-besselian_offsets)
+  - [2.2 Fundamental (Besselian) plane, frames and time scales: besselian_offsets](#22-fundamental-besselian-plane-frames-and-time-scales-besselian_offsets)
   - [2.3 Star magnitude cap and corridor width: plan_corridor](#23-star-magnitude-cap-and-corridor-width-plan_corridor)
   - [2.4 Local Gaia catalog: pysyzygos/gaia_local.py](#24-local-gaia-catalog-pysyzygosgaia_localpy)
   - [2.5 Candidate scan: find_candidates](#25-candidate-scan-find_candidates)
@@ -86,17 +86,17 @@ own copies of map and preview).
 The old `"windows"` mode (`search_mode = "windows"`) queries the Gaia archive per hourly window instead. It is kept for
 comparison; it shares the per-star solve and checks (`handle_star`).
 
-### 2.2 Fundamental (Besselian) plane: `besselian_offsets`
+### 2.2 Fundamental (Besselian) plane, frames and time scales: `besselian_offsets`
 
-- Axes in J2000: **z** = unit vector to the star; **x** = (0,0,1) × z, normalised (east); **y** = z × x (north).
-- **Reference frame: ICRS/ICRF throughout.** "J2000" is SPICE's name for its inertial frame, which NAIF treats as the
+- **Axes:** in J2000, **z** = unit vector to the star; **x** = (0,0,1) × z, normalised (east); **y** = z × x (north).
+- **Reference frame:** ICRS/ICRF throughout. "J2000" is SPICE's name for its inertial frame, which NAIF treats as the
   ICRF (the ~20 mas frame bias of the old FK5 J2000 is not applied anywhere). JPL's ephemerides (DE440, Horizons SPK
   files) are ICRF-aligned, and Gaia DR3 positions are ICRS (Gaia-CRF3) at the reference epoch J2016.0: stars are moved
   by their proper motion from 2016.0 to the event date (plus parallax and light deflection, see "Gravitational light
   deflection and stellar parallax" in Part 6), so star and asteroid
   directions share one frame. "J2000.0" as a time is only the origin of ET (2000-01-01 12:00 TDB). Apparent positions
   (TETE, true equator and equinox of date) appear only in displays (favorites, globe).
-- **Time scales.** The computation runs in TDB (SPICE's ET); UTC appears only at input and output, converted with
+- **Time scales:** the computation runs in TDB (SPICE's ET); UTC appears only at input and output, converted with
   NAIF's leap-second kernel `naif0012.tls` (all leap seconds to the last one, end of 2016: TAI - UTC = 37 s). The
   Earth's rotation does not come from UTC: NAIF's Earth orientation file holds IERS's measured UT1 and polar motion
   against atomic time (the same model as Occult: UT1 from IERS EOP data since 1962, polar motion since 1846). So the
@@ -107,13 +107,13 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   `naif0012.tls` by name; and the report's `alt_az` (altitude and compass direction for records without them, display
   only) takes UT1 as UTC, which is under 0.01 deg off today and would reach ~0.25 deg after a century without leap
   seconds.
-- Observer: `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), fixed in ITRF93.
+- **Observer:** `georec(lon, lat, alt_km, a, f)` with the WGS84 ellipsoid (`pysyzygos/earth.py`), fixed in ITRF93.
   Longitude east-positive, geodetic, radians. The height is above the ellipsoid: sites.py's `ele` (above mean sea
   level) plus `geoid_m`, the EGM96 geoid's height there (`geoid.py`, a 0.5 deg grid; filled in when a site is saved),
   unless the site's height is above the ellipsoid already (`ele_ref="ellipsoid"`, e.g. MPC codes). Before
   2026-10-16 `ele` was used as an ellipsoid height, off by the geoid (-107 to +85 m; for the test sites -32 to +48 m),
   which moves the path relative to the site by that over tan(star altitude).
-- Asteroid as the observer sees it: `spkcpo(target, et, 'J2000', 'OBSERVER', 'CN', site_itrf, '399', 'ITRF93')`, the
+- **Asteroid as the observer sees it:** `spkcpo(target, et, 'J2000', 'OBSERVER', 'CN', site_itrf, '399', 'ITRF93')`, the
   asteroid at et minus the light time from the observer (not from the Earth's centre), relative to the observer at et.
   `CN` is converged light time without stellar aberration: astrometric, like Gaia positions. Aberration is left out
   on purpose: it shifts the star and the asteroid by the same amount, so the occultation condition (both in the same
@@ -124,7 +124,7 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   direction). The path lines (`paths.shadow_path`) apply the same per ground point. Elsewhere (scans, pick,
   pre-screens) the asteroid is geocentric, `spkpos(target, et, 'J2000', 'CN', '399')` (399 = the Earth's centre;
   3 would be the Earth-Moon barycentre); their margins are many km.
-- Offsets `(dx, dy)` = the first two components of `M @ (r_asteroid - r_observer)` (that `spkcpo` vector), km east and
+- **Offsets:** `(dx, dy)` = the first two components of `M @ (r_asteroid - r_observer)` (that `spkcpo` vector), km east and
   north. Miss distance = `hypot(dx, dy)`.
 
 ### 2.3 Star magnitude cap and corridor width: `plan_corridor`
