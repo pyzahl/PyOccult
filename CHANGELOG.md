@@ -15,6 +15,7 @@ corrected for their known bias. Also: paths that were cut off at one end are com
 stars are kept and marked (default Sun limit 0 deg).
 New code name "Beyond Horizons" (before: "New Horizons"): the orbits still come from JPL Horizons, and the
 astrometry is now checked beyond them, whole paths across the globe against an independent program.
+Zenodo: doi:10.5281/zenodo.23407110 (this release; all versions: 10.5281/zenodo.23149371).
 
 ### Added
 - **Twilight mark**: events with the Sun above -12 deg at the site get "☼ −8°" next to the star magnitude (Results
