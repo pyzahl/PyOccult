@@ -446,6 +446,34 @@ combinations as well as with Gaia + the asteroid-relative deflection without par
 Preston's own code replicating Occult's paths (star and asteroid positions, fundamental-plane track, geodetic track)
 is to settle these step by step.
 
+**The whole path with PySyzygos 1.1.0** (both corrections; star direction RA 80.22803602, Dec 40.88482549 deg; regular
+search at the same test site: 11:19:35.003 UT, 0.46 km from the centre line). Same points as the first table
+(Occult minus PySyzygos; across: positive to the left of the motion):
+
+| UT | Star alt | Across (km) | Along (km) | Along (s) | Path width Occult / ours (km) | In the plane x, y (km) | (mas) |
+|---|---|---|---|---|---|---|---|
+| 11:03:39.82 | 4 | +0.030 | +1.045 | +0.007 | 37.09 / 44.11 | -0.077, +0.049 | -0.11, +0.07 |
+| 11:04:21.98 | 21 | +0.185 | -0.070 | -0.003 | 8.06 / 9.69 | -0.159, -0.066 | -0.23, -0.10 |
+| 11:06:28.44 | 42 | +0.326 | +0.024 | +0.002 | 6.01 / 7.41 | -0.299, -0.094 | -0.43, -0.14 |
+| 11:08:34.90 | 54 | +0.391 | +0.095 | +0.008 | 5.68 / 7.05 | -0.374, -0.097 | -0.54, -0.14 |
+| 11:10:41.36 | 62 | +0.447 | +0.158 | +0.014 | 5.54 / 6.92 | -0.436, -0.103 | -0.63, -0.15 |
+| 11:12:47.83 | 65 | +0.453 | +0.122 | +0.011 | 5.51 / 6.89 | -0.392, -0.166 | -0.57, -0.24 |
+| 11:14:54.29 | 61 | +0.449 | +0.199 | +0.017 | 5.57 / 6.94 | -0.407, -0.141 | -0.59, -0.20 |
+| 11:17:00.75 | 51 | +0.397 | +0.269 | +0.021 | 5.65 / 7.10 | -0.375, -0.103 | -0.54, -0.15 |
+| 11:19:07.21 | 37 | +0.278 | +0.332 | +0.020 | 6.10 / 7.61 | -0.282, -0.044 | -0.41, -0.06 |
+| 11:20:31.52 | 23 | +0.210 | +0.462 | +0.018 | 7.46 / 9.19 | -0.223, -0.017 | -0.32, -0.03 |
+| 11:21:22.40 | 3 | +0.038 | +0.294 | +0.002 | 38.04 / 45.35 | -0.030, -0.019 | -0.04, -0.03 |
+
+All 732 points: across +0.030 to +0.471 km (mean +0.353), along -0.004 to +0.027 s (mean +0.013 s), largest
+distance 1.06 km (at the ends, where the ground speed is highest). With the star above 20 deg (681 points): across
++0.167 to +0.471 km (mean +0.371), largest distance 0.64 km. Fit in the plane: constant offset x -0.343 km
+(-0.50 mas), y -0.081 km (-0.12 mas), rms 70 m; with an Earth-rotation term x -0.276, y -0.102 km, UT1 -202 ms,
+rms 66 m. Compared with 1.0.0 (first table) the difference across the track is about 0.25 km smaller everywhere and
+the time difference is a third. The remaining offset in the plane is not quite constant along the track: -0.04 to
+-0.11 mas at the two ends (star at 3-4 deg) and -0.54 to -0.63 mas in the middle (star at 54-65 deg); with
+1.0.0 it was -0.6 at the ends and -1.2 in the middle. Open, for the step-by-step comparison with Steve Preston's
+code.
+
 ---
 
 ## 4. Internal and geometric checks
