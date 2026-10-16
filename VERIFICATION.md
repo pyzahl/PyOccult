@@ -516,7 +516,7 @@ against the shadow's motion (direction -0.60, +0.80 in the plane), so it is a pu
 
 (Across ranges with the star above 20 deg for the first two rows, all points for the last.) Open: the 11 ms along the
 track. The regression against OWC (section 1, rerun 2026-10-16 with the sites the lists were made for) is unchanged:
-Rocky Point 15 of 16 (only 218001's drop, as before), the second site 45 of 50 (69085 now found through the
+the observer's site 15 of 16 (only 218001's drop, as before), the second site 45 of 50 (69085 now found through the
 supplement); |time - OWC| median 0.70 s and 0.45 s, the same as with 1.1.0. The fix moves those events' times by
 -0.32 to +0.18 s and their paths' distance from the site by up to 0.38 km, below what separates PySyzygos from OWC
 anyway (other orbits; OWC times to 0.1 s).
