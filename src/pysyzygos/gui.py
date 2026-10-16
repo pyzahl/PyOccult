@@ -574,6 +574,13 @@ def index():
                         ui.upload(label="Load listing .txt", auto_upload=True, on_upload=lambda e: pc_upload(e)).props(
                             "accept=.txt dense flat").classes("w-64")
                         ui.button("Compare", on_click=lambda: pc_compare()).props("color=primary")
+                        ui.button("Step by step", on_click=lambda: pc_steps()).props("outline").tooltip(
+                            "The event step by step from our path: the star from the Gaia catalog through every "
+                            "correction (with its amount), the asteroid, the resulting vectors and the Besselian "
+                            "elements at the shadow's touch-down, centre and leaving, and the geodetic points then")
+                    with ui.expansion("Step-by-step data (catalog, corrections, vectors, Besselian elements)").classes(
+                            "w-full") as f_pc_steps:
+                        f_pc_steps_md = ui.markdown().classes("w-full text-sm")
                 f_pc.set_visibility(bool(pc_chk.value))
                 pc_chk.on_value_change(lambda e: (f_pc.set_visibility(bool(e.value)), save_ui_state(path_check=bool(e.value))))
             f_detail.set_visibility(False)
@@ -1272,6 +1279,8 @@ def index():
                                                          if pc_newest('compare_*.md') else ""))
         except (OSError, ValueError, TypeError):
             f_pc_info.text = "Our path: not computed yet (Compute our path first)."
+        st = pc_newest("steps_*.md")
+        f_pc_steps_md.content = open(st, encoding="utf-8").read() if st else "*Not computed yet: Step by step.*"
 
     async def pc_run():
         if not fav_cur["key"]:
@@ -1327,6 +1336,20 @@ def index():
             else:
                 ui.notify("The comparison failed: see the log", type="negative")
         await run_process(PYSYZYGOS + ["path-check", "compare", fav_cur["key"], lp, "--header", hp], log, on_done=done)
+
+    async def pc_steps():
+        if not fav_cur["key"]:
+            return
+        if not os.path.isfile(os.path.join(pc_dir(), "path.npz")):
+            ui.notify("Compute our path first", type="warning")
+            return
+        async def done(rc):
+            pc_refresh()
+            if rc == 0:
+                f_pc_steps.open()
+            else:
+                ui.notify("Step by step failed: see the log", type="negative")
+        await run_process(PYSYZYGOS + ["path-check", "steps", fav_cur["key"]], log, on_done=done)
 
     async def pc_keep():
         if fav_cur["key"]:

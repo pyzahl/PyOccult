@@ -7,6 +7,13 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- **Path verification, step by step** (`pysyzygos path-check steps`, GUI: *Step by step* in the Favorites' path
+  verification): the event from our side, stage by stage, for comparing with another program's own steps (asked for
+  by Steve Preston): the star from the catalog through every correction with its amount, the asteroid (geocentric,
+  barycentric, light time, its own deflection), the resulting vectors, the Besselian elements (ICRF axes and axes of
+  date; d, mu, UT1 - UTC) at the shadow's touch-down, centre and leaving, and the geodetic points. *Compute our
+  path* now removes the target's cached orbit files first, so it really uses today's orbit (the search reuses a
+  cached orbit file of the same name however old it is).
 - **Leap seconds:** the newest local leap-second kernel (naifNNNN.tls) is used, and NAIF's leap-second directory is
   checked with the weekly Earth orientation refresh: should a last leap second come before leap seconds end
   (2027-05-20), its new file is fetched by itself (`kernels.lsk_file`, `refresh_lsk`; `.lsk_checked`; offline:

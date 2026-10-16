@@ -243,6 +243,15 @@ def run(key, folder=None):
               results_db=os.path.join(work, "check.db"), hits_output_cvs_file=os.path.join(work, "hits.csv"),
               results_new_series=True, gaia_online_check=False)
     env = dict(os.environ, PYSYZYGOS_HOME=home.HOME)
+    # a fresh orbit: the search reuses a cached orbit file of the same name however old it is, so remove this
+    # asteroid's cached files first (the search then downloads today's from JPL Horizons) and keep only the new one
+    tid = str(r["target_id"])
+    from pysyzygos.report import file_id
+    pats = [f"PySyzygos_asteroid_{tid}_*.bsp", f"PySyzygos_body_{file_id(tid)}*.bsp"]
+    for p in pats:
+        for f in glob.glob(os.path.join(config.cache_path, p)):
+            os.remove(f)
+    t_start = time.time()
     print(f"path-check: search for {r.get('target_name', r['target_id'])} around {r['best_utc']} (fresh orbit)", flush=True)
     rc = subprocess.run([sys.executable, "-u", "-m", "pysyzygos", "run", "search", json.dumps(ov)], env=env).returncode
     if rc != 0:
@@ -256,14 +265,14 @@ def run(key, folder=None):
         raise SystemExit("the search did not find this event again (other star or time): see its output above")
     best = min(found)[1]
     shutil.copyfile(best, os.path.join(out, "path.npz"))
-    tid = str(r["target_id"])
-    from pysyzygos.report import file_id
-    pats = [f"PySyzygos_asteroid_{tid}_*.bsp", f"PySyzygos_body_{file_id(tid)}*.bsp"]
     for old in glob.glob(os.path.join(out, "*.bsp")):
         os.remove(old)
     for p in pats:
         for f in glob.glob(os.path.join(config.cache_path, p)):
-            shutil.copyfile(f, os.path.join(out, os.path.basename(f)))
+            if os.path.getmtime(f) >= t_start - 1:               # downloaded by this run only
+                shutil.copyfile(f, os.path.join(out, os.path.basename(f)))
+    if not glob.glob(os.path.join(out, "*.bsp")):
+        raise SystemExit("no orbit file was downloaded by this run (see its output above)")
     z = np.load(os.path.join(out, "path.npz"), allow_pickle=False)
     meta = dict(key=key, target_id=tid, target_name=str(z["target_name"]), star=str(z["star"]),
                 best_utc=str(z["best_utc"]), version=str(z["version"]), run_utc=time.strftime("%Y-%m-%d %H:%M", time.gmtime()),
@@ -407,6 +416,240 @@ def export(out, step=1.45):
     return "\n".join(L) + "\n"
 
 
+# ----------------------------------------------------------------------------------------------- step by step
+EARTH_A = 6378.137                                           # km, WGS84 equatorial radius (Besselian x, y unit)
+
+
+def _radec(v):
+    v = np.asarray(v, float)
+    r = np.linalg.norm(v)
+    return math.degrees(math.atan2(v[1], v[0])) % 360.0, math.degrees(math.asin(v[2] / r))
+
+
+def _hms(ra_deg, nd=5):
+    h = ra_deg / 15.0
+    a, b = divmod(h * 3600.0, 3600.0)
+    m, s_ = divmod(b, 60.0)
+    return f"{int(a):02d}h{int(m):02d}m{s_:0{3 + nd}.{nd}f}s"
+
+
+def _dms_s(dec_deg, nd=4):
+    sg = "-" if dec_deg < 0 else "+"
+    a = abs(dec_deg) * 3600.0
+    d, r = divmod(a, 3600.0)
+    m, s_ = divmod(r, 60.0)
+    return f"{sg}{int(d):02d}°{int(m):02d}'{s_:0{3 + nd}.{nd}f}\""
+
+
+def _shift_mas(a, b):
+    """b - a as (RA x cos Dec, Dec) in mas, for two unit vectors."""
+    ra1, de1 = _radec(a)
+    ra2, de2 = _radec(b)
+    dra = ((ra2 - ra1 + 180.0) % 360.0 - 180.0) * math.cos(math.radians(de1))
+    return dra * 3.6e6, (de2 - de1) * 3.6e6
+
+
+def steps(out, folder_key=None):
+    """The event step by step (pathcheck folder `out`): the star from the catalog through every correction (amounts),
+    the asteroid (geocentric, barycentric, its own deflection), the resulting vectors and the Besselian elements (ICRF
+    axes and axes of date, d, mu) at the shadow axis's touch-down on the Earth, its closest approach to the Earth's
+    centre and its leaving, and the geodetic centre-line points then. Returns (markdown, data dict)."""
+    import erfa
+    from scipy.optimize import brentq, minimize_scalar
+    from pysyzygos import astrometry as A, config, corridor, gaia_local, paths, starrv
+    spice, z, tid = _load(out)
+    meta = json.load(open(os.path.join(out, "meta.json")))
+    star_used = np.asarray(z["star_dir"], float)
+    r_km, s3 = float(z["r_km"]), float(z["sigma3_km"])
+    x_ax, y_ax, z_ax = paths.plane_basis(star_used)
+
+    def axis_xy(et):
+        a = np.asarray(spice.spkpos(tid, et, "J2000", "CN", "399")[0])
+        return np.array([a @ x_ax, a @ y_ax])
+
+    # the three instants: closest approach to the Earth's centre, touch-down and leaving of the centre line
+    et_best = float(z["best_et"])
+    res = minimize_scalar(lambda d: float(np.linalg.norm(axis_xy(et_best + d))), bounds=(-7200.0, 7200.0),
+                          method="bounded", options=dict(xatol=1e-3))
+    et_c = et_best + float(res.x)
+
+    def on_earth(et):
+        return bool(paths.shadow_path(tid, star_used, et, r_km, s3, half_span=0.0, step=1.0)["center"])
+
+    def edge(direction):
+        lo, step = et_c, 30.0
+        hi = lo + direction * step
+        while on_earth(hi) and abs(hi - et_c) < 4 * 3600:
+            lo, hi = hi, hi + direction * step
+        for _ in range(40):                                      # bisection to ~0.01 s
+            mid = 0.5 * (lo + hi)
+            lo, hi = (mid, hi) if on_earth(mid) else (lo, mid)
+            if abs(hi - lo) < 0.005:
+                break
+        return lo
+
+    instants = [("touch-down", edge(-1.0)), ("centre (closest to the Earth's centre)", et_c), ("leaving", edge(+1.0))]
+    utc = lambda et: spice.et2utc(et, "ISOC", 3)
+    tdb = lambda et: spice.timout(et, "YYYY-MM-DD HR:MN:SC.### ::TDB")
+
+    # ---- the star, at the centre instant: catalog, then each correction
+    gl = gaia_local.LocalGaia(config.gaia_local_dir)
+    ra0, de0 = float(z["star_ra"]), float(z["star_dec"])
+    cone = gl.cone(ra0, de0, 30.0 / 3600.0)
+    row = cone[cone.source_id.astype(str) == str(z["star"])]
+    if row.empty:
+        raise SystemExit(f"star {z['star']} not found in the local catalog {config.gaia_local_dir}")
+    row = row.iloc[[0]]
+    r0 = row.iloc[0]
+    cat = A.unit([math.cos(math.radians(r0.dec)) * math.cos(math.radians(r0.ra)),
+                  math.cos(math.radians(r0.dec)) * math.sin(math.radians(r0.ra)), math.sin(math.radians(r0.dec))])
+    t_c = utc(et_c)
+    vec = lambda df, col: A.unit([math.cos(math.radians(df[f"dec_{col}"].iloc[0])) * math.cos(math.radians(df[f"ra_{col}"].iloc[0])),
+                                  math.cos(math.radians(df[f"dec_{col}"].iloc[0])) * math.sin(math.radians(df[f"ra_{col}"].iloc[0])),
+                                  math.sin(math.radians(df[f"dec_{col}"].iloc[0]))])
+    tag = t_c[:10].replace("-", "")
+    p1 = vec(corridor.propagate_exact(row, t_c, pm_bias=False, rv=False), tag)
+    p2 = vec(corridor.propagate_exact(row, t_c, pm_bias=True, rv=False), tag)
+    p3 = vec(corridor.propagate_exact(row, t_c, pm_bias=True, rv=True), tag)
+    earth_ssb = np.asarray(spice.spkpos("399", et_c, "J2000", "NONE", "0")[0])
+    plx = float(r0.parallax) if r0.parallax == r0.parallax else 0.0
+    p4 = A.parallax_dir(p3, plx, earth_ssb) if plx > 0 else p3
+    ast_c = np.asarray(spice.spkpos(tid, et_c, "J2000", "CN", "399")[0])
+    defl_star, defl_ast = {}, {}
+    for b in ("10", "5", "6"):
+        body = np.asarray(spice.spkpos(b, et_c, "J2000", "CN", "399")[0])
+        defl_star[A.BODY_NAMES[b]] = A.deflect(p4, -body, p4, A.GM[b])
+        defl_ast[A.BODY_NAMES[b]] = A.deflect(p4, -body, A.unit(ast_c - body), A.GM[b])
+    p5 = A.unit(p4 + sum(defl_star.values()))
+    p6 = A.unit(p4 + sum(defl_star.values()) - sum(defl_ast.values()))
+    rv = float(starrv.rv_for([int(r0.source_id)])[0])
+    # of date (true equator and equinox): precession-nutation (IAU 2006/2000A, ERFA) and the Earth's rotation (UT1)
+    from astropy.time import Time
+    from astropy.utils import iers
+    iers.conf.auto_download = False
+
+    def of_date(et):
+        t = Time(utc(et), scale="utc")
+        rpn = erfa.pnm06a(t.tt.jd1, t.tt.jd2)
+        try:
+            ut1 = t.ut1
+            dut1 = float((ut1.jd1 - t.utc.jd1 + ut1.jd2 - t.utc.jd2) * 86400.0)
+        except Exception:                                        # no IERS data at hand: UT1 = UTC (stated)
+            ut1, dut1 = t.utc, float("nan")
+        gast = math.degrees(erfa.gst06a(ut1.jd1, ut1.jd2, t.tt.jd1, t.tt.jd2))
+        return rpn, gast, dut1
+
+    rpn_c, _, _ = of_date(et_c)
+    ap = None
+    try:                                                         # astropy's apparent place of date (with aberration)
+        from astropy.coordinates import SkyCoord, TETE, Distance
+        import astropy.units as u
+        sc = SkyCoord(ra=r0.ra * u.deg, dec=r0.dec * u.deg, distance=Distance(parallax=max(plx, 0.01) * u.mas),
+                      pm_ra_cosdec=float(r0.pmra) * u.mas / u.yr, pm_dec=float(r0.pmdec) * u.mas / u.yr,
+                      radial_velocity=rv * u.km / u.s, obstime=Time("2016-01-01T12:00:00", scale="tcb"), frame="icrs")
+        tt = sc.apply_space_motion(new_obstime=Time(t_c, scale="utc")).transform_to(TETE(obstime=Time(t_c, scale="utc")))
+        ap = (tt.ra.deg, tt.dec.deg)
+    except Exception:
+        pass
+
+    # ---- markdown
+    L = [f"# Step by step: {meta['target_name']} occults Gaia DR3 {z['star']}", "",
+         f"PySyzygos {__version__}; our path run {meta.get('run_utc')} UTC (PySyzygos {meta.get('version')}), orbit "
+         f"{meta.get('orbit') or '?'}; orbit files: {', '.join(os.path.basename(f) for f in sorted(glob.glob(os.path.join(out, '*.bsp'))))}. "
+         f"Frames: ICRF (SPICE 'J2000'); times UTC and TDB; Earth orientation ITRF93 (NAIF, IERS EOP); WGS84.", "",
+         "## 1. Instants", "", "| Instant | UTC | TDB | ET (s past J2000 TDB) |", "|---|---|---|---|"]
+    for name, et in instants:
+        L.append(f"| {name} | {utc(et)} | {tdb(et)} | {et:.3f} |")
+    L += ["", "Touch-down and leaving: the centre line (shadow axis) meets / leaves the WGS84 surface (height 0), with "
+          "each point's own light time (bisection to 0.01 s). Centre: the axis's closest approach to the Earth's centre.",
+          "", "## 2. The star (at the centre instant)", "",
+          "| Gaia DR3 catalog (epoch 2016.0 TCB) | |", "|---|---|",
+          f"| source_id | {int(r0.source_id)} |", f"| G | {float(r0.phot_g_mean_mag):.3f} |",
+          f"| RA, Dec | {float(r0.ra):.9f}°, {float(r0.dec):.9f}° ({_hms(float(r0.ra))} {_dms_s(float(r0.dec))}) |",
+          f"| parallax | {plx:.4f} mas |", f"| pmRA·cosDec, pmDec | {float(r0.pmra):.4f}, {float(r0.pmdec):.4f} mas/yr |",
+          f"| radial velocity | {rv:.3f} km/s" + (" (from data/gaia_dr3_rv_fast.npy)" if rv else " (not used: below the threshold or none)") + " |",
+          f"| kind, RUWE | {int(getattr(r0, 'star_kind', 0) or 0)} (0 = main catalog), {getattr(r0, 'ruwe', float('nan'))} |", "",
+          "| Step | RA | Dec | Shift by this step (RA·cosDec, Dec; mas) |", "|---|---|---|---|"]
+    prev = cat
+    for label, v in (("catalog position (2016.0)", cat), ("+ proper motion to the event (barycentric, ICRF)", p1),
+                     ("+ Gaia bright-star proper-motion bias", p2), ("+ radial velocity (perspective acceleration)", p3),
+                     ("+ stellar parallax (geocentric)", p4), ("+ the star's own light deflection (Sun, Jupiter, Saturn)", p5)):
+        ra_, de_ = _radec(v)
+        sx, sy = _shift_mas(prev, v)
+        L.append(f"| {label} | {ra_:.9f}° ({_hms(ra_)}) | {de_:.9f}° ({_dms_s(de_)}) | {sx:+.3f}, {sy:+.3f} |")
+        prev = v
+    ra_, de_ = _radec(p6)
+    sx, sy = _shift_mas(p5, p6)
+    L.append(f"| **star direction used**: star deflection minus the asteroid's | {ra_:.9f}° | {de_:.9f}° | {sx:+.3f}, {sy:+.3f} (vs the line above) |")
+    L += ["", "| Light deflection at the centre instant (mas, RA·cosDec, Dec) | Star | Asteroid (its own light) | Star minus asteroid |",
+          "|---|---|---|---|"]
+    for k in defl_star:
+        a_ = _shift_mas(p4, A.unit(p4 + defl_star[k]))
+        b_ = _shift_mas(p4, A.unit(p4 + defl_ast[k]))
+        L.append(f"| {k} | {a_[0]:+.3f}, {a_[1]:+.3f} | {b_[0]:+.3f}, {b_[1]:+.3f} | {a_[0] - b_[0]:+.3f}, {a_[1] - b_[1]:+.3f} |")
+    chk = A.angle_mas(p6, star_used)
+    L += ["", f"The search computed its star direction once per candidate (at its first time estimate); against the "
+              f"direction above it differs by {chk:.4f} mas. Unit vector used (ICRF): "
+              f"({star_used[0]:.12f}, {star_used[1]:.12f}, {star_used[2]:.12f}).", ""]
+    rd = _radec(rpn_c @ p5)
+    L.append(f"Of date (true equator and equinox; IAU 2006/2000A precession-nutation of the geocentric direction with "
+             f"deflection, no aberration): RA {_hms(rd[0])}, Dec {_dms_s(rd[1])}." +
+             (f" Astropy's apparent place of date (TETE, with annual aberration): RA {_hms(ap[0])}, Dec {_dms_s(ap[1])}."
+              if ap else ""))
+    L += ["", "## 3. The asteroid", "",
+          "| Instant | Geocentric astrometric RA, Dec (ICRF, light time 'CN') | Distance (AU) | Light time (s) | "
+          "Barycentric position at t - lt (km) | Check: bary(t - lt) - Earth(t) minus geocentric (m) | Its own deflection by the Sun (mas) |",
+          "|---|---|---|---|---|---|---|"]
+    rows = []
+    for name, et in instants:
+        a, lt = spice.spkpos(tid, et, "J2000", "CN", "399")
+        a = np.asarray(a)
+        bary = np.asarray(spice.spkpos(tid, et - lt, "J2000", "NONE", "0")[0])
+        e_ = np.asarray(spice.spkpos("399", et, "J2000", "NONE", "0")[0])
+        sun = np.asarray(spice.spkpos("10", et, "J2000", "CN", "399")[0])
+        dsun = _shift_mas(A.unit(a), A.unit(A.unit(a) + A.deflect(A.unit(a), -sun, A.unit(a - sun), A.GM["10"])))
+        ra_, de_ = _radec(a)
+        L.append(f"| {name} | {_hms(ra_)} {_dms_s(de_)} | {np.linalg.norm(a) / 1.495978707e8:.9f} | {lt:.6f} | "
+                 f"({bary[0]:.3f}, {bary[1]:.3f}, {bary[2]:.3f}) | {np.linalg.norm(bary - e_ - a) * 1000:.3f} | "
+                 f"{dsun[0]:+.3f}, {dsun[1]:+.3f} |")
+        rows.append((name, et, a))
+    L += ["", "At a point on the Earth the light time is that point's own (shorter by up to 21 ms), with the asteroid "
+              "moving at its barycentric velocity in between (SPICE spkcpo per site and per path point).", "",
+          "## 4. Fundamental plane (Besselian elements)", "",
+          "ICRF axes: z = the star direction used, x = (0,0,1) × z (east), y = z × x (north). Of date: the same plane, "
+          "with x east and y north of the true pole of date; d = the star's declination of date, mu = its Greenwich "
+          "hour angle (GAST - RA of date, UT1 from IERS). x, y in km and in Earth radii (6378.137 km); rates per second "
+          "and per hour.", "",
+          "| Instant | x, y (km) ICRF axes | x, y (Earth radii) | dx/dt, dy/dt (km/s) | x, y of date (Earth radii) | d (deg) | mu (deg) | UT1-UTC (s) |",
+          "|---|---|---|---|---|---|---|---|"]
+    bess = []
+    for name, et, a in rows:
+        xy = np.array([a @ x_ax, a @ y_ax])
+        v = (axis_xy(et + 0.5) - axis_xy(et - 0.5))
+        rpn, gast, dut1 = of_date(et)
+        pole = rpn.T @ np.array([0.0, 0.0, 1.0])
+        xd = A.unit(np.cross(pole, z_ax)); yd = np.cross(z_ax, xd)
+        sd = rpn @ z_ax
+        dd = math.degrees(math.asin(sd[2]))
+        mu = (gast - math.degrees(math.atan2(sd[1], sd[0]))) % 360.0
+        xyd = np.array([a @ xd, a @ yd]) / EARTH_A
+        L.append(f"| {name} | {xy[0]:+.3f}, {xy[1]:+.3f} | {xy[0] / EARTH_A:+.7f}, {xy[1] / EARTH_A:+.7f} | "
+                 f"{v[0]:+.5f}, {v[1]:+.5f} | {xyd[0]:+.7f}, {xyd[1]:+.7f} | {dd:.7f} | {mu:.7f} | {dut1:+.4f} |")
+        bess.append(dict(instant=name, et=et, utc=utc(et), x_km=xy[0], y_km=xy[1], dxdt=v[0], dydt=v[1],
+                         x_date=xyd[0], y_date=xyd[1], d_deg=dd, mu_deg=mu, ut1_utc=dut1))
+    L += ["", "## 5. Geodetic (WGS84, height 0)", "",
+          "| Instant | Centre line lon, lat (deg) | Shadow limits lon, lat (deg) |", "|---|---|---|"]
+    for name, et in instants:
+        p_ = paths.shadow_path(tid, star_used, et, r_km, s3, half_span=0.0, step=1.0)
+        g = lambda k: f"{p_[k][0][1]:+.6f}, {p_[k][0][2]:+.6f}" if p_[k] else "off the Earth"
+        L.append(f"| {name} | {g('center')} | {g('edge_plus')} / {g('edge_minus')} |")
+    L += ["", f"Shadow radius {r_km:.3f} km (diameter {2 * r_km:.2f} km); 3-sigma {s3:.3f} km.", ""]
+    data = dict(meta=meta, star=dict(source_id=int(r0.source_id), steps={k: _radec(v) for k, v in
+                (("catalog", cat), ("pm", p1), ("pm_bias", p2), ("rv", p3), ("parallax", p4), ("deflection", p5),
+                 ("used", p6))}), besselian=bess)
+    return "\n".join(L), data
+
+
 # ----------------------------------------------------------------------------------------------- command
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="pysyzygos path-check", description=__doc__,
@@ -418,6 +661,7 @@ def main(argv=None):
     q = sub.add_parser("compare"); q.add_argument("key"); q.add_argument("listing")
     q.add_argument("--header", help="a text file with Occult's plot header (orbit, star RA/Dec, diameter)")
     sub.add_parser("keep").add_argument("key")
+    sub.add_parser("steps").add_argument("key")
     a = ap.parse_args(argv)
     out = fav_dir(a.key)
     stamp = time.strftime("%Y%m%dT%H%M", time.gmtime())
@@ -441,6 +685,14 @@ def main(argv=None):
             w = csv.DictWriter(f, fieldnames=list(points[0])); w.writeheader(); w.writerows(points)
         print(md)
         print(f"wrote {mdp}")
+    elif a.cmd == "steps":
+        md, data = steps(out)
+        path = os.path.join(out, f"steps_{stamp}.md")
+        open(path, "w", encoding="utf-8").write(md)
+        with open(os.path.join(out, f"steps_{stamp}.json"), "w") as f:
+            json.dump(data, f, indent=1, default=float)
+        print(md)
+        print(f"wrote {path}")
     elif a.cmd == "keep":
         dest = os.path.join("owc_refs", "occult_paths")
         os.makedirs(dest, exist_ok=True)

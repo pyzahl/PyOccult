@@ -495,8 +495,14 @@ pysyzygos                 # opens http://127.0.0.1:8080 in your browser (local o
    JPL#, star RA/Dec, diameter), and *Compare*: a report pops up (sample points, across and along the track, the fit in
    the fundamental plane, a one-line result; Markdown and CSV kept in `favorites/<event>/pathcheck/`). *Export our
    path* gives our path in Occult's layout for a comparison the other way; *Keep in owc_refs* copies a comparison to
-   `owc_refs/occult_paths/` (private) with an index line. Compute both sides on the same day: orbits change. On the
-   command line: `pysyzygos path-check run|export|compare|keep <favorite key>`.
+   `owc_refs/occult_paths/` (private) with an index line. *Step by step* shows, in a section below, the event from
+   our side for a comparison stage by stage: the star from the Gaia catalog through every correction with its amount
+   (proper motion, Gaia's bias, radial velocity, parallax, light deflection of the star and of the asteroid, the
+   direction used; the place of date), the asteroid (geocentric and barycentric, light time, its own deflection), the
+   Besselian elements in ICRF axes and in axes of date (x, y, rates, d, mu, UT1 - UTC) at the shadow's touch-down,
+   centre and leaving, and the geodetic points then. Compute both sides on the same day: orbits change (*Compute our
+   path* always downloads today's orbit). On the command line: `pysyzygos path-check run|export|compare|steps|keep
+   <favorite key>`.
 
 Settings changed in the GUI apply to that run only; `pysyzygos_config.py` is not changed. Details: "Web interface
 (GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.

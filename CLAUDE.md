@@ -197,7 +197,12 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   compare uses the same orbit), meta.json (version, SBDB orbit id, run_utc). `compare`: parse_listing (Occult layout,
   sign apart), parse_header (JPL#, RA/Dec, Dia), shadow_path at Occult's times, plane offsets via spkcpo per point,
   fit_plane (const; + rotation), markdown -> compare_<UTC stamp>.md/.csv. `export`: shadow_path at 1.45 s in Occult's
-  layout (fmt_dms/fmt_ut). GUI: Favorites checkbox `pc_chk` (gui_state path_check), block `f_pc`, dialog. Bodies: not yet.
+  layout (fmt_dms/fmt_ut). `steps`: star catalog -> each correction (amounts) -> direction used (checked against the
+  search's), asteroid geo/bary/lt/own deflection, Besselian elements (ICRF axes and of date via erfa.pnm06a/gst06a,
+  d, mu) at touch-down/centre/leaving (bisection on the centre line, minimize for the centre), geodetic points ->
+  steps_<stamp>.md/.json. `run` deletes the target's cached SPKs first (search reuses same-name cache files forever)
+  and keeps only the newly downloaded. GUI: Favorites checkbox `pc_chk` (gui_state path_check), block `f_pc`, dialog,
+  expansion `f_pc_steps`. Bodies: not yet.
 - `pysyzygos/starrv.py` (2026-10-16): Gaia DR3 radial velocities of fast nearby stars (data/gaia_dr3_rv_fast.npy,
   164,602 stars with pm x |rv| x parallax > 24445: > 0.01 mas within 20 yr), `rv_for(ids)` (0 if unknown) ->
   `corridor.propagate_exact(df, utc, pm_bias, rv)` SkyCoord radial_velocity (perspective acceleration; Barnard 75 mas
