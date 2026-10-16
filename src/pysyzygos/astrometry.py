@@ -10,9 +10,14 @@ to the asteroid:
                      the difference star minus asteroid, which keeps their relative geometry right.
 
 Deflection of a source in direction p seen from an observer at distance E from a body (unit vector e from the body to
-the observer), q = unit vector from the body to the source (q = p for a star), PPN formula for a finite source:
+the observer), q = unit vector from the body to the source (q = p for a star), PPN formula for a finite source
+(Explanatory Supplement, 3rd ed.; IAU SOFA iauLd):
 
-    dp = (2 GM / c^2 E) * (e - (p.e) p) / (1 + q.e)
+    dp = (2 GM / c^2 E) * p x (e x q) / (1 + q.e) = (2 GM / c^2 E) * (e (p.q) - q (p.e)) / (1 + q.e)
+
+For a star (q = p) the numerator is e - (p.e) p. Before 2026-10-15 that star form was used for the asteroid too, which
+underestimated the asteroid's deflection where q and p differ (Phaethon 2019-07-29: 1.99 instead of 2.43 mas; found
+in the comparison with Occult, VERIFICATION.md section 3).
 
 (4.07 mas at elongation 90 deg from the Sun, 1.75" at the solar limb). Pure math; SPICE is passed in, so this module
 has no state and the tests can use a stand-in. Used by pysyzygos.handle_star.
@@ -26,6 +31,30 @@ RAD2MAS = np.degrees(1.0) * 3.6e6
 # GM, km^3/s^2 (DE440); planets as system barycentres (de440.bsp has them; mas-level deflection is insensitive to it)
 GM = {"10": 1.32712440041279419e11, "5": 1.267127641e8, "6": 3.79405848418e7}
 BODY_NAMES = {"10": "Sun", "5": "Jupiter", "6": "Saturn"}
+
+# Gaia (E)DR3 proper-motion bias of bright stars: the frame of their proper motions spins against the ICRF by up to
+# 80 micro-arcsec/yr for G < 13. Cantat-Gaudin & Brandt 2021, A&A 649, A124 (arXiv:2103.07432), Table 1 and their
+# Python function edr3ToICRF (Appendix A): G_min, G_max, omega_X, omega_Y, omega_Z (micro-arcsec/yr).
+GAIA_SPIN = np.array([
+    (0.0, 9.0, 18.4, 33.8, -11.3), (9.0, 9.5, 14.0, 30.7, -19.4), (9.5, 10.0, 12.8, 31.4, -11.8),
+    (10.0, 10.5, 13.6, 35.7, -10.5), (10.5, 11.0, 16.2, 50.0, 2.1), (11.0, 11.5, 19.4, 59.9, 0.2),
+    (11.5, 11.75, 21.8, 64.2, 1.0), (11.75, 12.0, 17.7, 65.6, -1.9), (12.0, 12.25, 21.3, 74.8, 2.1),
+    (12.25, 12.5, 25.7, 73.6, 1.0), (12.5, 12.75, 27.3, 76.6, 0.5), (12.75, 13.0, 34.9, 68.9, -2.9)])
+
+
+def gaia_pm_bias(pmra, pmdec, ra, dec, g):
+    """Gaia DR3 proper motions (pmra* = pmra cos dec, pmdec; mas/yr) corrected for the bright-star frame spin
+    (Cantat-Gaudin & Brandt 2021, edr3ToICRF, vectorised): unchanged for G >= 13 or a missing G. ra, dec in degrees.
+    Only for Gaia's own proper motions (not for proper motions taken from other catalogs)."""
+    pmra, pmdec = np.array(pmra, float, ndmin=1), np.array(pmdec, float, ndmin=1)
+    ra, dec, g = (np.broadcast_to(np.asarray(v, float), pmra.shape) for v in (ra, dec, g))
+    i = np.searchsorted(GAIA_SPIN[:, 1], np.nan_to_num(g, nan=99.0), side="right")    # bin with G_min <= G < G_max
+    ok = i < len(GAIA_SPIN)
+    wx, wy, wz = (np.where(ok, GAIA_SPIN[np.minimum(i, len(GAIA_SPIN) - 1), k], 0.0) for k in (2, 3, 4))
+    sa, ca, sd, cd = np.sin(np.radians(ra)), np.cos(np.radians(ra)), np.sin(np.radians(dec)), np.cos(np.radians(dec))
+    corr_ra = -sd * ca * wx - sd * sa * wy + cd * wz
+    corr_dec = sa * wx - ca * wy
+    return pmra - corr_ra / 1000.0, pmdec - corr_dec / 1000.0
 
 
 def unit(v):
@@ -47,7 +76,8 @@ def deflect(p, obs_from_body_km, q, gm):
     den = 1.0 + float(np.dot(q, e))
     if den < 1e-12:                                   # source exactly behind the body: not observable anyway
         return np.zeros(3)
-    return (2.0 * gm / (C_KM_S ** 2 * E)) * (e - np.dot(p, e) * p) / den
+    q = np.asarray(q, float)
+    return (2.0 * gm / (C_KM_S ** 2 * E)) * (e * float(np.dot(p, q)) - q * float(np.dot(p, e))) / den
 
 
 def parallax_dir(u_bary, plx_mas, earth_from_ssb_km):

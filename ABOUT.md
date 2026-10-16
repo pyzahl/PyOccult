@@ -637,7 +637,9 @@ All checks, with their numbers and the discussion of the differences, are in
 
 **What PySyzygos does now.** The asteroid comes from `spkpos(..., 'CN', '399')`: light-time corrected, astrometric,
 with no stellar aberration and no gravitational light deflection. The star direction is the Gaia DR3 catalog
-direction, propagated with its proper motion; Gaia directions are by definition free of light deflection (the
+direction, propagated with its proper motion (for stars brighter than G 13 corrected for Gaia's bright-star frame
+spin, Cantat-Gaudin & Brandt 2021, A&A 649, A124: up to 80 micro-arcsec/yr; `gaia_pm_bias`, since 2026-10-15);
+Gaia directions are by definition free of light deflection (the
 catalog removes it). Aberration is consistent: neither source gets it, and it would shift both the same way, so it
 cancels. Light deflection does not cancel: the star's light and the asteroid's reflected light are bent by
 different amounts, because the asteroid is much closer.
@@ -645,7 +647,14 @@ different amounts, because the asteroid is much closer.
 **Size.** For a source in direction u seen from an observer at distance E from the Sun (unit vector e from the Sun
 to the observer), with q the unit vector from the Sun to the source (q = u for a star):
 
-    deflection = (2GM/c^2) / E * |e - (u.e) u| / (1 + q.e)          (2GM/c^2 = 2.95 km for the Sun)
+    deflection = (2GM/c^2) / E * |u x (e x q)| / (1 + q.e)          (2GM/c^2 = 2.95 km for the Sun)
+               = (2GM/c^2) / E * |e (u.q) - q (u.e)| / (1 + q.e)
+
+(Explanatory Supplement, 3rd ed.; IAU SOFA iauLd). For a star (q = u) the numerator is e - (u.e) u; for the asteroid
+q and u differ (the directions from the Sun and from the Earth). Up to 2026-10-15 PySyzygos used the star form for
+the asteroid as well, which put the asteroid's deflection too close to the star's away from elongation ~90 deg (main
+belt at 150 deg: difference 0.05 instead of 0.43 mas; Phaethon 2019: 7.39 instead of 6.94 mas). Found with Occult's
+deflection values in the comparison of VERIFICATION.md section 3; the table below is with the correct form.
 
 For a star this is 4.07 mas x (1 + cos eps) / sin eps at elongation eps (1.75" at the solar limb). What moves the
 shadow path is the difference between the star's and the asteroid's deflection, times the asteroid's distance.
@@ -654,11 +663,11 @@ Sun, typical main-belt asteroid (2.5 AU from the Sun), observer at 1 AU:
 
 | Elongation | Star | Asteroid | Difference | Asteroid distance | Shift of the path on the ground |
 |---|---|---|---|---|---|
-| 60 deg (twilight) | 7.05 mas | 4.24 mas | 2.81 mas | 2.85 AU | 5.8 km |
-| 90 deg | 4.07 mas | 2.91 mas | 1.16 mas | 2.29 AU | 1.9 km |
-| 120 deg | 2.35 mas | 1.99 mas | 0.36 mas | 1.85 AU | 0.5 km |
-| 150 deg | 1.09 mas | 1.04 mas | 0.05 mas | 1.58 AU | 0.05 km |
-| 170 deg and beyond | <= 0.36 mas | about the same | ~0 | 1.5 AU | negligible |
+| 60 deg (twilight) | 7.05 mas | 4.83 mas | 2.22 mas | 2.85 AU | 4.6 km |
+| 90 deg | 4.07 mas | 2.67 mas | 1.41 mas | 2.29 AU | 2.3 km |
+| 120 deg | 2.35 mas | 1.47 mas | 0.88 mas | 1.85 AU | 1.2 km |
+| 150 deg | 1.09 mas | 0.66 mas | 0.43 mas | 1.58 AU | 0.5 km |
+| 170 deg | 0.36 mas | 0.21 mas | 0.14 mas | 1.51 AU | 0.16 km |
 
 Jupiter (2GM/c^2 = 2.8 m, 4.2 AU away), a star at angular distance chi from Jupiter's centre, asteroid at 1.5 AU
 (much closer than Jupiter, so its light is not bent by Jupiter):

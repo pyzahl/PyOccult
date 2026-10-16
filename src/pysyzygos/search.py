@@ -215,8 +215,8 @@ def fetch_and_propagate_stars(
         ra=df["ra"].values * u.deg,
         dec=df["dec"].values * u.deg,
         distance=CoordinateDistance(safe_parallax),
-        pm_ra_cosdec=df["pmra"].values * u.mas / u.yr,
-        pm_dec=df["pmdec"].values * u.mas / u.yr,
+        pm_ra_cosdec=corridor.gaia_pm(df, getattr(config, "gaia_pm_bias", True))[0] * u.mas / u.yr,
+        pm_dec=corridor.gaia_pm(df, getattr(config, "gaia_pm_bias", True))[1] * u.mas / u.yr,
         obstime=gaia_epoch,
         frame="icrs",
     )
@@ -1050,7 +1050,8 @@ def run_summary(mode, t_main, t_pass1, t_pass2, n_targets):
                          min_dur_s=config.pick_min_dur_s),
              earth_pck=EARTH_PCK, targets_from=globals().get("TARGETS_FROM", ""),
              corrections=dict(star_parallax=bool(getattr(config, "star_parallax", True)),
-                              light_deflection=bool(getattr(config, "light_deflection", True))))
+                              light_deflection=bool(getattr(config, "light_deflection", True)),
+                              gaia_pm_bias=bool(getattr(config, "gaia_pm_bias", True))))
     print(f"\nRun summary ({mode}): {n_targets} asteroids, {s['candidates']} candidates, {s['solves']} exact solves, "
           f"{s['hits']} hits")
     print(f"  total {s['total_s']:.1f} s = start-up {s['startup_s']:.1f} s + asteroid data {t_pass1:.1f} s + search "
@@ -1106,7 +1107,8 @@ def target_test_corridor(loc, plan, target_id, size, local=None, stars_cands=Non
             RUN["gated"] += 1
             continue
         # only the candidates need exact space motion: propagate each to its own event time
-        prop = corridor.propagate_exact(stars.iloc[[cand.star]], spice.et2utc(cand.et_guess, "ISOC", 0))
+        prop = corridor.propagate_exact(stars.iloc[[cand.star]], spice.et2utc(cand.et_guess, "ISOC", 0),
+                                        pm_bias=getattr(config, "gaia_pm_bias", True))
         ra_col = prop.filter(regex=r'^ra_\d{8}$').columns[0]
         dec_col = prop.filter(regex=r'^dec_\d{8}$').columns[0]
         row = next(prop.itertuples(index=False))

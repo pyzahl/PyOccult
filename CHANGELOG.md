@@ -11,6 +11,11 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
   and Planets & Moons pages, Markdown, favorites, CSV exports with a new `sun_alt` value, the GUI Pick table; hover:
   civil or nautical twilight). Only bright stars are seen in twilight (`report.twilight_text`, `TWILIGHT_SUN_ALT`).
 
+- **Gaia proper-motion bias of bright stars**: proper motions of stars brighter than G 13 are corrected for the
+  frame spin of Gaia DR3's bright stars (Cantat-Gaudin & Brandt 2021, A&A 649, A124; up to 80 micro-arcsec/yr, up to
+  ~0.8 mas in 2026), as Occult does (`astrometry.gaia_pm_bias`, identical to the paper's function; config
+  `gaia_pm_bias`, default on; shown in the report header). Not for the UCAC proper motions of 2-parameter stars.
+
 ### Changed
 - **Default Sun limit 0 deg** (was -6) for sites without their own `max_sun_alt` (config template, GUI Site tab,
   pick, pre-screens): twilight events of bright stars are kept and marked instead of dropped. Prompted by
@@ -18,6 +23,12 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
   Sites that set `max_sun_alt` keep their value.
 
 ### Fixed
+- **Light deflection of the asteroid** (since 0.10.0): the deflection formula's star form, numerator e - (p.e) p, was
+  used for the asteroid too; for a source at a finite distance it is e (p.q) - q (p.e) (Explanatory Supplement;
+  IAU SOFA iauLd). The asteroid's deflection was too close to the star's away from elongation ~90 deg, so paths were
+  off across the track by up to ~1 km for main-belt asteroids (largest near opposition: 0.43 instead of 0.05 mas at
+  150 deg) and 0.3 km for Phaethon 2019. Found with Occult's deflection values (VERIFICATION.md section 3); tested
+  against a transcription of iauLd. Results change accordingly.
 - **Shadow paths (KML, path files, whole-Earth view) cut off at one end** when the event's time at the observer's
   site lies near one end of the track: the path's time span was centred on that time and covered 1.3 Earth radii of
   motion either side, so the other end could be missing (Phaethon 2019-07-29: the path started 3 minutes late, found

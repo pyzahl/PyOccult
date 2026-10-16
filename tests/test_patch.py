@@ -44,7 +44,7 @@ ns.update(star_test=star_test,
 exec(funcs, ns)
 ns.update(DB=_con, RUN_ID=pysyzygos_db.start_run(_con, "corridor")[0])   # after the excerpt (it resets them)
 # propagation stand-in (astropy is not installed in this sandbox): same output columns as propagate_exact
-def fake_prop(df, utc):
+def fake_prop(df, utc, pm_bias=True):
     out = df.copy(); out["ra_20261003"], out["dec_20261003"] = out["ra"], out["dec"]; calls['propagate'] += 1; return out
 C.propagate_exact = fake_prop
 

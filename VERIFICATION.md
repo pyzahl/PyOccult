@@ -269,6 +269,11 @@ Only parallax plus deflection fits both, within sub-mas and within Occult's 1-si
 a weak test: near opposition the parallax (towards the Sun) and the deflection (away from it) partly cancel. A
 sharper test would be a star with parallax > 3 mas at elongation ~90 deg.
 
+*Note (2026-10-15):* the asteroid deflections above (3.71 mas for 16556) were computed with the star's formula, which
+is wrong for a source at a finite distance (section 3, update); with the correct form the asteroid's deflection is
+larger away from elongation ~90 deg and the differential deflection changes accordingly. The conclusion that Occult
+applies parallax and deflection stands (section 3 confirms it on a whole path).
+
 ---
 
 ## 3. Against Occult's geodetic path: (3200) Phaethon, 2019-07-29
@@ -400,6 +405,46 @@ were cut. Fixed after this comparison: the span is now centred on the shadow axi
 centre, and the path runs 11:03:44-11:21:17 (Occult 11:03:40-11:21:22; the ends are within one sample step, about
 9 s here). And the whole-Earth view failed for a search window ending soon after the event (it asks for the
 asteroid's position a day later): to fix.
+
+**Update 2026-10-15: two corrections found with Occult's numbers.** Occult's deflection dialog for this event
+(Steve Preston; "Relativistic offset from Sun's gravity", distance to the asteroid 0.95190 AU, solar elongation
+46.3 deg) gives, in RA x cos(Dec) / Dec: star -9.0 / +2.2 mas, asteroid -2.3 / +0.6 mas, asteroid relative to the
+star +6.6 / -1.6 mas. PySyzygos had star -9.11 / +2.22 (the same), but asteroid only -1.93 / +0.47:
+
+1. **Light deflection of the asteroid (a PySyzygos error, fixed).** PySyzygos used the star's form of the deflection
+   formula, numerator e - (p.e) p, also for the asteroid. For a source at a finite distance the numerator is
+   p x (e x q) = e (p.q) - q (p.e) (Explanatory Supplement, 3rd ed.; IAU SOFA iauLd), with q the direction from the
+   Sun to the source; for a star q = p and both agree. Here p and q differ by 71 deg. Correct form: asteroid
+   -2.37 / +0.58 mas, asteroid relative to the star +6.74 / -1.64 mas, Occult's values to their rounding. It affects
+   every prediction since 0.10.0, most near opposition: for a main-belt asteroid at 150 deg elongation the
+   differential deflection is 0.43 mas, not 0.05 (table in `ABOUT.md`, Part 6). Tested against a literal transcription
+   of iauLd (`tests/test_astrometry.py`).
+2. **Gaia's proper-motion bias of bright stars (added).** Gaia DR3's proper motions of stars brighter than G 13 carry
+   a frame spin of up to 80 micro-arcsec/yr (Cantat-Gaudin & Brandt 2021, A&A 649, A124, arXiv:2103.07432); Occult
+   corrects it (Steve Preston). PySyzygos now applies the paper's correction (`astrometry.gaia_pm_bias`, identical to
+   their Python function; config `gaia_pm_bias`). HIP 24973 (G 7.29): +0.032 / -0.012 mas/yr, +0.12 / -0.04 mas at
+   2019.57 (3.6 years after Gaia's epoch); for 2026 events up to ~0.8 mas for the brightest stars.
+
+The orbit is ruled out as a cause: Occult takes Horizons osculating elements at the geocentric mid-time of the event
+(Steve Preston); two-body propagation of osculating elements from PySyzygos's SPK at 11:12:30 UT (SPICE oscelt,
+conics) differs from JPL's integrated trajectory by 8 mm over +-10 min (0.00001 mas), 0.28 m after an hour.
+
+The same comparison after the corrections (all 732 points; across: star above 20 deg):
+
+| PySyzygos | Offset in the plane x, y (mas) | Across (km) | Along (s) | rms |
+|---|---|---|---|---|
+| before (1.0.0) | -1.05, +0.03 | +0.43 to +0.73 (mean +0.63) | +0.016 to +0.062 | 70 m |
+| asteroid deflection corrected | -0.61, -0.07 | +0.22 to +0.52 (mean +0.42) | +0.001 to +0.035 | 70 m |
+| and Gaia proper-motion bias | **-0.50, -0.12** | **+0.17 to +0.47 (mean +0.37)** | **-0.004 to +0.027** | 70 m |
+
+Open: the remaining 0.5 mas (0.34 km east-west), and the Earth-rotation term of the fit, unchanged at UT1 -202 ms
+(it cannot come from the star). Occult applies UT1 - UTC from IERS data (Steve Preston), so it is not UTC for UT1;
+whether it is a difference in the Earth orientation or an artefact of the fit is open. Also open: Occult's printed
+"astrometric" star place includes parallax and deflection (Steve Preston), but it agrees with neither Gaia +
+parallax + the star's full deflection (+1.5 / -0.7 mas off, beyond its rounding of about 0.6 mas) nor the other
+combinations as well as with Gaia + the asteroid-relative deflection without parallax (+0.2 / -0.3 mas). Steve
+Preston's own code replicating Occult's paths (star and asteroid positions, fundamental-plane track, geodetic track)
+is to settle these step by step.
 
 ---
 

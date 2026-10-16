@@ -271,6 +271,10 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   Gaia (propagated) + stellar parallax + light deflection by Sun/Jupiter/Saturn as star MINUS asteroid (asteroid stays
   SPICE 'CN'). Switches `star_parallax`, `light_deflection` (off = old results exactly). Log `star_ra/star_dec` are the
   corrected direction; `corr_parallax_mas`, `corr_deflection_mas`. Not in the pick screen yet.
+  `astrometry.deflect` uses the finite-source numerator e (p.q) - q (p.e) (SOFA iauLd; fixed 2026-10-15, before: the
+  star form e - (p.e) p for the asteroid too, up to ~1 km wrong near opposition). Gaia proper motions G < 13 corrected
+  for the frame spin (`astrometry.gaia_pm_bias` = Cantat-Gaudin & Brandt 2021 edr3ToICRF; `corridor.gaia_pm` skips
+  UCAC kinds 3/4; config `gaia_pm_bias`, run summary `corrections`), in `corridor.propagate_exact` and windows mode.
 - Fundamental plane: z toward the star, x east = (0,0,1) x z, y north. Miss distance = hypot(dx, dy) in km.
 - Observer longitude is east-positive, geodetic, radians inside the solver.
 - Geodetic <-> ITRF conversions use WGS84 from `pysyzygos/earth.py` (A_KM, F, C_KM), never `bodvrd('EARTH','RADII')`

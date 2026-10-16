@@ -206,16 +206,32 @@ def solver_bracket_s(plan, j, factor=1.3, max_s=4 * 3600.0):
     return 2.0 * float(np.clip(half, step, max_s / 2.0))
 
 
-def propagate_exact(df, utc_time):
+def gaia_pm(df, pm_bias=True):
+    """(pmra*, pmdec) in mas/yr of the stars in df, with Gaia's bright-star proper-motion bias removed when pm_bias
+    (astrometry.gaia_pm_bias; G < 13). Proper motions not from Gaia (supplement kinds 3, 4: UCAC5, UCAC4) and rows
+    without phot_g_mean_mag stay as they are."""
+    pmra, pmdec = df["pmra"].to_numpy(float), df["pmdec"].to_numpy(float)
+    if not pm_bias or "phot_g_mean_mag" not in df:
+        return pmra, pmdec
+    from pysyzygos.astrometry import gaia_pm_bias
+    g = df["phot_g_mean_mag"].to_numpy(float).copy()
+    if "star_kind" in df:
+        g[df["star_kind"].to_numpy() >= 3] = np.nan                  # proper motion from UCAC: no Gaia bias
+    return gaia_pm_bias(pmra, pmdec, df["ra"].to_numpy(float), df["dec"].to_numpy(float), g)
+
+
+def propagate_exact(df, utc_time, pm_bias=True):
     """Astropy space motion for the surviving stars only (same recipe as fetch_and_propagate_stars). Adds
-    ra_YYYYMMDD / dec_YYYYMMDD. df must have ra, dec, parallax, pmra, pmdec."""
+    ra_YYYYMMDD / dec_YYYYMMDD. df must have ra, dec, parallax, pmra, pmdec (and phot_g_mean_mag for the
+    proper-motion bias correction, gaia_pm)."""
     import astropy.units as u
     from astropy.coordinates import SkyCoord
     from astropy.time import Time
     t = Time(utc_time, scale="utc")
     plx = np.clip(df["parallax"].fillna(0.0).to_numpy(), 0.01, None)
+    pmra, pmdec = gaia_pm(df, pm_bias)
     sc = SkyCoord(ra=df["ra"].values * u.deg, dec=df["dec"].values * u.deg, distance=(1000.0 / plx) * u.pc,
-                  pm_ra_cosdec=df["pmra"].values * u.mas / u.yr, pm_dec=df["pmdec"].values * u.mas / u.yr,
+                  pm_ra_cosdec=pmra * u.mas / u.yr, pm_dec=pmdec * u.mas / u.yr,
                   obstime=Time("2016-01-01T12:00:00", scale="tcb"), frame="icrs")
     new = sc.apply_space_motion(new_obstime=t)
     out = df.copy()
