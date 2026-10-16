@@ -500,7 +500,8 @@ def steps(out, folder_key=None):
     if row.empty:
         raise SystemExit(f"star {z['star']} not found in the local catalog {config.gaia_local_dir}")
     row = row.iloc[[0]]
-    r0 = row.iloc[0]
+    r0 = row.iloc[0]                       # a mixed row: numbers become float64, so never read the id from it
+    sid = int(row["source_id"].to_numpy(np.int64)[0])        # the exact 19-digit id from the int64 column
     cat = A.unit([math.cos(math.radians(r0.dec)) * math.cos(math.radians(r0.ra)),
                   math.cos(math.radians(r0.dec)) * math.sin(math.radians(r0.ra)), math.sin(math.radians(r0.dec))])
     t_c = utc(et_c)
@@ -522,7 +523,7 @@ def steps(out, folder_key=None):
         defl_ast[A.BODY_NAMES[b]] = A.deflect(p4, -body, A.unit(ast_c - body), A.GM[b])
     p5 = A.unit(p4 + sum(defl_star.values()))
     p6 = A.unit(p4 + sum(defl_star.values()) - sum(defl_ast.values()))
-    rv = float(starrv.rv_for([int(r0.source_id)])[0])
+    rv = float(starrv.rv_for([sid])[0])
     # of date (true equator and equinox): precession-nutation (IAU 2006/2000A, ERFA) and the Earth's rotation (UT1)
     from astropy.time import Time
     from astropy.utils import iers
@@ -564,14 +565,17 @@ def steps(out, folder_key=None):
           "each point's own light time (bisection to 0.01 s). Centre: the axis's closest approach to the Earth's centre.",
           "", "## 2. The star (at the centre instant)", "",
           "| Gaia DR3 catalog (epoch 2016.0 TCB) | |", "|---|---|",
-          f"| source_id | {int(r0.source_id)} |", f"| G | {float(r0.phot_g_mean_mag):.3f} |",
+          f"| source_id | {sid} |", f"| G | {float(r0.phot_g_mean_mag):.3f} |",
           f"| RA, Dec | {float(r0.ra):.9f}°, {float(r0.dec):.9f}° ({_hms(float(r0.ra))} {_dms_s(float(r0.dec))}) |",
           f"| parallax | {plx:.4f} mas |", f"| pmRA·cosDec, pmDec | {float(r0.pmra):.4f}, {float(r0.pmdec):.4f} mas/yr |",
           f"| radial velocity | {rv:.3f} km/s" + (" (from data/gaia_dr3_rv_fast.npy)" if rv else " (not used: below the threshold or none)") + " |",
           f"| kind, RUWE | {int(getattr(r0, 'star_kind', 0) or 0)} (0 = main catalog), {getattr(r0, 'ruwe', float('nan'))} |", "",
-          "| Step | RA | Dec | Shift by this step (RA·cosDec, Dec; mas) |", "|---|---|---|---|"]
+          "| Step | RA | Dec | Shift of the position by this step (RA·cosDec, Dec; mas, not mas/yr) |", "|---|---|---|---|"]
     prev = cat
-    for label, v in (("catalog position (2016.0)", cat), ("+ proper motion to the event (barycentric, ICRF)", p1),
+    years = (et_c - spice.str2et("2016-01-01 12:00:00 TDB")) / (365.25 * 86400.0)
+    pm_label = (f"+ proper motion to the event: {float(r0.pmra):.3f}, {float(r0.pmdec):.3f} mas/yr x {years:.3f} yr "
+                f"(barycentric, ICRF)")
+    for label, v in (("catalog position (2016.0)", cat), (pm_label, p1),
                      ("+ Gaia bright-star proper-motion bias", p2), ("+ radial velocity (perspective acceleration)", p3),
                      ("+ stellar parallax (geocentric)", p4), ("+ the star's own light deflection (Sun, Jupiter, Saturn)", p5)):
         ra_, de_ = _radec(v)
@@ -644,7 +648,7 @@ def steps(out, folder_key=None):
         g = lambda k: f"{p_[k][0][1]:+.6f}, {p_[k][0][2]:+.6f}" if p_[k] else "off the Earth"
         L.append(f"| {name} | {g('center')} | {g('edge_plus')} / {g('edge_minus')} |")
     L += ["", f"Shadow radius {r_km:.3f} km (diameter {2 * r_km:.2f} km); 3-sigma {s3:.3f} km.", ""]
-    data = dict(meta=meta, star=dict(source_id=int(r0.source_id), steps={k: _radec(v) for k, v in
+    data = dict(meta=meta, star=dict(source_id=sid, steps={k: _radec(v) for k, v in
                 (("catalog", cat), ("pm", p1), ("pm_bias", p2), ("rv", p3), ("parallax", p4), ("deflection", p5),
                  ("used", p6))}), besselian=bess)
     return "\n".join(L), data
