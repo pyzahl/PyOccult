@@ -442,9 +442,9 @@ Open: the remaining 0.5 mas (0.34 km east-west), and the Earth-rotation term of 
 whether it is a difference in the Earth orientation or an artefact of the fit is open. Also open: Occult's printed
 "astrometric" star place includes parallax and deflection (Steve Preston), but it agrees with neither Gaia +
 parallax + the star's full deflection (+1.5 / -0.7 mas off, beyond its rounding of about 0.6 mas) nor the other
-combinations as well as with Gaia + the asteroid-relative deflection without parallax (+0.2 / -0.3 mas). Steve
-Preston's own code replicating Occult's paths (star and asteroid positions, fundamental-plane track, geodetic track)
-is to settle these step by step.
+combinations as well as with Gaia + the asteroid-relative deflection without parallax (+0.2 / -0.3 mas). A
+step-by-step replication of Occult's path computation (star and asteroid positions, fundamental-plane track,
+geodetic track), run by Steve Preston, is to settle these.
 
 **The whole path with PySyzygos 1.1.0** (both corrections; star direction RA 80.22803602, Dec 40.88482549 deg; regular
 search at the same test site: 11:19:35.003 UT, 0.46 km from the centre line). Same points as the first table
@@ -471,8 +471,7 @@ distance 1.06 km (at the ends, where the ground speed is highest). With the star
 rms 66 m. Compared with 1.0.0 (first table) the difference across the track is about 0.25 km smaller everywhere and
 the time difference is a third. The remaining offset in the plane is not quite constant along the track: -0.04 to
 -0.11 mas at the two ends (star at 3-4 deg) and -0.54 to -0.63 mas in the middle (star at 54-65 deg); with
-1.0.0 it was -0.6 at the ends and -1.2 in the middle. Open, for the step-by-step comparison with Steve Preston's
-code.
+1.0.0 it was -0.6 at the ends and -1.2 in the middle.
 
 ---
 
