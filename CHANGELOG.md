@@ -4,7 +4,7 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
-## [Unreleased]
+## [1.2.0] "Beyond Horizons" - 2026-10-16
 
 ### Added
 - **Offline use** (GUI tab **System**, `pysyzygos offline on|off|copy|status|remove`): copies of the pick's asteroid
@@ -34,6 +34,9 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
   `--cache`.
 
 ### Fixed
+- Whole-Earth view (globe) missing after short searches (a window of an hour or two): its star-field inset asks for
+  the asteroid's position a day before and after the event, past the end of the orbit file downloaded for such a
+  window, and the search printed "no globe plot". Now a shorter step is taken there and drawn to a full day.
 - `path-check steps`: the star's source_id was read from a mixed table row, i.e. through a float, and printed rounded
   (2637445446884721408 as ...721664); the radial-velocity lookup there used the rounded id too. Now taken from the
   int64 column. The star itself and the search were not affected. The proper-motion row names the proper motion and
@@ -706,6 +709,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[1.2.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.2.0
 [1.1.1]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.1
 [1.1.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.0.0

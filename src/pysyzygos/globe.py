@@ -382,11 +382,26 @@ def globe_data(spice, record, target, star_dir, paths, sigma3_km, site=None, sta
     if stars is not None:
         ra_s, dec_s, g = stars
         xi, eta = gnomonic(ra_s, dec_s, ra_d, dec_d)
-        track = []
-        for dt in (-86400.0, 0.0, 86400.0):
-            _, a, b = spice.recrad(spice.spkpos(str(target), et + dt, "J2000", "CN", "399")[0])
+        def sky(t):
+            _, a, b = spice.recrad(spice.spkpos(str(target), t, "J2000", "CN", "399")[0])
             tx, ty = gnomonic([math.degrees(a)], [math.degrees(b)], ra_d, dec_d)
-            track.append((float(tx[0]), float(ty[0])))
+            return float(tx[0]), float(ty[0])
+
+        x0, y0 = sky(et)
+        track = []
+        for day in (-86400.0, 86400.0):           # the motion over +-1 day; a short search's orbit file may end
+            for dt in (day, day / 4, day / 24):   # sooner: then a shorter step, drawn to a full day (straight there)
+                try:
+                    x, y = sky(et + dt)
+                except Exception:                 # SPICE: not covered by the orbit file
+                    continue
+                k = day / dt
+                track.append((x0 + k * (x - x0), y0 + k * (y - y0)))
+                break
+            else:
+                track.append((x0, y0))
+            if day < 0:
+                track.append((x0, y0))
         inset = dict(field_arcmin=120.0, mag_limit=min(float(record["mag"]) + 1.5, 13.0),
                      stars=list(zip(np.ravel(xi).tolist(), np.ravel(eta).tolist(), np.ravel(g).tolist())), track=track)
     return dict(R=R, basis=basis, sun_dir=sun / np.linalg.norm(sun), paths=paths, axis=axis, site=site, style=style,
