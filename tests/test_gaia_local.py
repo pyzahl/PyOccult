@@ -168,7 +168,12 @@ assert x5["kind"] == L.KIND_2P_UCAC5 and x5["pmra"] == -4.0 and abs(x5["pm_error
 assert x4["kind"] == L.KIND_2P_UCAC4 and x4["pmdec"] == 10.0 and abs(x4["pm_error"] - 5.0) < 1e-6
 assert xw["kind"] == L.KIND_2P and xw["pmra"] == 0, "a wrong partner must be rejected"
 assert len(sup2) == len(sup) and sup2.dtype == L.SUPP_DTYPE
-print("supplement pm: UCAC5", stats["ucac5"], "UCAC4", stats["ucac4"], "rejected wrong partners: ok")
+# a rerun finds nothing new (only the stars still without are asked) but must keep the totals in catalog.json
+L._xmatch = fake_xmatch
+stats2 = L.supplement_pm(out, chunk=137, log=lambda *a: None)
+L._xmatch = real_xm
+assert (stats2["ucac5"], stats2["ucac4"], stats2["none"]) == (stats["ucac5"], stats["ucac4"], stats["none"]), (stats, stats2)
+print("supplement pm: UCAC5", stats["ucac5"], "UCAC4", stats["ucac4"], "rejected wrong partners, rerun totals: ok")
 
 # merged lookup: with the supplement (default) its stars come too, flagged; without, the main catalog only
 assert L.has_supplement(out)

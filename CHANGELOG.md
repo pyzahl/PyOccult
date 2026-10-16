@@ -4,6 +4,14 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
+## [Unreleased]
+
+### Fixed
+- `gaia supplement-pm` (and `setup --supplement`) rerun: its record in the supplement's catalog.json counted only that
+  run's new matches, so a rerun on a finished supplement reported "0 from UCAC5, 0 from UCAC4" and `setup --status`
+  "2-param stars with pm: 0 of 108169", although the proper motions were in the star files. The record now counts
+  all stars in the files (465,566 of 573,735 for G <= 16). Data were never affected.
+
 ## [1.1.1] "Beyond Horizons" - 2026-10-16
 
 The shadow at each observer is now computed with the asteroid as that observer sees it: the light time from the

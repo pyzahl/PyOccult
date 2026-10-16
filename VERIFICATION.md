@@ -664,7 +664,10 @@ light time from each observer all fixed or added; sections 3 and 4).
   estimates one from H (marked * in the tables); Occult used 5.0 km (DAMIT) for Phaethon, PySyzygos 6.25 km (SBDB).
 - **Stars Gaia measured less well:** since 0.17.0 the high-RUWE supplement (RUWE >= 1.4 and 2-parameter stars, with
   UCAC5/UCAC4 proper motions for the latter since 0.18.0) brings their events in, flagged; 69085 of section 1.5 is now
-  found. 325516's 2-parameter star is still not found (to check).
+  found. 325516 (Test site 2, 2026-10-08) is computed at OWC's time (01:44:13 against 01:44:11 UT) on the same star, but
+  its path passes 32 km from the site, outside the 20 km reach: the star (Gaia DR3 91626190888697088, G 11.98,
+  2-parameter) moves fast and its proper motion from UCAC5 (68.0, 25.6 +- 1.3 mas/yr) is uncertain by ~14 mas at the
+  event, ~20 km on the ground; a 1-2 sigma difference in the star, flagged by the star-uncertainty warning.
 - **Small asteroids** (H above ~17, under ~1 km): their orbits are poorly known, and JPL's and OWC's orbits can differ
   by tens of km across the track, so an event can fall inside one reach and outside the other: 484605 (our path
   29 km from the site) and 549201 (47 km), both with OWC's within 20 km.

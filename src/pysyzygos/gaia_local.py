@@ -393,8 +393,9 @@ def supplement_pm(catalog_dir, chunk=50000, log=print):
             got += len(p)
             log(f"   {cat.split(':')[1]}: {min(i + chunk, len(todo))}/{len(todo)} stars, {got} with a proper motion, "
                 f"{time.time() - t0:.0f} s")
-    n5 = sum(1 for v in found.values() if v[3] == KIND_2P_UCAC5)
-    n4 = len(found) - n5
+    new5 = sum(1 for v in found.values() if v[3] == KIND_2P_UCAC5)
+    new4 = len(found) - new5
+    n5 = n4 = n_none = 0                                           # totals over the files, not only this run's matches
     for s in stems:                                                # rewrite every star file with the new fields
         path = os.path.join(sd, s + ".npy")
         a = np.load(path)
@@ -410,16 +411,22 @@ def supplement_pm(catalog_dir, chunk=50000, log=print):
         if os.path.exists(hpath):
             _save_atomic(hpath, _as_dtype(np.load(hpath), SUPP_DTYPE))
         _save_atomic(path, out)
+        n5 += int((out["kind"] == KIND_2P_UCAC5).sum())
+        n4 += int((out["kind"] == KIND_2P_UCAC4).sum())
+        n_none += int((out["kind"] == KIND_2P).sum())
     for f in glob_bright(sd):
         os.remove(f)
-    man.update(pm_xmatch=dict(two_param=int(len(rows)), ucac5=n5, ucac4=n4, none=int(len(rows) - n5 - n4),
+    # a rerun only looks at the stars still without a proper motion; the record counts all of them (before
+    # 2026-10-16 it counted only this run's matches, so a rerun reported "0 from UCAC5, 0 from UCAC4")
+    log(f"   this run: {new5} new from UCAC5, {new4} from UCAC4 (of {len(rows)} still without before)")
+    man.update(pm_xmatch=dict(two_param=n5 + n4 + n_none, ucac5=n5, ucac4=n4, none=n_none,
                               date=time.strftime("%Y-%m-%d"), method="CDS XMatch: UCAC5 (Gaia DR1 2015.0 pos <= 0.2\", "
                               "dG <= 0.5), then UCAC4 (pos at 2016 <= 0.5\", dmag <= 1)"))
     fd, tmp = tempfile.mkstemp(dir=sd, suffix=".tmp")
     with os.fdopen(fd, "w") as f:
         json.dump(man, f, indent=1)
     replace_file(tmp, man_path)
-    log(f"   proper motions: {n5} from UCAC5, {n4} from UCAC4, {len(rows) - n5 - n4} still without (of {len(rows)})")
+    log(f"   proper motions: {n5} from UCAC5, {n4} from UCAC4, {n_none} still without (of {n5 + n4 + n_none})")
     return man["pm_xmatch"]
 
 
