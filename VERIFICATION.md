@@ -286,6 +286,9 @@ point by point with PySyzygos's path at the same instants. Both computed on the 
 same JPL orbit solution. (Occult was run by Steve Preston, IOTA; his listing and plot are kept privately in
 `owc_refs/occult_paths/` with the comparison scripts.)
 
+The comparison can be repeated for any event with `pysyzygos path-check` (GUI: Favorites, "Path verification"),
+which reproduces the numbers below for this event.
+
 **The two predictions**
 
 | | Occult | PySyzygos |

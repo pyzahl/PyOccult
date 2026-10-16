@@ -496,6 +496,9 @@ def index():
                 fav_info = ui.label().classes("text-sm text-slate-600")
                 ui.button("Reload", on_click=lambda: load_favs()).props("flat dense")
                 ui.link("Open in a new tab", "/fav/favorites.html", new_tab=True)
+                pc_chk = ui.checkbox("Path verification", value=bool(load_ui_state().get("path_check", False))).tooltip(
+                    "Show the tools to compare a favorite's geodetic path with Occult's path listing (pathcheck.py; "
+                    "method: VERIFICATION.md section 3)")
                 ui.button("CSV", on_click=lambda: fav_csv()).props("outline dense").tooltip(
                     "Download all favorites as a table, named favorites_<today>.csv."
                     " Columns: csv_exports.py in the data folder (default: as the table shows them; any log column can be added). "
@@ -548,6 +551,31 @@ def index():
                                 ui.button("Save", on_click=lambda: save_fav()).props("color=primary")
                                 ui.button("Remove from favorites", on_click=lambda: remove_fav()).props(
                                     "outline color=negative")
+                with ui.column().classes("w-full gap-2 border-t pt-2") as f_pc:
+                    ui.label("Path verification: our geodetic path against Occult's listing").classes("font-semibold")
+                    f_pc_info = ui.label().classes("text-sm text-slate-600")
+                    with ui.row().classes("gap-2 items-center"):
+                        ui.button("Compute our path (fresh)", on_click=lambda: pc_run()).props("outline dense").tooltip(
+                            "Runs the search for this event only, with today's orbit from JPL and this version of "
+                            "PySyzygos (relaxed limits; about 10-30 s), and keeps its path and orbit files with the "
+                            "favorite. Compute it on the same day as the Occult listing: orbits change")
+                        ui.button("Export our path (Occult layout)", on_click=lambda: pc_export()).props(
+                            "outline dense").tooltip("Our centre line, shadow and 1-sigma limits every 1.45 s as a text "
+                                                     "table in Occult's layout, to send for a comparison the other way")
+                        ui.button("Last report", on_click=lambda: pc_show()).props("flat dense")
+                        ui.button("Keep in owc_refs", on_click=lambda: pc_keep()).props("flat dense").tooltip(
+                            "Copy the last comparison (report, points, Occult's listing) to owc_refs/occult_paths/ "
+                            "(private) and add a line to its index.md")
+                    f_pc_list = ui.textarea("Occult's path listing: paste the text (or load the .txt below)").classes(
+                        "w-full font-mono text-xs").props("rows=4")
+                    f_pc_head = ui.textarea("Occult's plot header (optional: JPL#..., RA, Dec, Dia = ...)").classes(
+                        "w-full font-mono text-xs").props("rows=2")
+                    with ui.row().classes("gap-2 items-center"):
+                        ui.upload(label="Load listing .txt", auto_upload=True, on_upload=lambda e: pc_upload(e)).props(
+                            "accept=.txt dense flat").classes("w-64")
+                        ui.button("Compare", on_click=lambda: pc_compare()).props("color=primary")
+                f_pc.set_visibility(bool(pc_chk.value))
+                pc_chk.on_value_change(lambda e: (f_pc.set_visibility(bool(e.value)), save_ui_state(path_check=bool(e.value))))
             f_detail.set_visibility(False)
 
     with ui.card().classes("w-full") as log_card:
@@ -1125,6 +1153,7 @@ def index():
             return
         r, site, files = e["record"], e.get("site") or {}, e.get("files") or {}
         f_title.text = favorites.title_text(e)
+        pc_refresh()
         f_info.clear()
         with f_info:
             for group, rows in favorites.event_info(e):
@@ -1214,6 +1243,94 @@ def index():
             ui.notify(msg, type="positive" if ok else "warning")
             fav_cur["key"] = None
             load_favs()
+
+    # ------------------------------------------------ path verification (pathcheck.py)
+    with ui.dialog() as pc_dialog, ui.card().classes("w-full max-w-5xl"):
+        pc_md = ui.markdown().classes("w-full text-sm")
+        pc_state = {"md": None}
+        with ui.row():
+            ui.button("Download .md", on_click=lambda: ui.download(pc_state["md"], os.path.basename(pc_state["md"]))
+                      if pc_state["md"] else None).props("outline dense")
+            ui.button("Close", on_click=pc_dialog.close).props("flat dense")
+
+    def pc_dir():
+        from pysyzygos import pathcheck
+        return pathcheck.fav_dir(fav_cur["key"], os.path.join(ROOT, favorites.DIR)) if fav_cur["key"] else None
+
+    def pc_newest(pattern):
+        import glob as _glob
+        d = pc_dir()
+        files = sorted(_glob.glob(os.path.join(d, pattern))) if d else []
+        return files[-1] if files else None
+
+    def pc_refresh():
+        d = pc_dir()
+        try:
+            m = json.load(open(os.path.join(d, "meta.json")))
+            f_pc_info.text = (f"Our path: computed {m['run_utc']} UTC with PySyzygos {m['version']}, orbit "
+                              f"{m.get('orbit') or '?'}." + ("  Last comparison: " + os.path.basename(pc_newest('compare_*.md'))
+                                                         if pc_newest('compare_*.md') else ""))
+        except (OSError, ValueError, TypeError):
+            f_pc_info.text = "Our path: not computed yet (Compute our path first)."
+
+    async def pc_run():
+        if not fav_cur["key"]:
+            return
+        async def done(rc):
+            pc_refresh()
+            ui.notify("Our path is computed" if rc == 0 else "Computing our path failed: see the log",
+                      type="positive" if rc == 0 else "negative")
+        await run_process(PYSYZYGOS + ["path-check", "run", fav_cur["key"]], log, on_done=done)
+
+    async def pc_export():
+        if not fav_cur["key"]:
+            return
+        async def done(rc):
+            f = pc_newest("pysyzygos_path_*.txt")
+            if rc == 0 and f:
+                ui.download(f, os.path.basename(f))
+            else:
+                ui.notify("Export failed: compute our path first (see the log)", type="negative")
+        await run_process(PYSYZYGOS + ["path-check", "export", fav_cur["key"]], log, on_done=done)
+
+    async def pc_upload(e):
+        data = await e.file.read()
+        f_pc_list.value = data.decode("utf-8", errors="replace") if b"\x00" not in data[:200] else ""
+        ui.notify(f"Loaded {getattr(e.file, 'name', 'the file')}: {len(f_pc_list.value.splitlines())} lines")
+
+    def pc_show(path=None):
+        path = path or pc_newest("compare_*.md")
+        if not path:
+            ui.notify("No comparison yet", type="warning")
+            return
+        pc_md.content = open(path, encoding="utf-8").read()
+        pc_state["md"] = path
+        pc_dialog.open()
+
+    async def pc_compare():
+        if not fav_cur["key"]:
+            return
+        if not (f_pc_list.value or "").strip():
+            ui.notify("Paste Occult's path listing first (or load its .txt)", type="warning")
+            return
+        d = pc_dir()
+        if not os.path.isfile(os.path.join(d, "path.npz")):
+            ui.notify("Compute our path first", type="warning")
+            return
+        lp, hp = os.path.join(d, "occult_input.txt"), os.path.join(d, "occult_header_input.txt")
+        open(lp, "w", encoding="utf-8").write(f_pc_list.value)
+        open(hp, "w", encoding="utf-8").write(f_pc_head.value or "")
+        async def done(rc):
+            pc_refresh()
+            if rc == 0:
+                pc_show()
+            else:
+                ui.notify("The comparison failed: see the log", type="negative")
+        await run_process(PYSYZYGOS + ["path-check", "compare", fav_cur["key"], lp, "--header", hp], log, on_done=done)
+
+    async def pc_keep():
+        if fav_cur["key"]:
+            await run_process(PYSYZYGOS + ["path-check", "keep", fav_cur["key"]], log)
 
     def on_fav_select(e):
         fav_cur["key"] = e.args if isinstance(e.args, str) else (e.args or [None])[0]

@@ -7,6 +7,12 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 ## [Unreleased]
 
 ### Added
+- **Path verification against Occult** (`pysyzygos path-check`, GUI Favorites with the "Path verification"
+  checkbox): for a favorite, compute our geodetic path fresh (the search for that event only, today's orbit; path and
+  orbit files kept with the favorite), export it in Occult's listing layout, and compare it with Occult's listing
+  (pasted or loaded, optionally with its plot header): a Markdown report in a popup and a CSV, by the method of
+  VERIFICATION.md section 3 (it reproduces the Phaethon numbers there); optionally kept in `owc_refs/occult_paths/`
+  with an index line. `pathcheck.py`, `tests/test_pathcheck.py`.
 - **Site heights above sea level corrected to the WGS84 ellipsoid.** Elevations from maps, Open-Meteo and most GPS
   displays are above mean sea level (the geoid), but the geometry needs the height above the ellipsoid; they differ by
   -107 to +85 m (the test sites: -32 to +48 m), which moved the path relative to a site by that over tan(star

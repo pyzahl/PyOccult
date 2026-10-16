@@ -10,6 +10,7 @@
     pysyzygos picks list|import       saved picks
     pysyzygos prescreen build|list    pre-screened target lists per region and window (pick --prescreen)
     pysyzygos favorites ...           favorites list (page, CSV)
+    pysyzygos path-check ...          a favorite's path, fresh, and its comparison with an Occult listing
     pysyzygos kstars ...              point KStars (Linux)
     pysyzygos stellarium ...          point Stellarium (Remote Control plugin)
     pysyzygos run <command> '<json>'  a search or pick with settings overridden for this run (used by the GUI)
@@ -25,7 +26,8 @@ os.environ.setdefault("PYSYZYGOS_T0", repr(time.time()))   # when the command st
 
 COMMANDS = {"gui": "gui", "setup": "setup", "pick": "pick", "search": "search", "report": "report",
             "owc-check": "owc_check", "gaia": "gaia_local", "picks": "picks", "prescreen": "prescreen", "favorites": "favorites",
-            "kstars": "kstars", "stellarium": "stellarium", "run": "runner", "cleanup": "cleanup"}
+            "kstars": "kstars", "stellarium": "stellarium", "run": "runner", "cleanup": "cleanup",
+            "path-check": "pathcheck"}
 SCRIPTS = {"search"}            # not import-safe (sets up SPICE at import): executed as a script
 
 

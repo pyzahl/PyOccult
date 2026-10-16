@@ -191,6 +191,13 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   files (ELE = ele + geoid_m, also when the user file sets ELE = site["ele"]); `ele_ref: "ellipsoid"` (MPC codes,
   GUI select) -> geoid_m 0. Run summary site: ele (MSL, for KStars/Stellarium), geoid_m, ele_wgs84, ele_ref.
   `pysyzygos/sitesfile.py`: load_sites/save_sites (moved from gui.py). tests/test_geoid.py.
+- `pysyzygos/pathcheck.py` (2026-10-16, `pysyzygos path-check run|export|compare|keep <fav key>`): favorites/<key>/
+  pathcheck/: `run` = search subprocess for that event only (ct = event - 1 h, 2 h, relaxed limits, debug_save_paths,
+  map_dir/results_db/hits in pathcheck/run), path.npz of the favorite's star, the target's SPK files copied (a later
+  compare uses the same orbit), meta.json (version, SBDB orbit id, run_utc). `compare`: parse_listing (Occult layout,
+  sign apart), parse_header (JPL#, RA/Dec, Dia), shadow_path at Occult's times, plane offsets via spkcpo per point,
+  fit_plane (const; + rotation), markdown -> compare_<UTC stamp>.md/.csv. `export`: shadow_path at 1.45 s in Occult's
+  layout (fmt_dms/fmt_ut). GUI: Favorites checkbox `pc_chk` (gui_state path_check), block `f_pc`, dialog. Bodies: not yet.
 - `pysyzygos/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
   list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
 - `pysyzygos/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi

@@ -97,6 +97,7 @@ everything: `pysyzygos` (the web interface) or `pysyzygos <command>`, e.g. `pysy
 | `pysyzygos/kstars.py` | points a running KStars at an event (Linux, D-Bus); used by the report's KStars button in the GUI |
 | `pysyzygos/stellarium.py` | points a running Stellarium at an event (Remote Control plugin, HTTP); the report's Stellarium button |
 | `pysyzygos/favorites.py` | the favorites list (`favorites/`, private): events starred in the report, with copies of map and preview; `list` |
+| `pysyzygos/pathcheck.py` | path verification: a favorite's geodetic path, fresh, compared with Occult's path listing (`pysyzygos path-check`; GUI Favorites) |
 | `pysyzygos/setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
 | `pysyzygos/gaia_local.py` | builds and reads the local Gaia catalog (used by `pysyzygos/setup.py` and the search) |
 | `pysyzygos/gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
@@ -487,6 +488,15 @@ pysyzygos                 # opens http://127.0.0.1:8080 in your browser (local o
    table (`favorites_<date>.csv`; columns: see "CSV downloads" below); `favorites/favorites.csv`, with all fields,
    is rewritten with every change, for use in other tools or sharing. Drag the bottom-right corner of the table to resize it (remembered
    in your browser; the Results report and the Pick table have the same corner).
+   **Path verification** (checkbox at the top, off by default): compare a favorite's geodetic path with Occult's
+   path listing for the same event, as in VERIFICATION.md section 3. *Compute our path (fresh)* runs the search for
+   this event only, with today's orbit from JPL, and keeps the path and the orbit files with the favorite (so a later
+   comparison uses the same orbit). Paste Occult's listing (or load its .txt), optionally its plot header (orbit
+   JPL#, star RA/Dec, diameter), and *Compare*: a report pops up (sample points, across and along the track, the fit in
+   the fundamental plane, a one-line result; Markdown and CSV kept in `favorites/<event>/pathcheck/`). *Export our
+   path* gives our path in Occult's layout for a comparison the other way; *Keep in owc_refs* copies a comparison to
+   `owc_refs/occult_paths/` (private) with an index line. Compute both sides on the same day: orbits change. On the
+   command line: `pysyzygos path-check run|export|compare|keep <favorite key>`.
 
 Settings changed in the GUI apply to that run only; `pysyzygos_config.py` is not changed. Details: "Web interface
 (GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.
