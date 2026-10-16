@@ -12,7 +12,7 @@ Standard library only (the pick tool must not need SPICE/astropy).
 """
 from pysyzygos.version import __version__
 from pysyzygos import net                      # https with certifi's certificate authorities
-import json, os, tempfile, time
+import json, os, shutil, tempfile, time
 
 FILE = "PySyzygos_sbdb_phys.json"
 BULK_FIELDS = ["diameter", "diameter_sigma", "extent", "albedo", "H", "G"]     # needed in the pick tool's bulk query
@@ -64,6 +64,13 @@ def put(entries, cache_path=None, keep_newer=True):
     with os.fdopen(fd, "w") as f:
         json.dump(cache, f)
     os.replace(tmp, path)
+    try:                                                      # a copy for use without network (offline.py), if on
+        from pysyzygos import offline
+        if offline.enabled():
+            shutil.copyfile(path, offline.PHYS + ".tmp")
+            os.replace(offline.PHYS + ".tmp", offline.PHYS)
+    except OSError:
+        pass
     return n_new
 
 

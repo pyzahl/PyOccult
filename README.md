@@ -504,6 +504,18 @@ pysyzygos                 # opens http://127.0.0.1:8080 in your browser (local o
    path* always downloads today's orbit). On the command line: `pysyzygos path-check run|export|compare|steps|keep
    <favorite key>`.
 
+7. **System**: the data folder, `setup --status` (into the log), **Data in use** (refreshed when the tab is opened;
+   `pysyzygos info` on the command line): leap seconds, the Earth orientation (measured to, predicted to, valid
+   from), DE440's range, the star catalogs (the one in use marked; stars, size, supplement, star indexes), the
+   asteroid data in the cache (list date and age, size data, orbit files), the offline copies (copies of past picks
+   and searches), saved picks, pre-screens and the results database; and **offline use**: the pick's asteroid list (JPL
+   SBDB) and the searches' orbit files (JPL Horizons) are cached in memory (`/dev/shm`, lost at a restart). With
+   "Keep copies of orbit downloads for use without network" every download is also kept in the data folder's
+   `offline/` (the list compressed, ~34 MB for H < 17; orbit files and size data small); without network a pick or
+   search then uses these copies and says how old they are. Plan online, observe offline: a search window run once
+   online can be run again offline. *Copy now* copies what is in the cache at once. Command line:
+   `pysyzygos offline on|off|copy|status|remove`.
+
 Settings changed in the GUI apply to that run only; `pysyzygos_config.py` is not changed. Details: "Web interface
 (GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.
 

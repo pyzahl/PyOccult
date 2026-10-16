@@ -209,6 +209,14 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   by 2026); config `star_rv`; windows mode takes the archive's radial_velocity. Archive anonymous async jobs cap at
   50000 rows (Gaia.ROW_LIMIT does not lift it): split queries by source_id ranges. Checked: equal to the archive's
   EPOCH_PROP_POS to <= 0.002 mas without, <= 0.025 mas with radial velocity.
+- `pysyzygos/offline.py` (2026-10-16, `pysyzygos offline`, GUI tab System): copies in HOME/offline/ when the marker
+  offline/enabled exists: sbdb_list.json.gz (pick.fetch_sbdb keep_sbdb after download; on OSError -> sbdb_fallback
+  or the stale cache, warning), orbits/*.bsp (search.fetch_target_orbit keep_spk; on RequestException ->
+  spk_fallback covering the window), sbdb_phys.json (sbdb.put copies it; search.sbdb_phys -> phys_fallback: copy,
+  else the list's row via entry_from_bulk). cleanup removes offline/ only with --all. tests/test_offline.py. Tests that
+  download (test_pick, test_sizecache) call `offline.use_dir(tmp)`: the copies are relative to the working folder
+  and tests run in the data folder. `pysyzygos/sysinfo.py`: `pysyzygos info [--json]`, the System tab's "Data in use"
+  (run as a process: SPICE for the kernels' coverage).
 - `pysyzygos/cameras.py`: `SENSORS` (sensor, px w, px h, pixel um, camera names) for the Site tab's "Sensor (cameras)"
   list; sizes = pixels x pixel size (`sensor_mm`); one entry per sensor, cameras searchable in the label.
 - `pysyzygos/occultations.py`: earlier occultations from NASA PDS "Small Bodies Occultations" V4.0 (doi

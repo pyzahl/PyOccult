@@ -320,14 +320,25 @@ SKIPPED = []                                             # targets without an or
 def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
     target_id = str(target_id)
     fn = Path(cache_dir) / f"PySyzygos_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
+    from pysyzygos import offline
+    resp = None
     if not fn.is_file():
-        resp = requests.get(
-            U.URL_JPL_HORIZONS_API,
-            params={'format': 'json', 'COMMAND': target_id + ';', 'EPHEM_TYPE': 'SPK',
-                    'MAKE_EPHEM': 'YES', 'START_TIME': epochs['start'],
-                    'STOP_TIME': epochs['stop'], 'OBJ_DATA': 'NO'},
-            timeout=60)
-        resp.raise_for_status()
+        try:
+            resp = requests.get(
+                U.URL_JPL_HORIZONS_API,
+                params={'format': 'json', 'COMMAND': target_id + ';', 'EPHEM_TYPE': 'SPK',
+                        'MAKE_EPHEM': 'YES', 'START_TIME': epochs['start'],
+                        'STOP_TIME': epochs['stop'], 'OBJ_DATA': 'NO'},
+                timeout=60)
+            resp.raise_for_status()
+        except requests.RequestException as e:                    # no network: an orbit file kept for offline use
+            old = offline.spk_fallback(target_id, str(epochs['start'])[:10], str(epochs['stop'])[:10], (cache_dir,))
+            if old is None:
+                raise
+            print(f"WARNING: JPL Horizons not reachable ({str(e)[:60]}): orbit of {target_id} from "
+                  f"{os.path.basename(old)} (downloaded {time.strftime('%Y-%m-%d', time.gmtime(os.path.getmtime(old)))})")
+            fn, resp = Path(old), None
+    if resp is not None:                                       # downloaded now
         data = resp.json()
         if 'spk' not in data:
             text = " ".join(str(data.get('result', data)).split())
@@ -335,6 +346,7 @@ def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
                 raise RuntimeError(f"no such object in Horizons: {text[:160]}")
             raise RuntimeError(f"Horizons gave no SPK: {text[:200]}")
         fn.write_bytes(base64.b64decode(data['spk']))
+        offline.keep_spk(fn)                                   # a copy for offline use, if switched on
     if target_id not in _loaded:
         spice.furnsh(str(fn))
         _loaded[target_id] = int(spice.spkobj(str(fn))[0])
@@ -360,7 +372,14 @@ def sbdb_phys(target_id, timeout=30):
         entry = sbdb_cache.entry_from_api(resp.json())
     except (requests.RequestException, ValueError) as e:
         print(f"SBDB lookup failed for {n}: {e}")
-        return hit["phys"] if hit else None                       # stale data beats none
+        if hit:
+            return hit["phys"]                                    # stale data beats none
+        from pysyzygos import offline                             # without network: the copies kept for offline use
+        old = offline.phys_fallback(n)
+        if old:
+            print(f"  size data of {n} from the offline copy")
+            return old["phys"]
+        return None
     sbdb_cache.put({n: entry}, config.cache_path)
     return entry["phys"]
 

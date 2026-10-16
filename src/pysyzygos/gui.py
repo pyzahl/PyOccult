@@ -228,6 +228,7 @@ def index():
         t_bod = ui.tab("Planets & Moons")
         t_search, t_res = ui.tab("Search"), ui.tab("Results")
         t_fav = ui.tab("Favorites")
+        t_sys = ui.tab("System")
     log_card = None
 
     with ui.tab_panels(tabs, value=t_site).classes("w-full"):
@@ -593,6 +594,35 @@ def index():
                 f_pc.set_visibility(bool(pc_chk.value))
                 pc_chk.on_value_change(lambda e: (f_pc.set_visibility(bool(e.value)), save_ui_state(path_check=bool(e.value))))
             f_detail.set_visibility(False)
+
+        with ui.tab_panel(t_sys):
+            from pysyzygos import offline
+            ui.label(f"Data folder: {home.describe()}").classes("text-sm text-slate-600")
+            with ui.row().classes("gap-2 items-center"):
+                ui.button("Setup status", on_click=lambda: sys_status()).props("outline dense").tooltip(
+                    "pysyzygos setup --status (in the log below): kernels, Earth orientation, catalogs, supplement, "
+                    "the site's height")
+            ui.separator()
+            with ui.row().classes("items-center gap-2"):
+                ui.label("Data in use").classes("font-semibold")
+                ui.button("Refresh", on_click=lambda: sys_info_refresh()).props("flat dense").tooltip(
+                    "pysyzygos info: time and Earth orientation (valid ranges), the star catalogs (the one in use "
+                    "marked), the asteroid data in the cache and the offline copies, results")
+            sys_info = ui.column().classes("w-full gap-1")
+            ui.separator()
+            ui.label("Offline use").classes("font-semibold")
+            ui.label("The pick's asteroid list (JPL SBDB) and the searches' orbit files (JPL Horizons) are cached in "
+                     f"{config.cache_path}, which is lost when the computer restarts where it is /dev/shm. With copies "
+                     "kept here (the data folder's offline/), a pick or search without network uses them and says how "
+                     "old they are: plan online, observe offline. The list is ~34 MB compressed (asteroids with "
+                     "H < 17).").classes("text-xs text-slate-500")
+            off_chk = ui.checkbox("Keep copies of orbit downloads for use without network", value=offline.enabled())
+            off_info = ui.label().classes("text-sm text-slate-600 whitespace-pre-line")
+            with ui.row().classes("gap-2"):
+                ui.button("Copy now", on_click=lambda: sys_copy()).props("outline dense").tooltip(
+                    "Copy what is in the cache now (the asteroid list of the last pick, the orbit files of past "
+                    "searches) and switch the copies on")
+                ui.button("Remove copies", on_click=lambda: sys_remove_ask()).props("flat dense color=negative")
 
     with ui.card().classes("w-full") as log_card:
         with ui.row().classes("w-full items-center"):
@@ -1312,6 +1342,68 @@ def index():
             ui.notify(msg, type="positive" if ok else "warning")
             fav_cur["key"] = None
             load_favs()
+
+    # ------------------------------------------------ System tab
+    def sys_refresh():
+        from pysyzygos import offline
+        off_info.text = offline.status_text()
+
+    def sys_toggle(e):
+        from pysyzygos import offline
+        offline.set_enabled(bool(e.value))
+        sys_refresh()
+
+    async def sys_status():
+        await run_process(PYSYZYGOS + ["setup", "--status"], log)
+
+    async def sys_copy():
+        from pysyzygos import offline
+        ok, n = await run.io_bound(offline.copy_now, config.cache_path)
+        off_chk.value = offline.enabled()
+        sys_refresh()
+        ui.notify(f"Copied: asteroid list {'yes' if ok else 'no (none in the cache: run a pick first)'}, {n} orbit files",
+                  type="positive" if ok or n else "warning")
+
+    def sys_remove_ask():
+        with ui.dialog() as d, ui.card():
+            ui.label("Remove all offline copies (asteroid list, orbit files)?")
+            with ui.row():
+                ui.button("Remove", on_click=lambda: (sys_remove(), d.close())).props("color=negative")
+                ui.button("Cancel", on_click=d.close).props("flat")
+        d.open()
+
+    def sys_remove():
+        from pysyzygos import offline
+        offline.remove()
+        off_chk.value = False
+        sys_refresh()
+
+    async def sys_info_refresh():
+        import subprocess
+        env = dict(os.environ, PYSYZYGOS_HOME=ROOT, PYTHONUTF8="1",
+                   PYTHONPATH=os.pathsep.join(x for x in (os.path.dirname(PKG), os.environ.get("PYTHONPATH")) if x))
+        if cat_sel.value:
+            env["PYSYZYGOS_CATALOG"] = cat_sel.value
+        r = await run.io_bound(subprocess.run, PYSYZYGOS + ["info", "--json"], capture_output=True, text=True,
+                               cwd=ROOT, env=env, timeout=120)
+        sys_info.clear()
+        with sys_info:
+            try:
+                data = json.loads(r.stdout.strip().splitlines()[-1])
+            except (ValueError, IndexError):
+                ui.label(f"pysyzygos info failed: {(r.stderr or r.stdout)[-300:]}").classes("text-sm text-red-700")
+                return
+            for group, rows in data:
+                ui.label(group).classes("text-base font-semibold mt-1")
+                with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-0").style("grid-template-columns: 16rem 1fr"):
+                    for k, v in rows:
+                        ui.label(k).classes("text-sm text-slate-500")
+                        ui.label(v).classes("text-sm text-slate-800 break-words")
+        sys_refresh()
+
+    off_chk.on_value_change(sys_toggle)
+    sys_refresh()
+    tabs.on_value_change(lambda e: sys_info_refresh() if e.value in (t_sys, "System") else None)
 
     # ------------------------------------------------ path verification (pathcheck.py)
     with ui.dialog() as pc_dialog, ui.card().classes("w-full max-w-5xl"):

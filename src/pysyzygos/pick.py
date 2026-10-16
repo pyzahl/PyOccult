@@ -43,20 +43,34 @@ def fetch_sbdb(hmax, cache, max_age_s=None):
     sbdb_max_age_days). Returns (fields, data, fetched)."""
     max_age_s = sbdb.max_age_s() if max_age_s is None else max_age_s
     want = math.inf if hmax is None else hmax
+    stale = None                                                 # an expired cache: still usable without network
     if cache and os.path.exists(cache):
         with open(cache) as f:
             blob = json.load(f)
         fetched = blob.get("fetched") or os.path.getmtime(cache)
-        if (blob.get("hmax", 0) >= want and blob.get("full_prec") and set(SBDB_FIELDS) <= set(blob["fields"])
-                and time.time() - fetched < max_age_s):
+        usable = blob.get("hmax", 0) >= want and blob.get("full_prec") and set(SBDB_FIELDS) <= set(blob["fields"])
+        if usable and time.time() - fetched < max_age_s:
             return blob["fields"], blob["data"], fetched
+        stale = blob if usable else None
     q = dict(fields=",".join(SBDB_FIELDS), **{"sb-kind": "a", "sb-ns": "n", "full-prec": "true"})
     if hmax is not None:
         q["sb-cdata"] = json.dumps({"AND": [f"H|LT|{hmax}"]})
     print(f"Downloading SBDB ({'all numbered' if hmax is None else f'H < {hmax}'}, full precision) ...", file=sys.stderr)
-    with net.urlopen(SBDB_URL + "?" + urllib.parse.urlencode(q), timeout=1200) as r:
-        blob = json.load(r)
+    from pysyzygos import offline
+    try:
+        with net.urlopen(SBDB_URL + "?" + urllib.parse.urlencode(q), timeout=1200) as r:
+            blob = json.load(r)
+    except (OSError, ValueError) as e:                           # no network (or a broken answer): an older list
+        old = offline.sbdb_fallback(want) or stale
+        if old is None:
+            raise
+        age = (time.time() - (old.get("fetched") or 0)) / 86400.0
+        print(f"WARNING: SBDB not reachable ({str(e)[:80]}): using the asteroid list from "
+              f"{time.strftime('%Y-%m-%d', time.gmtime(old.get('fetched') or 0))} ({age:.0f} days old; orbits of that "
+              f"date)", file=sys.stderr)
+        return old["fields"], old["data"], old.get("fetched")
     blob["hmax"], blob["fetched"], blob["full_prec"] = want, time.time(), True
+    offline.keep_sbdb(blob)                                      # a compressed copy for offline use, if switched on
     if cache:
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(cache)), suffix=".tmp")
         with os.fdopen(fd, "w") as f:

@@ -6,6 +6,17 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+- **Offline use** (GUI tab **System**, `pysyzygos offline on|off|copy|status|remove`): copies of the pick's asteroid
+  list (compressed, 103 MB -> 34 MB for H < 17), of the searches' orbit files and of the size cache in the data
+  folder's `offline/`, kept with every download when switched on (the caches in `/dev/shm` are lost at a restart).
+  Without network the pick uses the copied (or a stale cached) list, the search a copied orbit file covering its
+  window and the copied size data, each with a warning saying how old it is. Tested with the network blocked: the
+  Phaethon search gives the same event as online. The System tab also shows the data folder, runs
+  `setup --status` and lists the **data in use** (`pysyzygos info`): leap seconds, Earth orientation (measured /
+  predicted / valid range), DE440, the catalogs (in use marked), supplement, star indexes, the asteroid data in the
+  cache and the copies, picks, pre-screens, results.
+
 ### Changed
 - **GUI star limit (Pick, Search, Planets & Moons):** a note next to "Star G limit" says where the value comes from
   (the site's aperture, frames, exposure, MagAdjust, or its mag_limit; capped at the catalog's limit) and, in Pick,

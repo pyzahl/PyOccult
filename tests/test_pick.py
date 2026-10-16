@@ -1,6 +1,8 @@
 import os, sys, json, math, time, types, tempfile, numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 from pysyzygos import pick as P, screen as SC
+from pysyzygos import offline as _offline
+_offline.use_dir(tempfile.mkdtemp())          # never the data folder's real offline copies
 
 # ---------- 1. OWC General Observability Criterion: StarMag < 5 log10(ap_cm) + 2.5 log10(dur/frames) + 8.5 + adj
 opt = dict(aperture=25.0, frames=4, mag_adjust=0.0)

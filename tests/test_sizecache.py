@@ -2,6 +2,8 @@ import os, sys, re, json, time, types, functools, tempfile, numpy as np
 from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src'))
 from pysyzygos import sbdb as pysyzygos_sbdb
+from pysyzygos import offline as _offline
+_offline.use_dir(tempfile.mkdtemp())          # never the data folder's real offline copies
 # sbdb_phys + get_asteroid_size from pysyzygos.py (not importable: kernel setup at import), with a stand-in SBDB
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'pysyzygos', 'search.py')).read()
 code = src[src.index("SIZE_OVERRIDES = {}"):src.index("def get_asteroid_ra_dec(")]
