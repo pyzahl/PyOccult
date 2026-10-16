@@ -2,7 +2,7 @@
 
 How PySyzygos's predictions were checked: against OccultWatcher Cloud (OWC) search results and Occult's (occult.exe)
 event plots, against its own older code paths, and with independent geometry. What is computed and how: `ABOUT.md`;
-open items: `ABOUT.md`, Part 6. Updated 2026-10-14 (version 1.0.0).
+open items: `ABOUT.md`, Part 6. Updated 2026-10-16 (version 1.1.1).
 
 Contents:
 
@@ -627,9 +627,33 @@ anyway (other orbits; OWC times to 0.1 s).
 
 ## 5. What the differences mean
 
-- **Times** agree within a few seconds (mostly under 2 s). Larger differences are small asteroids (under ~3 km):
-  2 to 9 s for six of them and 17 s for 281158 (H 17.9) in section 1.4, 4.5 s for 86427 in 1.5. That is the
-  along-track part of the orbit difference between JPL Horizons and OWC's orbits.
+State of version 1.1.1 (2026-10-16: light deflection of the asteroid, Gaia proper-motion bias and the
+light time from each observer all fixed or added; sections 3 and 4).
+
+- **Geometry against Occult: the same to the listing's rounding across the track.** A whole path, (3200) Phaethon on
+  2019-07-29 with the same JPL orbit solution and the same Gaia star (section 3): across the track -0.03 to
+  +0.03 km at all 732 points, which is Occult's rounding to whole arcseconds (24-31 m); along the track Occult's
+  shadow is 11 ms later (0.15 km), a small systematic beyond its 0.01 s rounding but far below the uncertainty of the
+  prediction itself (path 1 sigma 0.69 km from JPL's orbit; Occult's 1 sigma (0.9 x 0.2) mas, ~0.6 km; the event lasts
+  0.46 s). In the fundamental plane: 0.17 mas, 42 m rms. Open: the 11 ms, and a second object in another geometry
+  (a main-belt asteroid with the star high) as an independent check.
+- **Found and fixed through that comparison** (each affected every prediction):
+  - the asteroid's own light deflection (formula for a source at a finite distance; up to ~1 km across the track,
+    most near opposition; section 3, update 2026-10-15);
+  - the light time from each observer instead of from the Earth's centre (up to ~0.4-0.9 km at the surface, largest
+    with the star high; section 3, update 2026-10-16);
+  - added: the bias of Gaia DR3's proper motions of stars brighter than G 13 (up to ~0.8 mas in 2026);
+  - the shadow path's time span (paths cut off at one end) and the Earth orientation checked independently (0.2 m
+    against astropy/IERS, section 4).
+- **What Occult and PySyzygos share, confirmed:** Gaia DR3 star with proper motion, stellar parallax and light
+  deflection (the star's and the asteroid's, star minus asteroid), JPL Horizons orbits (Occult's osculating elements
+  at mid-event and PySyzygos's integrated SPK agree to 8 mm over the event), UT1 - UTC from IERS, a WGS84 path at
+  height 0 ("at MSL" in Occult; the geoid's tens of metres are below what was resolved).
+- **Times against OWC** agree within a few seconds (mostly under 2 s; rerun 2026-10-16: median 0.70 s at the
+  observer's site, 0.45 s at the second site, unchanged by the fixes above, which move times by tenths of a second
+  and paths by up to 0.4 km). Larger differences are small asteroids (under ~3 km): 2 to 9 s for six of them and
+  17 s for 281158 (H 17.9) in section 1.4, 4.5 s for 86427 in 1.5. That is the along-track part of the orbit
+  difference between JPL Horizons and OWC's orbits.
 - **Stars** are always the same; G matches OWC's magnitude column to 0.01.
 - **Drops** agree within 0.25 mag below 5 mag. Larger differences come from the asteroid's brightness (H-G with
   G 0.15 here; OWC's phase law or its V conversion is unknown), up to 0.66 mag for single asteroids; above 5 mag both
@@ -637,17 +661,18 @@ anyway (other orbits; OWC times to 0.1 s).
   duration difference is the diameter (OWC 3.56 km, PySyzygos 1.77 km from H); the drop is unexplained (hypothesis,
   unverified: the 5.6 mag star's angular diameter makes the event partial; `ABOUT.md`, Part 6).
 - **Durations** differ where the diameters differ: OWC often has a measured or catalogued diameter where PySyzygos
-  estimates one from H (marked * in the tables).
-- **Missing stars:** PySyzygos's local catalog keeps only Gaia stars with a full astrometric solution (parallax,
-  proper motion) and RUWE < 1.4. Gaia's 2-parameter sources (position only) and poorly measured stars (often
-  unresolved doubles) are left out, so their events are never predicted; OWC lists them (2 of 50 in section 1.5).
-  Open item: keep them in the catalog, flagged (a 2-parameter star's position error grows with the years since 2016,
-  as its proper motion is unknown).
+  estimates one from H (marked * in the tables); Occult used 5.0 km (DAMIT) for Phaethon, PySyzygos 6.25 km (SBDB).
+- **Stars Gaia measured less well:** since 0.17.0 the high-RUWE supplement (RUWE >= 1.4 and 2-parameter stars, with
+  UCAC5/UCAC4 proper motions for the latter since 0.18.0) brings their events in, flagged; 69085 of section 1.5 is now
+  found. 325516's 2-parameter star is still not found (to check).
 - **Small asteroids** (H above ~17, under ~1 km): their orbits are poorly known, and JPL's and OWC's orbits can differ
   by tens of km across the track, so an event can fall inside one reach and outside the other: 484605 (our path
   29 km from the site) and 549201 (47 km), both with OWC's within 20 km.
-- **Paths across the track:** since 0.10.0 PySyzygos applies stellar parallax and light deflection as Occult does
-  (section 2); for high sites OWC online is off by the site's elevation effect (1.1). A whole path compared with
-  Occult's (section 3: Phaethon 2019, same orbit solution) agrees to about 1 mas, with 55-70 m rms around that.
+- **High sites:** OWC online ignores the site's elevation (1.1); PySyzygos uses it.
 - **More events than OWC:** the pick keeps an event if it can be observable (upper size bound); a few search events
   lie just outside OWC's listing (window edges, the nominal vs upper size).
+
+In short: where both use the same orbit and star, PySyzygos and Occult now compute the same path to tens of metres
+across the track and about 10 ms along it, well inside the uncertainty of any prediction; the remaining differences
+against OWC come from the inputs (orbits of small asteroids, diameters, the asteroid's magnitude), not from the
+computation.

@@ -4,7 +4,12 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
-## [Unreleased]
+## [1.1.1] "Beyond Horizons" - 2026-10-16
+
+The shadow at each observer is now computed with the asteroid as that observer sees it: the light time from the
+observer, not from the Earth's centre. This removed the last systematic difference to Occult's path of (3200)
+Phaethon: across the track the two now agree within the listing's rounding (+-30 m), along it within 11 ms
+(VERIFICATION.md sections 3 and 5). The OWC regression checks are unchanged (15 of 16, 45 of 50).
 
 ### Fixed
 - **The asteroid as each observer sees it: light time from the observer, not from the Earth's centre.** An observer
@@ -612,6 +617,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[1.1.1]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.1
 [1.1.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.0.0
 [0.15.0]: https://github.com/pyzahl/PySyzygos/commits/main
