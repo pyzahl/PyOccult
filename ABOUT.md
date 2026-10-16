@@ -542,7 +542,7 @@ setup of OccultWatcher Cloud, whose server keeps its predictions ready; locally,
 | `naif0012.tls`, `pck00010.tpc`, `de440.bsp` | NAIF generic kernels | leap seconds, Earth radii, Sun/Moon/planets |
 | `earth_latest_high_prec.bpc` | NAIF generic kernels | ITRF93 Earth orientation, refreshed after `earth_pck_max_age` days; measured to its "last datum", predicted ~3 months beyond (both shown at start-up and in the report header; a window past the coverage is refused) |
 | `earth_1962_*_combined.bpc` (optional) | NAIF generic kernels | ITRF93 Earth orientation from 1962 (measured to its creation, then a long-term prediction), for windows before 2000 (historic events); loaded before `earth_latest_high_prec.bpc`, which rules from 2000 on; fetched by a search or pick before 2000, or `setup --historic-earth` (~31 MB) |
-| Asteroid orbit files | JPL Horizons API (`EPHEM_TYPE=SPK`), cached in `cache_path` | `pysyzygos/search.py` positions |
+| Asteroid orbit files | JPL Horizons API (`EPHEM_TYPE=SPK`), cached in `cache_path`, downloaded again after `orbit_max_age_days` (1) | `pysyzygos/search.py` positions |
 | Asteroid size, H, G | SBDB API (`sbdb.api`, `phys-par=1`), cached per asteroid | `get_asteroid_size` |
 | Elements, sizes for all asteroids | SBDB Query API (`sbdb_query.api`, numbered, full precision), cached | `pysyzygos/pick.py` |
 | Asteroid names | SBDB full name, from the same per-asteroid cache as the size | `get_asteroid_name` |

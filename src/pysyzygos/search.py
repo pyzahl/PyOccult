@@ -322,7 +322,8 @@ def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
     fn = Path(cache_dir) / f"PySyzygos_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
     from pysyzygos import offline
     resp = None
-    if not fn.is_file():
+    max_age = float(getattr(config, "orbit_max_age_days", 1)) * 86400.0
+    if not fn.is_file() or time.time() - fn.stat().st_mtime > max_age:   # missing or older than orbit_max_age_days
         try:
             resp = requests.get(
                 U.URL_JPL_HORIZONS_API,
@@ -331,8 +332,9 @@ def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
                         'STOP_TIME': epochs['stop'], 'OBJ_DATA': 'NO'},
                 timeout=60)
             resp.raise_for_status()
-        except requests.RequestException as e:                    # no network: an orbit file kept for offline use
-            old = offline.spk_fallback(target_id, str(epochs['start'])[:10], str(epochs['stop'])[:10], (cache_dir,))
+        except requests.RequestException as e:                    # no network: this file even if old, else a copy
+            old = str(fn) if fn.is_file() else offline.spk_fallback(target_id, str(epochs['start'])[:10],
+                                                                   str(epochs['stop'])[:10], (cache_dir,))
             if old is None:
                 raise
             print(f"WARNING: JPL Horizons not reachable ({str(e)[:60]}): orbit of {target_id} from "

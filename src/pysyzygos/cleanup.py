@@ -4,6 +4,8 @@ large local Gaia catalogs (their star files, as from Zenodo or a build).
     pysyzygos cleanup                    list what would be deleted, with sizes (nothing is deleted)
     pysyzygos cleanup --yes              delete it
     pysyzygos cleanup --keep-results     ... but keep the run outputs (results database, picks, pre-screens, maps, ...)
+    pysyzygos cleanup --orbits           only the cached orbit files (the next search downloads them again)
+    pysyzygos cleanup --cache            only the caches (orbit files, the asteroid list, size data, exports)
     pysyzygos cleanup --all --yes        also your settings: sites.py, pysyzygos_config.py, csv_exports.py, GUI state,
                                         favorites, and the data-folder setting of `pysyzygos setup --home`: a start like
                                         a first install (setup asks for your site again; without --all it keeps it)
@@ -28,6 +30,7 @@ CACHE_PATTERNS = ("PySyzygos_asteroid_*.bsp", "PySyzygos_body_*.bsp", "PySyzygos
                   "PySyzygos_sbdb_phys.json", "pysyzygos_exports",
                   "PyOccult_asteroid_*.bsp", "PyOccult_body_*.bsp", "PyOccult_sbdb_cache.json",   # names before 1.0.0
                   "PyOccult_sbdb_phys.json", "pyoccult_exports")
+ORBIT_PATTERNS = ("PySyzygos_asteroid_*.bsp", "PySyzygos_body_*.bsp", "PyOccult_asteroid_*.bsp", "PyOccult_body_*.bsp")
 OUTPUTS = ("pysyzygos.db", "pysyzygos.db-wal", "pysyzygos.db-shm", "owc_check.db", "owc_check.db-wal", "owc_check.db-shm",
            "hits_log.csv", "hits_report.html", "hits_report.md", "bodies_log.csv", "bodies_report.html",
            "owc_check_hits.csv", "pick_events.csv", "pick_candidates.csv", "targets.py", "maps", "picks", "prescreen",
@@ -117,6 +120,22 @@ def _gb(n):
     return f"{n / 1e9:.2f} GB" if n >= 1e8 else f"{n / 1e6:.1f} MB" if n >= 1e5 else f"{n / 1e3:.0f} kB"
 
 
+def empty_cache(cp=None, orbits_only=False):
+    """Delete PySyzygos's own files in cache_path right away (the GUI's System tab, --orbits / --cache): the orbit
+    files only, or all its caches. Offline copies (offline/) are kept. Returns (files, bytes)."""
+    cp = cp or cache_path()
+    n = size = 0
+    for pat in ORBIT_PATTERNS if orbits_only else CACHE_PATTERNS:
+        for p in glob.glob(os.path.join(cp, pat)):
+            try:
+                size += _size(p)
+                shutil.rmtree(p) if os.path.isdir(p) and not os.path.islink(p) else os.remove(p)
+                n += 1
+            except OSError as e:
+                print(f"not deleted: {p} ({e})", file=sys.stderr)
+    return n, size
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PySyzygos {__version__}")
@@ -124,7 +143,13 @@ def main(argv=None):
     ap.add_argument("--keep-results", action="store_true", help="keep the run outputs (results, picks, pre-screens, maps)")
     ap.add_argument("--all", dest="everything", action="store_true",
                     help="also your settings (sites.py, pysyzygos_config.py, favorites, ...) and the data-folder setting")
+    ap.add_argument("--orbits", action="store_true", help="only delete the cached orbit files (no --yes needed)")
+    ap.add_argument("--cache", action="store_true", help="only delete the caches in cache_path (no --yes needed)")
     a = ap.parse_args(argv)
+    if a.orbits or a.cache:
+        n, size = empty_cache(orbits_only=a.orbits)
+        print(f"{cache_path()}: deleted {n} {'orbit files' if a.orbits else 'cache files'} ({_gb(size)})")
+        return 0
     items = plan(a.keep_results, a.everything)
     print(f"data folder: {os.getcwd()}")
     if not items:

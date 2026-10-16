@@ -514,7 +514,9 @@ pysyzygos                 # opens http://127.0.0.1:8080 in your browser (local o
    `offline/` (the list compressed, ~34 MB for H < 17; orbit files and size data small); without network a pick or
    search then uses these copies and says how old they are. Plan online, observe offline: a search window run once
    online can be run again offline. *Copy now* copies what is in the cache at once. Command line:
-   `pysyzygos offline on|off|copy|status|remove`.
+   `pysyzygos offline on|off|copy|status|remove`. A search downloads an orbit again when the cached one is older than
+   `orbit_max_age_days` (default 1 day); *Download orbits again* deletes the cached orbit files at once, *Empty
+   cache* also the asteroid list and size data (`pysyzygos cleanup --orbits` / `--cache`; the offline copies stay).
 
 Settings changed in the GUI apply to that run only; `pysyzygos_config.py` is not changed. Details: "Web interface
 (GUI)" below; screenshots of every tab: "GUI Step by Step in Screenshots" at the end.
@@ -595,6 +597,8 @@ A download stopped halfway, setup or a run fails with odd errors, or you just wa
 what it downloaded and generated and set it up again. Your large Gaia catalog (the Zenodo download) is kept, so
 starting over takes minutes, not hours. Go step by step, from the gentlest:
 
+0. **Only fresh orbits or caches**: `pysyzygos cleanup --orbits` (the next search downloads the current orbits) or
+   `pysyzygos cleanup --cache` (also the asteroid list and size data); the System tab's buttons do the same.
 1. **Run setup again**: `uv run pysyzygos setup` (or `pysyzygos setup`). It checks everything, resumes unfinished
    downloads and builds, and fixes most problems on its own.
 2. **Fresh downloads and caches, keep your results**: `uv run pysyzygos cleanup --keep-results --yes`, then

@@ -24,6 +24,14 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
   reset it (↺), also across GUI restarts (gui_state `mag_override`); before, any edit in the Site tab reset it.
   Prompted by a site with 107 cm typed for 10.7 cm, which sent a pick to G 18 and a 10 GB index.
 - Pick and pre-screen index progress: elapsed time and ETA as H:MM:SS (were seconds).
+- **Orbit files expire:** a search downloads an asteroid's orbit (Horizons SPK) again when the cached file is older
+  than `orbit_max_age_days` (new config key, default 1); before, a cached file was reused regardless of age. Without
+  network the old file is used, with a warning giving its date. `pysyzygos info` (System tab) shows the oldest
+  cached orbit. Why a day: JPL's solutions for main-belt asteroids are months old (median 133 days for H < 17, last
+  observation median 306 days, 2026-10-16), but near-Earth asteroids often get a new one daily (11 % within a day),
+  and a download costs only seconds. Manually: System tab **Download orbits again** (deletes the cached orbit files)
+  and **Empty cache** (also the asteroid list and size data; offline copies kept), `pysyzygos cleanup --orbits` /
+  `--cache`.
 
 ### Fixed
 - `path-check steps`: the star's source_id was read from a mixed table row, i.e. through a float, and printed rounded

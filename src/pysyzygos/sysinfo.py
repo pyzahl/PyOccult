@@ -18,6 +18,14 @@ def _age(t):
     return f"{d:.0f} days ago" if d >= 1.5 else f"{d * 24:.0f} h ago"
 
 
+def _config(name, default):
+    try:
+        from pysyzygos import config
+        return getattr(config, name, default)
+    except Exception:
+        return default
+
+
 def _size(paths):
     return sum(os.path.getsize(p) for p in paths if os.path.isfile(p))
 
@@ -127,8 +135,11 @@ def asteroids(cache_path):
         out.append(("Asteroid list (SBDB, cache)", f"none in {cache_path} (the next pick downloads it)"))
     out.append(("Size data (SBDB, cache)", f"{len(sbdb.load(cache_path))} asteroids"))
     spk = glob.glob(os.path.join(cache_path, "PySyzygos_asteroid_*.bsp"))
+    max_d = float(_config("orbit_max_age_days", 1))
+    oldest = (f"; oldest downloaded {_age(min(os.path.getmtime(f) for f in spk))}, a search downloads orbits "
+              f"older than {max_d:g} day{'s' if max_d != 1 else ''} again" if spk else "")
     out.append(("Orbit files (Horizons, cache)", f"{len(spk)} files, {_gb(_size(spk))} (from searches since the "
-                f"cache was last emptied; {cache_path})"))
+                f"cache was last emptied; {cache_path}){oldest}"))
     st = offline.status()
     s = st["sbdb"]
     out.append(("Offline copies", ("on" if st["enabled"] else "off") +

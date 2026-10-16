@@ -609,6 +609,13 @@ def index():
                     "pysyzygos info: time and Earth orientation (valid ranges), the star catalogs (the one in use "
                     "marked), the asteroid data in the cache and the offline copies, results")
             sys_info = ui.column().classes("w-full gap-1")
+            with ui.row().classes("gap-2 items-center"):
+                ui.button("Download orbits again", on_click=lambda: sys_cache(True)).props("outline dense").tooltip(
+                    "Delete the cached orbit files (JPL Horizons): the next search downloads the current orbits. "
+                    "Searches do this by themselves for files older than orbit_max_age_days (config, default 1)")
+                ui.button("Empty cache", on_click=lambda: sys_cache_ask()).props("flat dense color=negative").tooltip(
+                    f"Delete PySyzygos's files in {config.cache_path}: orbit files, the pick's asteroid list (the next "
+                    "pick downloads it again, ~100 MB), size data, CSV exports. The offline copies stay")
             ui.separator()
             ui.label("Offline use").classes("font-semibold")
             ui.label("The pick's asteroid list (JPL SBDB) and the searches' orbit files (JPL Horizons) are cached in "
@@ -1377,6 +1384,26 @@ def index():
         offline.remove()
         off_chk.value = False
         sys_refresh()
+
+    async def sys_cache(orbits_only):
+        from pysyzygos import cleanup
+        n, size = await run.io_bound(cleanup.empty_cache, config.cache_path, orbits_only)
+        ui.notify(f"Deleted {n} {'orbit files' if orbits_only else 'cache files'} ({size / 1e6:.0f} MB)",
+                  type="positive")
+        await sys_info_refresh()
+
+    def sys_cache_ask():
+        async def go():
+            d.close()
+            await sys_cache(False)
+
+        with ui.dialog() as d, ui.card():
+            ui.label(f"Delete PySyzygos's cached downloads in {config.cache_path} (orbit files, asteroid list, size "
+                     "data)? They are downloaded again when needed; the offline copies stay.")
+            with ui.row():
+                ui.button("Empty cache", on_click=go).props("color=negative")
+                ui.button("Cancel", on_click=d.close).props("flat")
+        d.open()
 
     async def sys_info_refresh():
         import subprocess

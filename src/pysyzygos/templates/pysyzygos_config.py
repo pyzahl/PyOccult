@@ -119,6 +119,8 @@ default_sigma3_km = 10.0
 cache_path = "/dev/shm" if _os.path.isdir("/dev/shm") else _tempfile.gettempdir()
 
 sbdb_max_age_days = 30  ## asteroid size data (SBDB) is cached in cache_path and refetched after this many days
+orbit_max_age_days = 1  ## asteroid orbit files (Horizons SPK) in cache_path are downloaded again after this many days
+                        ## (JPL's orbit solutions change after new observations: near-Earth asteroids often daily)
 
 ### Init, Cleanups, ToDO clean SHM cache?
 earth_pck_max_age = 7 ## days for earth pck to expire/auto update

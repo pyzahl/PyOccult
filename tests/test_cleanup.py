@@ -46,6 +46,14 @@ GONE = ("de440.bsp", "naif0012.tls", "jup365.bsp", "data/ObsCodes.html", "sbdb_c
         "gaia_dr3_g16/bright_G15.0.v2.npy", "gaia_dr3_g16/supplement")
 OUTPUTS = ("pysyzygos.db", "pyoccult.db", "hits_log.csv", "maps", "picks", "prescreen", "gaia_build.log", "targets.py", "sites.py~")
 
+# --orbits: only the orbit files in the cache; --cache: all PySyzygos's cache files; nothing else, no --yes needed
+assert CL.main(["--orbits"]) == 0
+assert sorted(os.listdir(cache)) == ["PyOccult_sbdb_phys.json", "PySyzygos_sbdb_cache.json", "pysyzygos_exports",
+                                     "someone_elses_file.dat"], os.listdir(cache)
+assert CL.main(["--cache"]) == 0 and sorted(os.listdir(cache)) == ["someone_elses_file.dat"]
+assert all(ex(p) for p in KEEP_ALWAYS + SETTINGS + GONE + OUTPUTS)
+make()
+
 # a dry run deletes nothing
 assert CL.main([]) == 0
 assert all(ex(p) for p in KEEP_ALWAYS + SETTINGS + GONE + OUTPUTS)

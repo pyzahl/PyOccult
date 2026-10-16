@@ -293,7 +293,7 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
 - `pysyzygos/cleanup.py` (`pysyzygos cleanup`, 2026-10-11): deletes downloads, PySyzygos's own cache files
   (CACHE_PATTERNS in cache_path only), catalog extras (bright_*, supplement/, tmp) and run outputs (OUTPUTS), with
   --all also SETTINGS + home.POINTER; NEVER: owc_refs/, owc_reference.*, private-docs/, release/, run.sh, .venv, git,
-  catalog star files. Dry run unless --yes. Reads cache_path from the config only if pysyzygos_config.py exists (loading
+  catalog star files. Dry run unless --yes; `--orbits` / `--cache` (`empty_cache`, ORBIT_PATTERNS; System tab buttons) delete at once. Reads cache_path from the config only if pysyzygos_config.py exists (loading
   it would create one). Keep its lists in step when new downloads/outputs are added. `tests/test_cleanup.py`.
 - `CONTRIBUTING.md`: fork/branch workflow, setup, tests, working with Claude Code, private files, pull requests,
   GPL-3.0-or-later for contributions. `LICENSE` (GPL-3.0 text), `CITATION.cff` (validated with cffconvert).
@@ -356,7 +356,7 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   rename, and rename finished files with `gaia_local.replace_file` (retries ~10 s: virus scanners). Tests check
   /proc/self/maps at the rename (test_gaia_local, test_shadowtrack). Found 2026-10-12 in the first Windows install.
 - Write cache files atomically (temp file + `os.replace`). Every cache (asteroid SPKs, SBDB bulk list, per-asteroid SBDB size data
-  `PySyzygos_sbdb_phys.json`; both SBDB caches refetched after `sbdb_max_age_days`) goes to `config.cache_path`
+  `PySyzygos_sbdb_phys.json`; both SBDB caches refetched after `sbdb_max_age_days`; Horizons orbit SPKs after `orbit_max_age_days`, default 1, stale file used offline) goes to `config.cache_path`
   (`/dev/shm` if present, else the system temp folder); never hard-code a path. Gaia is not cached: corridor mode
   reads the local catalog, the old windows mode queries the archive uncached.
 - Historic Earth orientation (2026-10-12): `kernels.historic_earth_pck` (newest `earth_1962_*_combined.bpc`, NAIF
