@@ -6,6 +6,20 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Changed
+- **GUI star limit (Pick, Search, Planets & Moons):** a note next to "Star G limit" says where the value comes from
+  (the site's aperture, frames, exposure, MagAdjust, or its mag_limit; capped at the catalog's limit) and, in Pick,
+  when the first pick would build a deeper star index (minutes, GBs on disk). A value you type is now kept until you
+  reset it (↺), also across GUI restarts (gui_state `mag_override`); before, any edit in the Site tab reset it.
+  Prompted by a site with 107 cm typed for 10.7 cm, which sent a pick to G 18 and a 10 GB index.
+- Pick and pre-screen index progress: elapsed time and ETA as H:MM:SS (were seconds).
+
+### Fixed
+- `path-check steps`: the star's source_id was read from a mixed table row, i.e. through a float, and printed rounded
+  (2637445446884721408 as ...721664); the radial-velocity lookup there used the rounded id too. Now taken from the
+  int64 column. The star itself and the search were not affected. The proper-motion row names the proper motion and
+  the years; the shift column says "mas, not mas/yr".
+
 ### Added
 - **Path verification, step by step** (`pysyzygos path-check steps`, GUI: *Step by step* in the Favorites' path
   verification): the event from our side, stage by stage, for comparing with another program's own steps (asked for

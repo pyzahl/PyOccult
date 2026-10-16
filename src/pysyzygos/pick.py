@@ -31,6 +31,12 @@ SBDB_FIELDS = ["spkid", "full_name", "H", "G", "diameter", "diameter_sigma", "ex
 
 
 # ---------------------------------------------------------------- SBDB
+
+def hms(seconds):
+    """Seconds as H:MM:SS (progress lines)."""
+    s = int(max(seconds, 0))
+    return f"{s // 3600}:{s // 60 % 60:02d}:{s % 60:02d}"
+
 def fetch_sbdb(hmax, cache, max_age_s=None):
     """Bulk SBDB download of numbered asteroids with H < hmax (hmax None: all), full-precision elements. Cached (atomic
     write); reused while it covers hmax, has all SBDB_FIELDS in full precision and is younger than max_age_s (config
@@ -142,8 +148,8 @@ def run_screen(rows, et0, et1, opt, site_args, workers, chunk=2000, mp_start="sp
             events += ev
             done += n
             el = time.time() - t0
-            print(f"  {done}/{len(rows)} asteroids, {len(events)} events, {el:.0f} s, "
-                  f"ETA {el / done * (len(rows) - done):.0f} s", file=sys.stderr, flush=True)
+            print(f"  {done}/{len(rows)} asteroids, {len(events)} events, {hms(el)}, "
+                  f"ETA {hms(el / done * (len(rows) - done))}", file=sys.stderr, flush=True)
     return events
 
 

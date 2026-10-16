@@ -659,7 +659,7 @@ def index(path, workers=4, block=100_000):
                 idx[i0:i0 + len(b)] = b
                 done += len(b)
                 el = time.time() - t0
-                print(f"  index: {done}/{n} events, {el:.0f} s, ETA {_hms(el / done * (n - done))}", file=sys.stderr,
+                print(f"  index: {done}/{n} events, {_hms(el)}, ETA {_hms(el / done * (n - done))}", file=sys.stderr,
                       flush=True)
         idx.flush()
         del idx

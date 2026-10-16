@@ -309,7 +309,10 @@ def index():
                 s_mag = ui.number("Star G limit", step=0.1, min=6, max=21).classes("w-28").tooltip(
                     "Faintest star (Gaia G) searched. Default: from the site's telescope (aperture, detection frames, longest "
                     "exposure, MagAdjust; Site tab), capped at the catalog's limit; change it for one run")
+                ui.button("↺", on_click=lambda: mag_reset("search")).props("flat dense").tooltip(
+                    "Back to the site's default star limit")
                 s_drop = ui.number("Min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1), step=0.05)
+            s_mag_note = ui.label().classes("text-xs text-slate-500")
             s_use_file = ui.switch("Targets from the saved pick of this site (Pick tab)", value=True).tooltip(
                 "Uses the newest saved pick of the selected site whose window covers the search window; "
                 "without one, targets.py or the list in pysyzygos_config.py")
@@ -349,6 +352,8 @@ def index():
                     "Faintest star (Gaia G) searched. Default: from the site's telescope (aperture, detection "
                     "frames, longest exposure, MagAdjust; Site tab), capped at the catalog's limit; change it for one "
                     "pick run. Above G 15 the first pick builds a deeper star index once (a few minutes)")
+                ui.button("↺", on_click=lambda: mag_reset("pick")).props("flat dense").tooltip(
+                    "Back to the site's default star limit")
                 p_hmax = ui.number("H below", value=getattr(config, "pick_hmax", 17.0), step=0.5).classes(
                     "w-28").tooltip(
                     "Only asteroids with H below this are screened (fainter H = smaller asteroids; more asteroids "
@@ -364,6 +369,7 @@ def index():
                     "are as loose), only its asteroids are screened: the same events, much faster; else all. "
                     "all: every asteroid, for any place and time (slower, no pre-screen needed). "
                     "Or one pre-screen by name (listed if it fits)")
+            p_mag_note = ui.label().classes("text-xs text-slate-500")
             with ui.row().classes("items-center"):
                 ui.button("Run pick", on_click=lambda: run_pick()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
@@ -453,10 +459,13 @@ def index():
                     "Faintest star (Gaia G) searched. Default: from the site's telescope (aperture, detection frames, longest "
                     "exposure, MagAdjust; Site tab), capped at the catalog's limit; change it for one run. "
                     "Planets have no drop limit (any star they cover disappears); moons also need the min. drop")
+                ui.button("↺", on_click=lambda: mag_reset("bodies")).props("flat dense").tooltip(
+                    "Back to the site's default star limit")
                 b_drop = ui.number("Moons: min. drop (mag)", value=getattr(config, "min_mag_drop", 0.1),
                                    step=0.05).classes("w-36").tooltip(
                     "Moons are bright (about mag 5 for Jupiter's): only bright stars give a measurable drop")
                 b_fresh = ui.checkbox("Start a fresh list", value=True)
+            b_mag_note = ui.label().classes("text-xs text-slate-500")
             with ui.row():
                 ui.button("Run", on_click=lambda: run_bodies()).props("color=primary")
                 ui.button("Stop", on_click=lambda: stop_process(log)).props("outline color=negative")
@@ -639,11 +648,64 @@ def index():
         """Faintest star for the pick: the site's telescope limit, capped at the selected catalog's G limit."""
         return round(min(mag_limit(s), cat_gmax.get(cat_sel.value, 18.0)), 1)
 
+    # the star G limits of Pick, Search and Planets & Moons: the site's default unless overridden (kept until reset with
+    # the ↺ button, also across restarts: gui_state mag_override); a note says where the value comes from
+    MAG = dict(setting=False, override={k: float(v) for k, v in (load_ui_state().get("mag_override") or {}).items()})
+    INDEX_GB = {15: 1.2, 16: 2.6, 17: 5.0, 18: 10.0}             # bright-star index sizes on disk (measured: 15, 16, 18)
+
+    def mag_fields():
+        return {"pick": (p_mag, p_mag_note), "search": (s_mag, s_mag_note), "bodies": (b_mag, b_mag_note)}
+
+    def mag_source(s):
+        lim, cap = mag_limit(s), cat_gmax.get(cat_sel.value, 18.0)
+        how = (f"mag_limit {float(s['mag_limit']):g} in sites.py" if s.get("mag_limit") else
+               f"{s.get('aperture_cm', 25.0):g} cm, {int(s.get('frames', 4))} frames, longest exposure "
+               f"{s.get('max_exp_s', 0.64):g} s, MagAdjust {s.get('mag_adjust', 0.0):+g}")
+        return (f"Star limit from site {state['name']}: {how} → G {lim:.1f}"
+                + (f", capped at the catalog's {cap:g}" if lim > cap else ""))
+
+    def mag_apply(s=None):
+        s = s or collect()
+        d = pick_mag_default(s)
+        MAG["setting"] = True
+        try:
+            for kind, (f, note) in mag_fields().items():
+                ov = MAG["override"].get(kind)
+                f.value = d if ov is None else ov
+                v = float(f.value or d)
+                text = (f"Star limit G {v:g}: your override (site default {d:g}; ↺ resets)" if ov is not None
+                        else mag_source(s))
+                if kind == "pick":
+                    n = max(15, math.ceil(v - 1e-9))
+                    if not os.path.isfile(os.path.join(cat_sel.value or "", f"bright_G{float(n):.1f}.v2.npy")):
+                        text += (f" · the G ≤ {n} star index is not built yet: the next pick builds it once "
+                                 f"(several minutes, ~{INDEX_GB.get(n, 10):g} GB on disk)")
+                note.text = text
+        finally:
+            MAG["setting"] = False
+
+    def mag_changed(kind, e):
+        if MAG["setting"]:
+            return
+        d = pick_mag_default(collect())
+        v = e.value
+        MAG["override"][kind] = None if v in (None, "") or abs(float(v) - d) < 1e-9 else float(v)
+        save_ui_state(mag_override={k: x for k, x in MAG["override"].items() if x is not None})
+        mag_apply()
+
+    def mag_reset(kind):
+        MAG["override"][kind] = None
+        save_ui_state(mag_override={k: x for k, x in MAG["override"].items() if x is not None})
+        mag_apply()
+
+    for _kind, (_f, _n) in mag_fields().items():
+        _f.on_value_change(lambda e, k=_kind: mag_changed(k, e))
+
     def update_derived(*_):
         s = collect()
         unsaved.text = "" if saved_site(state["name"]) == effective(s, state["name"]) else "unsaved changes"
         w, h = fov(s)
-        p_mag.value = s_mag.value = b_mag.value = pick_mag_default(s)
+        mag_apply(s)
         derived.text = (f"Stars searched to G {mag_limit(s):.1f} · camera field {w:.1f}′ × {h:.1f}′ "
                         f"(focal {s.get('focal_mm') or 100 * s.get('aperture_cm', 25):.0f} mm)")
 
@@ -834,7 +896,7 @@ def index():
     sel.on_value_change(lambda e: (show_site(e.value), save_ui_state(site=e.value, catalog=cat_sel.value))
                         if e.value in sites else None)
     def catalog_limit(*_):                                        # the catalog's limit caps the star limits
-        p_mag.value = s_mag.value = b_mag.value = pick_mag_default(collect())
+        mag_apply()
     cat_sel.on_value_change(catalog_limit)
     cat_sel.on_value_change(lambda e: save_ui_state(catalog=e.value, site=state["name"]) if e.value else None)
 
