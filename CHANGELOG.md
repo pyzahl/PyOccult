@@ -6,6 +6,14 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 
 ## [Unreleased]
 
+## [1.1.0] "New Horizons" - 2026-10-15
+
+More accurate paths, found in a whole-path comparison with Occult ((3200) Phaethon 2019-07-29, VERIFICATION.md
+section 3): the light deflection of the asteroid is now computed with the formula for a source at a finite distance
+(it was off by up to ~1 km across the track, most near opposition), and Gaia's proper motions of bright stars are
+corrected for their known bias. Also: paths that were cut off at one end are complete, and twilight events of bright
+stars are kept and marked (default Sun limit 0 deg).
+
 ### Added
 - **Twilight mark**: events with the Sun above -12 deg at the site get "☼ −8°" next to the star magnitude (Results
   and Planets & Moons pages, Markdown, favorites, CSV exports with a new `sun_alt` value, the GUI Pick table; hover:
@@ -589,6 +597,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[1.1.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.0
 [1.0.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.0.0
 [0.15.0]: https://github.com/pyzahl/PySyzygos/commits/main
 [0.14.0]: https://github.com/pyzahl/PySyzygos/commits/main
