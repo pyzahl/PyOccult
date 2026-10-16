@@ -439,7 +439,8 @@ The same comparison after the corrections (all 732 points; across: star above 20
 
 Open: the remaining 0.5 mas (0.34 km east-west), and the Earth-rotation term of the fit, unchanged at UT1 -202 ms
 (it cannot come from the star). Occult applies UT1 - UTC from IERS data (Steve Preston), so it is not UTC for UT1;
-whether it is a difference in the Earth orientation or an artefact of the fit is open. Also open: Occult's printed
+PySyzygos's Earth orientation agrees with astropy/IERS to 0.2 m here (section 4), so it is most likely an artefact
+of the fit (it takes up the offset's change along the track, see below). Also open: Occult's printed
 "astrometric" star place includes parallax and deflection (Steve Preston), but it agrees with neither Gaia +
 parallax + the star's full deflection (+1.5 / -0.7 mas off, beyond its rounding of about 0.6 mas) nor the other
 combinations as well as with Gaia + the asteroid-relative deflection without parallax (+0.2 / -0.3 mas). A
@@ -548,6 +549,18 @@ the time difference is a third. The remaining offset in the plane is not quite c
   star, 3.3 km from the centre line, 1.17 s, drop 5.24 mag, flagged "RUWE 1.65". The same check showed that no
   catalogued small body (JPL SB Identification, numbered or not) came near any star brighter than G 16 in that
   field at the time of the unexplained 3.5 s dip of a reference star a minute later (nearest: 44" from a G 15.5 star).
+- **Earth orientation against astropy** (2026-10-16): the same ground points (WGS84, height 0) turned into the
+  celestial frame by SPICE (NAIF's `earth_latest_high_prec.bpc`: IAU 1976 precession, IAU 1980 nutation with the
+  IERS nutation corrections, UT1, polar motion; ITRF93 -> J2000) and by astropy (IERS data, IAU 2006/2000A through
+  ERFA, the open-source build of the IAU's SOFA library; ITRS -> GCRS). At the Phaethon event (2019-07-29
+  11:12:30 UT, five points along its track) they differ by 0.03-0.21 m, as an Earth-rotation angle -0.3 mas
+  (UT1 -0.017 ms); UT1 - UTC that day was -0.1616 s and both apply it. For 2026-10-16 (both predictions a few days
+  past the last measured data, astropy with its bundled IERS file only): about 1 m. NAIF states "several
+  microradians" for this file and "below 3 microradians" for the historical part of `earth_1962_*_combined.bpc`
+  (3 microradians = 0.6" = 19 m on the ground), a conservative bound; the underlying IERS data are good to well
+  under 1 mas (a few cm). Scale: 1 mas of Earth orientation is 3 cm on the ground, 1 ms of UT1 about 46 cm at the
+  equator. So the Earth-rotation term of -0.15 to -0.20 s in the Occult path fit (section 3) is not a property of
+  PySyzygos's Earth orientation.
 - **Planets and moons** (0.14.0):
   - Ephemeris: the kernel built from Horizons vectors (SPK type 13, 20 min steps) reproduces Horizons to ~1 m;
     NAIF's `jup365.bsp` and Horizons agree to millimetres at sample times.
