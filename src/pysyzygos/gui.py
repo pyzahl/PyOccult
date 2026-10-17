@@ -86,6 +86,17 @@ class Job:
 SUPPLEMENT = dict(on=True)          # header "+ high-RUWE stars": every run gets PYSYZYGOS_SUPPLEMENT (gaia_local)
 
 
+def catalog_options(found=None):
+    """{folder: label} of the catalogs in the data folder for the header's selector (old format and incomplete
+    ones marked)."""
+    from pysyzygos import gaia_local
+    found = gaia_local.find_catalogs(ROOT) if found is None else found
+    return {d: f"{d} (G \u2264 {g:g}" + ("" if starcat.is_format2(os.path.join(ROOT, d)) else ", old format") + ")"
+            + ("" if ok else f", incomplete {gaia_local.status(os.path.join(ROOT, d))['done']}"
+                             f"/{gaia_local.status(os.path.join(ROOT, d))['total']}")
+            for d, g, ok, _ in found}
+
+
 async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
     if Job.proc and Job.proc.returncode is None:
         ui.notify("A run is already in progress", type="warning")
@@ -181,10 +192,7 @@ def index():
         found = gaia_local.find_catalogs(ROOT)
         complete = {d for d, g, ok, _ in found if ok}
         cat_gmax = {d: float(g) for d, g, ok, _ in found if g is not None}
-        cats = {d: f"{d} (G \u2264 {g:g}" + ("" if starcat.is_format2(os.path.join(ROOT, d)) else ", old format") + ")"
-                + ("" if ok else f", incomplete {gaia_local.status(os.path.join(ROOT, d))['done']}"
-                                 f"/{gaia_local.status(os.path.join(ROOT, d))['total']}")
-                for d, g, ok, _ in found}
+        cats = catalog_options(found)
         ui.label("Catalog:").classes("text-slate-300")
         cat_sel = ui.select(cats, value=last["catalog"] if last.get("catalog") in complete else
                             config.gaia_local_dir if config.gaia_local_dir in complete else
@@ -1452,8 +1460,13 @@ def index():
                          "and radial velocities (extras). G \u2264 16 is ready-made on Zenodo; other limits are built "
                          "from ESA's files (about 2 h). It is installed next to the old one and swapped in; the old "
                          "one is kept as <folder>.old until you delete it.").classes("text-xs text-slate-500")
-                ui.button("Install the new catalog", on_click=lambda: cat_upgrade(cat_sel.value)).props(
-                    "outline dense")
+                with ui.row().classes("items-center gap-3"):
+                    up_parts = ui.select({"quality": "core + quality (recommended)", "none": "core only",
+                                          "all": "all parts (+ extras)"}, value="quality").props("dense outlined")
+                    up_del = ui.checkbox("delete the old catalog when the new one is in place", value=True).props(
+                        "dense")
+                    ui.button("Upgrade the catalog", on_click=lambda: cat_upgrade_ask(
+                        cat_sel.value, up_parts.value, up_del.value)).props("outline dense")
             for old in sorted(f for f in os.listdir(ROOT) if f.startswith("gaia_dr3_") and f.endswith(".old")):
                 with ui.row().classes("items-center gap-2"):
                     ui.label(f"{old}: the catalog before the upgrade").classes("text-sm text-slate-600")
@@ -1469,10 +1482,49 @@ def index():
         cat_refresh()
         await sys_info_refresh()
 
-    async def cat_upgrade(name):
-        ui.notify("Installing the new catalog (see the log; G 16 from Zenodo, other limits about 2 h)")
-        await run_process(PYSYZYGOS + ["setup", "--upgrade-catalog", "--no-geoip", "--groups", "quality",
-                                       "--dir", name], log)
+    def cat_upgrade_ask(name, parts, delete_old):
+        """What the upgrade will do (source, time, disk), then run it."""
+        d = os.path.join(ROOT, name)
+        st = gaia_local.status(d)
+        gmax = float(st.get("gmax") or 16)
+        new = starcat.staging_dir(d)
+        free = shutil.disk_usage(ROOT).free / 1e9
+        old_gb = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(d) for f in fs) / 1e9
+        if starcat.is_format2(new):
+            how = f"A finished new catalog is already there ({os.path.basename(new)}): it is only swapped in."
+        elif gmax in starcat.ZENODO_STEM:
+            how = (f"The ready-made G \u2264 {gmax:g} catalog is downloaded (about 3 GB for core + quality, from the "
+                   f"fastest of Zenodo and the mirrors), checked and unpacked: a few minutes to half an hour.")
+        else:
+            how = (f"G \u2264 {gmax:g} is built from ESA's Gaia files: 753 GB streamed, about 2 hours, all parts "
+                   f"(a build cannot add parts later). Your computer must stay on and online.")
+        with ui.dialog() as dlg, ui.card().classes("max-w-xl"):
+            ui.label(f"Upgrade {name} to the new catalog format").classes("font-semibold")
+            ui.label(how).classes("text-sm")
+            ui.label(f"It is installed next to the old one ({os.path.basename(new)}) and swapped in when complete; "
+                     f"searches can go on meanwhile with the old one. Free disk: {free:.0f} GB; the old catalog "
+                     f"takes {old_gb:.1f} GB" + (" and is deleted afterwards." if delete_old else
+                                                 f" and is kept as {name}.old.")).classes("text-sm text-slate-600")
+            with ui.row():
+                async def go():
+                    dlg.close()
+                    await cat_upgrade(name, parts, delete_old)
+                ui.button("Upgrade", on_click=go).props("color=primary")
+                ui.button("Cancel", on_click=dlg.close).props("flat")
+        dlg.open()
+
+    async def cat_upgrade(name, parts="quality", delete_old=True):
+        ui.notify("Upgrading the catalog: see the log for its progress")
+        args = PYSYZYGOS + ["setup", "--upgrade-catalog", "--no-geoip", "--groups", parts, "--dir", name]
+        await run_process(args + (["--delete-old"] if delete_old else []), log)
+        d = os.path.join(ROOT, name)
+        if starcat.is_format2(d):
+            ui.notify(f"{name} is now in the new format" + ("; the old catalog is deleted" if delete_old and
+                      not os.path.exists(d + ".old") else ""), type="positive")
+        else:
+            ui.notify("The upgrade is not finished (see the log); run it again to resume", type="warning")
+        opts = catalog_options()
+        cat_sel.set_options(opts, value=cat_sel.value if cat_sel.value in opts else None)
         cat_refresh()
         await sys_info_refresh()
 

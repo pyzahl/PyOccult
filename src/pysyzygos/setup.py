@@ -457,6 +457,9 @@ def ask_groups(build=False):
 def install_catalog(d, gmax, groups, source, workers, keep_archive):
     """A new format-2 catalog in d: the ready-made one from Zenodo (G <= 16) or a build from ESA's files (any limit;
     then the proper motions of its 2-parameter stars from UCAC5/UCAC4). Returns the source used."""
+    if starcat.is_format2(d):                                     # finished earlier (e.g. an upgrade's <folder>.new)
+        print(f"   {d}: complete")
+        return None
     src = catalog_source(source, d, gmax, starcat.status(d))
     if src == "zenodo":
         starcat.fetch(d, gmax, groups, keep_archive)
@@ -512,9 +515,13 @@ def catalog_step(a):
                     sys.exit(f"\n   the new catalog in {new} is not complete yet: rerun setup --upgrade-catalog "
                              f"to resume (nothing is lost)")
                 old = starcat.swap_in(d)
+                for g in starcat.groups_present(d)[1:]:                  # parts not chosen (a .new built with all)
+                    if g not in groups:
+                        starcat.remove_group(d, g)
+                        print(f"   removed the part not chosen: {g}")
                 gb = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(old) for f in fs) / 1e9
                 print(f"   ok: the new catalog is in {d}; the old one moved to {old} ({gb:.1f} GB)")
-                if tty and input(f"   delete {old}? [Enter] yes, [k]eep: ").strip().lower() != "k":
+                if a.delete_old or (tty and input(f"   delete {old}? [Enter] yes, [k]eep: ").strip().lower() != "k"):
                     shutil.rmtree(old)
                     print(f"   deleted {old}")
                 else:
@@ -571,6 +578,9 @@ def main():
     ap.add_argument("--upgrade-catalog", action="store_true",
                     help="replace an old-format catalog (before 1.3.0) by the new one: installed next to it "
                          "(<folder>.new), then swapped in; the old one goes to <folder>.old")
+    ap.add_argument("--delete-old", action="store_true",
+                    help="with --upgrade-catalog: delete the old catalog once the new one is complete and swapped in "
+                         "(otherwise asked in a terminal, kept without one)")
     ap.add_argument("--supplement", action="store_true",
                     help="also install the catalog's high-RUWE supplement: the stars the catalog leaves out (Gaia "
                          "RUWE >= 1.4, 2-parameter), flagged in the results; ~8 M stars to G 16: 0.35 GB from Zenodo "

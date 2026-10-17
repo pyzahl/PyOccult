@@ -118,7 +118,7 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   Gaia's flags + error ellipse locally when the cone has the columns. Zenodo: G 16 only (`ZENODO_STEM`,
   `<stem>_<group>.tar.xz`), other limits are local ESA builds. Upgrade: `staging_dir` (<d>.new) + `swap_in` (old ->
   <d>.old; cleanup lists it). setup `catalog_step` (--groups, --upgrade-catalog), GUI System tab "Star catalog"
-  (`cat_refresh`, `cat_part`, `cat_upgrade`, `cat_delete_old`). tests/test_starcat.py.
+  (`cat_refresh`, `cat_part`, `cat_upgrade_ask` dialog -> `cat_upgrade` = setup --upgrade-catalog --groups P [--delete-old], then `catalog_options()` refreshes the header select; `cat_delete_old`). tests/test_starcat.py.
 - `pysyzygos/gaia_local.py`: (old format, before 1.3.0) builds/reads a local G-limited Gaia DR3 copy from ESA's CDN bulk files (`build`, `status`);
   one `.npy` per source file plus `.cells.npy` (1x1 deg cell index) and `.hpm.npy` (pm > 1500 mas/yr). No healpy.
   Ready-made copies (G <= 16, 18; no bright index) on Zenodo, concept DOI 10.5281/zenodo.23113337 (first version

@@ -382,6 +382,7 @@ All options of `pysyzygos setup` (also `pysyzygos setup --help`):
 | `--source auto\|zenodo\|esa` | where the catalog comes from: `auto` asks (Enter = Zenodo) for G 16 and builds other limits, `zenodo` the ready-made G 16, `esa` a build from ESA's files (any limit, about 2 h) |
 | `--groups LIST` | the catalog's optional parts: `quality`, `extras` (comma-separated), `all` or `none`; default: asked in a terminal, else `quality`. On an installed catalog it adds (Zenodo) or removes parts to match |
 | `--upgrade-catalog` | replace a catalog of the old format (before 1.3.0) by the new one: installed next to it (`<folder>.new`), swapped in, the old one moved to `<folder>.old` (setup asks to delete it) |
+| `--delete-old` | with `--upgrade-catalog`: delete the old catalog once the new one is complete and swapped in, without asking |
 | `--keep-archive` | keep the downloaded Zenodo `.tar.xz` files (deleted after unpacking otherwise) |
 | `--workers N` | parallel downloads for an ESA build (default 6) |
 | `--no-gaia` | kernels (and site) only, no catalog |
@@ -850,9 +851,11 @@ one per run with `PYSYZYGOS_CATALOG=gaia_dr3_g18 pysyzygos search` (the pick fol
 
 **Catalogs of the old format** (PySyzygos before 1.3.0: per-file `.npy` stars, a separate high-RUWE supplement and a
 bright-star index for the pick) keep working, marked "old format" in the GUI. To change to the new one, run
-`pysyzygos setup --upgrade-catalog` (or the System tab's **Install the new catalog**): it installs the new catalog
-next to the old one (`gaia_dr3_g16.new`), swaps it in, and moves the old one to `gaia_dr3_g16.old`, deleted when you
-say so (setup asks; the System tab has a Delete button; `pysyzygos cleanup` lists it). For G 16 that is the Zenodo
+`pysyzygos setup --upgrade-catalog` (add `--delete-old` to remove the old one when done), or the System tab's
+**Upgrade the catalog** (choose the parts; "delete the old catalog when the new one is in place" is on by default; a
+dialog first shows where the catalog comes from, how long it takes and the disk space). It installs the new catalog
+next to the old one (`gaia_dr3_g16.new`), swaps it in when complete, and deletes the old one (or keeps it as
+`gaia_dr3_g16.old`: the System tab has a Delete button for it, and `pysyzygos cleanup` lists it). For G 16 that is the Zenodo
 download; another limit is rebuilt from ESA's files.
 
 **Other catalog sources.** The search does not care where a catalog comes from: any folder with the files described at

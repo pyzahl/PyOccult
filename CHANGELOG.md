@@ -14,6 +14,13 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
   mas = 4.8 km); the Sun, and Jupiter or Saturn where they deflect the light, marked with their true distance.
   Plain SVG, 210 x 297 mm.
 
+- **Catalog upgrade in the System tab**: for a catalog of the old format, "Upgrade the catalog" with the parts to
+  install and "delete the old catalog when the new one is in place" (on by default); a dialog first says what it
+  will do (G 16: download; other limits: a 2-hour build from ESA's files; a finished `<folder>.new` is only swapped
+  in), the free disk space and the old catalog's size. Setup: `--delete-old` (with `--upgrade-catalog`) deletes the
+  old catalog only after the new one is complete and swapped in; parts not chosen are removed from a `.new` built
+  with all of them. The header's catalog list updates afterwards.
+
 ### Changed
 - **Search start-up 7 s faster**: `import astroquery.gaia` contacted the Gaia archive at every start (status
   messages, 7.2 s; offline: until a timeout); it is now imported only where the old "windows" mode queries the
