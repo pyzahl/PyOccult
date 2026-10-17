@@ -315,6 +315,8 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   --all also SETTINGS + home.POINTER; NEVER: owc_refs/, owc_reference.*, private-docs/, release/, run.sh, .venv, git,
   catalog star files. Dry run unless --yes; `--orbits` / `--cache` (`empty_cache`, ORBIT_PATTERNS; System tab buttons) delete at once. Reads cache_path from the config only if pysyzygos_config.py exists (loading
   it would create one). Keep its lists in step when new downloads/outputs are added. `tests/test_cleanup.py`.
+- `GETTING_STARTED.md` (2026-10-17): beginners' walk-through (install, site, pick, search, results, favorites; why the
+  first runs are slow, caches); linked at the top of README's Quick start. Keep it in step with GUI labels.
 - `CONTRIBUTING.md`: fork/branch workflow, setup, tests, working with Claude Code, private files, pull requests,
   GPL-3.0-or-later for contributions. `LICENSE` (GPL-3.0 text), `CITATION.cff` (validated with cffconvert).
 - `tests/`: stand-in based tests, run each with `python tests/<name>.py` (no SPICE, astropy or network needed).

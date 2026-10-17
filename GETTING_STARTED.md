@@ -1,0 +1,138 @@
+# Getting started: your first prediction in six steps
+
+This page takes you from a fresh install to your first predicted occultation and a look at everything PySyzygos
+knows about it. No Python knowledge is needed. The full details are in [README.md](README.md); what is computed and
+how is in [ABOUT.md](ABOUT.md).
+
+**What you will do:** tell PySyzygos where you observe and with what (once), let it look through all known
+asteroids for events at your site, compute the best of them exactly, and keep the ones you like.
+
+**What to expect the first time:** the first run of each step downloads data and is slow (minutes). Everything is
+kept, so later runs take seconds. See [Why the first run is slow](#why-the-first-run-is-slow) at the end.
+
+---
+
+## 1. Install and set up (once, about 15 minutes)
+
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/), a small tool that brings the right Python
+   and all packages by itself:
+   * Linux / macOS, in a terminal: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+   * Windows, in PowerShell: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+
+   Then open a new terminal.
+2. Get PySyzygos: `git clone https://github.com/pyzahl/PySyzygos`, or on GitHub the green **Code** button,
+   **Download ZIP**, and unpack it.
+3. In the PySyzygos folder, run the setup:
+
+   ```bash
+   cd PySyzygos
+   uv run pysyzygos setup
+   ```
+
+   It asks a few questions; pressing **Enter** takes the recommended answer each time:
+   * **your site**: a guess from your internet address, or type a town name. Approximate is fine for now; you set
+     the exact position in the next step.
+   * **the star catalog**: Enter = stars to magnitude G 16, the right choice for most telescopes.
+   * **its parts**: Enter = core + quality (4 GB on disk).
+
+   Then it downloads the planet and Earth data (about 120 MB) and the star catalog (about 3 GB). If it is
+   interrupted, run the same command again: it continues where it stopped.
+
+## 2. Start the program and set your site
+
+```bash
+uv run pysyzygos
+```
+
+Your web browser opens PySyzygos (it runs only on your computer). Work through the tabs from left to right.
+
+In the **Site** tab:
+* Move the marker to where you observe, or paste your coordinates from a map or GPS into the Latitude field (most
+  formats work, e.g. `40.7128, -74.0060`). An exact position matters: a shadow can be only a few km wide.
+* Enter your telescope: aperture, focal length, and your camera (type its name or sensor, e.g. "174", in
+  **Sensor (cameras)**).
+* Click **Save sites.py**.
+
+From this, PySyzygos works out how faint a star your equipment can use (shown as **Star G limit** in the next
+tabs).
+
+## 3. Pick: which asteroids pass in front of a star for you?
+
+In the **Pick** tab: keep the start date (today) and choose the number of days, e.g. 7 for a first try. Click
+**Run pick**.
+
+PySyzygos now checks every known asteroid brighter than H 17, about 465,000 of them, against the stars along its
+path for events at your site. The log at the bottom shows its progress.
+
+> **The first pick is the slow one.** It first downloads JPL's list of all asteroids (about 100 MB, a minute or
+> two), then screens them: several minutes, more for a long window. Later picks reuse the list.
+
+When it is done, the table shows the events found. Click **Use for search**: it sets the Search tab to the same
+window and takes you there.
+
+## 4. Search: the exact predictions
+
+In the **Search** tab, click **Run search**. For each picked asteroid PySyzygos downloads its current orbit from JPL
+and its size data, then computes each event exactly: the time at your site, the shadow's path on the Earth, the
+star's drop in brightness and the duration.
+
+> **The first search takes a little longer:** about a second per asteroid for the downloads (orbits two at a time).
+> A search again within a day uses them directly and takes seconds. Orbits older than a day are downloaded again,
+> so your predictions always use JPL's latest orbit.
+
+## 5. Results: look at the events
+
+The **Results** tab lists every event, best first. For each one:
+* **Map**: the shadow's path near you, with its edges and uncertainty limits, and your site.
+* **Preview**: the star field as your camera will see it.
+* **Globe**: the whole Earth as seen from the star, with the path and minute marks; below it, the geometry at true
+  scale and how the Sun's gravity bends the starlight.
+* **KML**: the path for Google Earth.
+* **Stellarium** (and on Linux **KStars**): points the planetarium program at the star at the event time.
+* **☆**: keeps the event in your favorites.
+
+Star the events you like.
+
+## 6. Favorites: everything about one event
+
+In the **Favorites** tab, **click a row**. Below the table you get:
+* the star-field preview and the path map side by side;
+* an event summary: when the shadow is on the Earth, magnitudes and drop, duration, the Moon, the Sun's distance,
+  the star's position and whether Gaia flags it as double, the asteroid's size, distance and motion;
+* the uncertainty: ellipses for the asteroid's and the star's position, and how far the path may lie from its
+  prediction, in km;
+* the asteroid's size, shape and rotation where known, and earlier occultations by it;
+* a **status** (planned, observed, cancelled, clouded) and a **note** to keep.
+
+Each favorite keeps its own copy of map and preview, so later searches do not change them.
+
+**That's it.** Next time: `uv run pysyzygos`, and run a new pick when your window has passed.
+
+---
+
+## Why the first run is slow
+
+PySyzygos works from local copies of the data it needs. The first time, it has to fetch them:
+
+| When | What is downloaded | How long | Kept |
+|---|---|---|---|
+| setup | planet and Earth data (120 MB), star catalog (3 GB) | minutes, depending on your internet | for good (checked for updates weekly) |
+| first pick | JPL's list of all asteroids (100 MB) | a minute or two | 30 days, then fetched again |
+| first search | each asteroid's orbit and size | about 1 s per asteroid | orbits 1 day, sizes 30 days |
+
+**Where the downloads are kept:** in a cache folder: on Linux in memory (`/dev/shm`, emptied when you restart the
+computer), on macOS and Windows in the system's temporary folder (emptied from time to time). After a restart the
+first pick and search are therefore slow again. To keep them for good, and to work without internet (e.g. at a
+remote observing site): **System** tab, tick **Keep copies of orbit downloads for use without network**.
+
+**Speeding up picks:** for windows you use often, a **pre-screen** does the site-independent part of the pick once
+(Pick tab, **Pre-screens** panel): later picks then take seconds. See "Pick" in the [README](README.md).
+
+## If something goes wrong
+
+* **Nothing happens / no events:** check the log at the bottom of the page. A short window (1-2 days) or a small
+  telescope can simply have no events; try 7-14 days.
+* **A download fails:** offline, or a server is busy. Run it again later; it resumes.
+* **The System tab** shows what data PySyzygos has and uses (catalog, orbits, Earth data and their dates), and
+  **Setup status** checks the installation.
+* More help: [README.md](README.md), section by section.

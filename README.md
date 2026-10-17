@@ -111,14 +111,18 @@ See [ABOUT.md](ABOUT.md) for the computations, data sources and open points, and
 
 # Quick start
 
-A few commands, one download (about 2 GB), then everything happens in your browser:
+**New to PySyzygos?** [GETTING_STARTED.md](GETTING_STARTED.md) walks you from the install to your first prediction
+and a look at all its details in six steps, and explains why the first runs are slow.
+
+A few commands, one download (about 3 GB), then everything happens in your browser:
 
 1. **Get it:** install [uv](https://docs.astral.sh/uv/getting-started/installation/), then
    `git clone https://github.com/pyzahl/PySyzygos` (or download the ZIP from GitHub and unpack it). Windows users: see
    [Windows, step by step](#windows-step-by-step-with-uv). Without uv on Linux/macOS: `sh linux_install.sh` does
    steps 2 and 3 with pip.
 2. **Set up once**, in the PySyzygos folder: `uv run pysyzygos setup`. It downloads the SPICE kernels and the local
-   Gaia catalog (G <= 16 from Zenodo; resumes if interrupted) and asks for your first observing site.
+   Gaia catalog (G <= 16, ready-made from Zenodo or a mirror; resumes if interrupted) and asks for your first
+   observing site.
 3. **Start the web interface:** `uv run pysyzygos` (opens http://127.0.0.1:8080). Work through the tabs from left
    to right:
    * **Site**: your position (map, place name or MPC observatory code) and your telescope and camera.
