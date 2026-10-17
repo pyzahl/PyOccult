@@ -322,6 +322,10 @@ It can be installed two ways, with the same result:
 * **zenodo** (recommended, G <= 16): download the ready-made catalog from Zenodo,
   [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it
   contains), one archive per part. Setup checks each SHA-256 and unpacks it; parts can be added or removed later.
+  The same archives are on mirrors (listed in `pysyzygos/urls.py`, `URL_CATALOG_MIRRORS`; add your own, e.g. a club's
+  copy, with `PYSYZYGOS_CATALOG_MIRROR=<folder address>`): setup measures each source and downloads from the fastest,
+  continues an interrupted download from another source, and checks every file against the SHA-256 stored in
+  PySyzygos, so a mirror cannot hand out a different file.
 * **esa**: build it yourself from ESA's Gaia DR3 bulk files: any magnitude limit (e.g. G <= 18 for large apertures),
   753 GB streamed, about 2 h. The parts you choose are built with it (a part can be removed later, but added only by
   another build).

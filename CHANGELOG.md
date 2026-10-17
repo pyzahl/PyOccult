@@ -16,6 +16,10 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
   465,590 of the 573,735 2-parameter stars with a UCAC5/UCAC4 proper motion. Checked against the earlier catalogs: the
   same stars, positions within 0.0001 mas, the same events for a 20-day search and a 4-day pick (times within 1 ms);
   search strips 2-7x faster.
+- **Catalog mirrors** (`URL_CATALOG_MIRRORS`, env `PYSYZYGOS_CATALOG_MIRROR`, `catalog fetch --mirror`): the archives
+  come from the fastest of Zenodo and the mirrors (a speed probe of each), an interrupted download continues from
+  another source, and every file is checked against the SHA-256 stored in PySyzygos (`starcat.ARCHIVE_SHA256`).
+  First mirror: a temporary folder on BNL's data box; tested end to end (core + quality, 3.2 GB, in 2.8 min).
 - **The star's Gaia flags and error ellipse offline**: with the quality part they come from the local catalog for
   every event; the online Gaia check now only asks about stars whose neighbours the catalog may miss (the star less
   than 5 mag brighter than the catalog limit), so for bright stars the run does not wait for the archive.

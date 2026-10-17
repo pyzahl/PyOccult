@@ -165,7 +165,7 @@ zen.update({k + ".sha256": (0, v[1] + ".sha256") for k, v in list(zen.items())})
 GL._fetch_resume = lambda url, size, dst, tries=6: shutil.copyfile(url[len("file://"):], dst)
 d2 = os.path.join(root, "other", "gaia_dr3_g16")
 os.makedirs(os.path.dirname(d2))
-st2 = SC.fetch(d2, 16.0, groups=("quality",), files=zen)
+st2 = SC.fetch(d2, 16.0, groups=("quality",), files=zen, mirror_list=[])
 assert st2["complete"] and st2["groups"] == ["core", "quality"] and st2["n_stars"] == st["n_stars"]
 assert (np.load(os.path.join(d2, "core.npy")) == np.load(os.path.join(d, "core.npy"))).all()
 assert not [f for f in os.listdir(os.path.dirname(d2)) if f.endswith(".tar.xz")]          # archives deleted
@@ -175,8 +175,27 @@ assert nq.quality is None
 fl = doubles.star_flags(nq.cone(keep.ra[sid], keep.dec[sid], 3 / 3600), sid, 10.0)
 assert fl["gaia_nss"] == 1 and "star_err_smaa_mas" not in fl, fl              # core flags only, no ellipse
 nq = None
-SC.fetch(d2, 16.0, groups=("quality",), files=zen)                            # added again later: only the part
+SC.fetch(d2, 16.0, groups=("quality",), files=zen, mirror_list=[])            # added again later: only the part
 assert SC.groups_present(d2) == ["core", "quality"]
+# a mirror only (not on Zenodo): the checksum from the stored table, else the mirror's .sha256; a wrong stored one
+# refuses the download
+SC.ARCHIVE_SHA256.clear()
+d3 = os.path.join(root, "mirror", "gaia_dr3_g16")
+os.makedirs(os.path.dirname(d3))
+st3 = SC.fetch(d3, 16.0, groups=("quality",), files={}, mirror_list=["file://" + out + "/"])
+assert st3["complete"] and st3["groups"] == ["core", "quality"]
+d4 = os.path.join(root, "mirror2", "gaia_dr3_g16")
+os.makedirs(os.path.dirname(d4))
+SC.ARCHIVE_SHA256["gaia_dr3_g16_v2_core.tar.xz"] = (None, "0" * 64)
+try:
+    SC.fetch(d4, 16.0, groups=(), files={}, mirror_list=["file://" + out + "/"])
+    raise AssertionError("a file with another checksum was accepted")
+except SystemExit as e:
+    assert "SHA-256 mismatch" in str(e), e
+assert not SC.is_format2(d4)
+os.environ["PYSYZYGOS_CATALOG_MIRROR"] = "https://example.org/cat"
+assert SC.mirrors()[0] == "https://example.org/cat/"
+del os.environ["PYSYZYGOS_CATALOG_MIRROR"]
 # a part of another build is refused
 other = json.load(open(os.path.join(d2, "quality.json")))
 other["build_id"] = "0" * 16

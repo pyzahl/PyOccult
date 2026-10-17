@@ -428,10 +428,10 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   Gaia FLAME (`radius_flame`, astrophysical_parameters files on ESA's CDN, join by source_id; + a flag "other
   estimates exist") into extras, for the star-size model (218001); 2) Hip/Tyc2 ids from Gaia's best_neighbour tables;
   3) stars too bright for Gaia from Hipparcos 2 (own kind). A core flag bit "entries in other Gaia files" (2 free).
-- Catalog mirrors (2026-10-16; Zenodo downloads were as slow as 0.1 MB/s at times): Zenodo stays the reference (DOI,
-  SHA-256); mirrors serve the same file names: GitHub Releases first (2 GiB per file), Cloudflare R2 or B2, a community
-  server. Code: `URL_CATALOG_MIRRORS` in urls.py; starcat.fetch takes the SHA-256 from Zenodo (stored copy as
-  fallback), probes each source's speed on the first MB, resumes the .part across sources (Range), `--mirror <url>`.
+- Catalog mirrors: BUILT in 1.3.0 (starcat `mirrors`, `sources`: Zenodo + `URL_CATALOG_MIRRORS` + env
+  PYSYZYGOS_CATALOG_MIRROR, speed probe, resume across sources, `ARCHIVE_SHA256` stored). First mirror: a temporary
+  BNL box share (Nextcloud: direct files at public.php/dav/files/<token>/rev2/<name>, Range works). Still to add:
+  GitHub Releases or another permanent host; replace the BNL one when it goes.
 - Live search engine (ABOUT.md 3.8, timings of 2026-10-10): resident process with kernels, catalog, global
   pre-screen + index, SBDB list and orbits in memory; site test + exact solves in ~1-2 s; maps on demand; rolling
   nightly pre-screen builds. Locally: one combined pick + search run (saves a ~5 s start-up), SBDB rows only for

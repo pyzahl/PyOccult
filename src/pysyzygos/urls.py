@@ -24,6 +24,12 @@ GAIA_DR3_LISTING_PREFIX = "Gaia/gdr3/gaia_source/"                              
 
 # --- ready-made local catalogs on Zenodo (gaia_local.py, setup.py)
 URL_ZENODO_CATALOG_RECORD = "https://zenodo.org/api/records/23113337"           # concept record: newest version
+# mirrors of the ready-made catalog archives (starcat.fetch; the same file names, checked against the SHA-256 stored
+# in starcat.ARCHIVE_SHA256): folder addresses ending in /, tried with Zenodo, the fastest wins. Env
+# PYSYZYGOS_CATALOG_MIRROR adds one (e.g. a club's or institute's copy).
+URL_CATALOG_MIRRORS = [
+    "https://bnlbox.sdcc.bnl.gov/public.php/dav/files/2byYPzX4odRZRfR/rev2/",   # temporary (2026-10-17), BNL box
+]
 URL_CDS_XMATCH = "https://cdsxmatch.u-strasbg.fr/xmatch/api/v1/sync"             # CDS XMatch (supplement pm: UCAC5/4)
 
 # --- JPL Solar System Dynamics

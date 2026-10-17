@@ -66,6 +66,13 @@ CSV_COLS = ["source_id", "ra", "dec", "parallax", "pmra", "pmdec", "phot_g_mean_
 ROWS = np.dtype([("source_id", "<i8"), ("ra", "<f8"), ("dec", "<f8"), ("parallax", "<f4"), ("pmra", "<f4"),
                  ("pmdec", "<f4"), ("phot_g_mean_mag", "<f4"), ("ruwe", "<f4"), ("kind", "u1")])
 ZENODO_STEM = {16.0: "gaia_dr3_g16_v2"}                        # archives <stem>_<group>.tar.xz on the catalog record
+# the published archives (build d242c96ed70f63b3, 2026-10-16): size and SHA-256, so a mirror's copy is checked without
+# Zenodo; a newer build on Zenodo (another checksum there) is taken from Zenodo's .sha256 instead
+ARCHIVE_SHA256 = {
+    "gaia_dr3_g16_v2_core.tar.xz": (2034082136, "6d1dfc8e4cba430ed0e4f840a8f0a23e648ceac1b82868b56990932fd618ece4"),
+    "gaia_dr3_g16_v2_quality.tar.xz": (None, "55e82c33b2f0882515801f47d53785b18608c17ab448bd1e25519f5dda13142b"),
+    "gaia_dr3_g16_v2_extras.tar.xz": (None, "1262480f747c207fc868727e6f110da63f62d64f3f57a96dc91ad87a9f38ba10"),
+}
 
 
 # ----------------------------------------------------------------------------------------------- encoding
@@ -618,34 +625,129 @@ def pack(d, out_folder, groups=None, xz_threads=0):
     return out
 
 
-def fetch(d, gmax=16.0, groups=("quality",), keep_archive=False, files=None):
-    """Install the ready-made catalog (core) and the optional groups from Zenodo into d (resumable downloads, SHA-256
-    checked). A complete core is kept; groups already there are skipped. files: {name: (size, url)} instead of
-    Zenodo's listing (tests). Returns status(d)."""
+def mirrors():
+    """Mirror folders of the catalog archives: env PYSYZYGOS_CATALOG_MIRROR (comma-separated) first, then urls.py."""
+    env = [m.strip() for m in os.environ.get("PYSYZYGOS_CATALOG_MIRROR", "").split(",") if m.strip()]
+    return [m if m.endswith("/") else m + "/" for m in env + list(getattr(U, "URL_CATALOG_MIRRORS", []))]
+
+
+def _remote_size(url, timeout=30):
+    """Size of a remote file (bytes) from a 1-byte range request, or None (also: file:// paths)."""
+    if url.startswith("file://"):
+        p = url[len("file://"):]
+        return os.path.getsize(p) if os.path.isfile(p) else None
+    import requests
+    try:
+        with requests.get(url, headers={"Range": "bytes=0-0"}, stream=True, timeout=timeout) as r:
+            if r.status_code == 206 and "/" in r.headers.get("Content-Range", ""):
+                return int(r.headers["Content-Range"].rsplit("/", 1)[1])
+            if r.status_code == 200 and r.headers.get("Content-Length"):
+                return int(r.headers["Content-Length"])
+    except (requests.RequestException, ValueError):
+        pass
+    return None
+
+
+def _probe(url, nbytes=4 << 20, timeout=20):
+    """Download speed of a source (bytes/s) from its first nbytes; 0 when it does not answer."""
+    if url.startswith("file://"):
+        return float("inf") if os.path.isfile(url[len("file://"):]) else 0.0
+    import requests
+    t0, got = time.time(), 0
+    try:
+        with requests.get(url, headers={"Range": f"bytes=0-{nbytes - 1}"}, stream=True, timeout=timeout) as r:
+            if r.status_code not in (200, 206):
+                return 0.0
+            for c in r.iter_content(1 << 16):
+                got += len(c)
+                if got >= nbytes or time.time() - t0 > timeout:
+                    break
+    except requests.RequestException:
+        return 0.0
+    return got / max(time.time() - t0, 1e-3)
+
+
+def sources(name, files=None, mirror_list=None):
+    """[(label, url, size)] of the places that have this archive, fastest first, and the SHA-256 to expect: the stored
+    one (ARCHIVE_SHA256), else Zenodo's .sha256, else the first mirror's. files: {name: (size, url)} stands in for
+    Zenodo's listing (tests); mirror_list for mirrors()."""
+    from pysyzygos import gaia_local as GL
+    found, sha_zen = [], None
+    try:
+        fl = files if files is not None else GL.zenodo_files(None, name)
+        if name in fl:
+            found.append(("Zenodo " + GL.ZENODO_DOI, fl[name][1], fl[name][0]))
+            if name + ".sha256" in fl:
+                sha_zen = _get_text(fl[name + ".sha256"][1]).split()[0].lower()
+    except SystemExit:                                            # not (yet) in the newest Zenodo version
+        print(f"   Zenodo: no {name} there (yet); trying the mirrors", flush=True)
+    except (OSError, ValueError, KeyError) as e:                  # Zenodo unreachable
+        print(f"   Zenodo: no answer ({str(e)[:80]}); trying the mirrors", flush=True)
+    for m in (mirrors() if mirror_list is None else mirror_list):
+        size = _remote_size(m + name)
+        if size:
+            host = m.split("/")[2] if m.startswith(("http://", "https://")) else "(local folder)"
+            found.append((f"mirror {host}", m + name, size))
+    stored = ARCHIVE_SHA256.get(name)
+    expect = sha_zen or (stored[1] if stored else None)
+    if expect is None:
+        for label, url, _ in found:
+            if label.startswith("mirror"):
+                try:
+                    expect = _get_text(url + ".sha256").split()[0].lower()
+                    break
+                except Exception:
+                    continue
+    if stored and stored[0] and found:
+        found = [f for f in found if f[2] == stored[0] or (sha_zen and sha_zen != stored[1])]
+    speed = {url: _probe(url) for _, url, _ in found} if len(found) > 1 else {}
+    found.sort(key=lambda f: -speed.get(f[1], 0.0))
+    for label, url, _ in found:
+        if url in speed:
+            print(f"   {label}: {speed[url] / 1e6:.1f} MB/s" if speed[url] != float("inf") else f"   {label}: local",
+                  flush=True)
+    return found, expect
+
+
+def fetch(d, gmax=16.0, groups=("quality",), keep_archive=False, files=None, mirror_list=None):
+    """Install the ready-made catalog (core) and the optional groups into d: from the fastest of Zenodo and the mirrors
+    (sources), resumable (a partial download continues from another source if one fails), SHA-256 checked. A complete
+    core is kept; groups already there are skipped. files / mirror_list stand in for Zenodo / mirrors() (tests).
+    Returns status(d)."""
     from pysyzygos import gaia_local as GL
     if float(gmax) not in ZENODO_STEM:
-        sys.exit(f"Zenodo has the catalog for G <= {', '.join(f'{g:g}' for g in ZENODO_STEM)} only, not {gmax:g}; "
+        sys.exit(f"the ready-made catalog is for G <= {', '.join(f'{g:g}' for g in ZENODO_STEM)} only, not {gmax:g}; "
                  f"build it from ESA's files instead")
     want = (["core"] if not is_format2(d) else []) + [g for g in groups
                                                       if not (is_format2(d) and group_ok(d, g))]
     for g in want:
         name = archive_name(gmax, g)
-        fl = files or GL.zenodo_files(gmax, name)
-        (_, (size, url)), (_, (_, sha_url)) = ((k, fl[k]) for k in (name, name + ".sha256"))
+        found, expect = sources(name, files, mirror_list)
+        if not found or not expect:
+            sys.exit(f"{name}: not found on Zenodo nor on a mirror (offline?); rerun later, or build from ESA's files "
+                     f"(--source esa)")
+        size = found[0][2]
         archive = os.path.join(os.path.dirname(os.path.abspath(d)), name)
         free = shutil.disk_usage(os.path.dirname(archive)).free
         if free < 2.4 * size:
             sys.exit(f"not enough disk space next to {d}: {2.4 * size / 1e9:.1f} GB needed, {free / 1e9:.1f} GB free")
-        expect = _get_text(sha_url).split()[0].lower()
-        print(f"   {GL.ZENODO_DOI}: {name}, {size / 1e9:.2f} GB ({GROUP_TEXT[g]})", flush=True)
+        print(f"   {name}, {size / 1e9:.2f} GB ({GROUP_TEXT[g]})", flush=True)
         if not os.path.isfile(archive):
-            GL._fetch_resume(url, size, archive + ".part")
+            for k, (label, url, _) in enumerate(found):
+                print(f"   from {label}", flush=True)
+                try:
+                    GL._fetch_resume(url, size, archive + ".part")
+                    break
+                except Exception as e:                           # this source failed: the next one resumes the .part
+                    if k == len(found) - 1:
+                        raise
+                    print(f"   {label} failed ({str(e)[:100]}); trying the next source", flush=True)
             if GL._sha256(archive + ".part") != expect:
                 os.remove(archive + ".part")
                 sys.exit(f"{name}: SHA-256 mismatch (corrupt download, deleted); rerun to download again")
             GL.replace_file(archive + ".part", archive)
         elif GL._sha256(archive) != expect:
-            sys.exit(f"{archive} exists but its SHA-256 does not match Zenodo's; delete it and rerun")
+            sys.exit(f"{archive} exists but its SHA-256 does not match; delete it and rerun")
         GL.unpack_archive(archive, d, need="catalog.json" if g == "core" else f"{g}.json")
         if g != "core" and not group_ok(d, g):
             remove_group(d, g)
@@ -708,21 +810,26 @@ def main(argv=None):
     ap.add_argument("cmd", choices=["build", "fetch", "add", "remove", "status", "xmatch", "pack"])
     ap.add_argument("group", nargs="?", help="add/remove: quality or extras")
     ap.add_argument("--dir", default=d0 or "gaia_dr3_g16", help="catalog folder (default: config gaia_local_dir)")
-    ap.add_argument("--gmax", type=float, default=g0, help="build: faintest G (default: config gaia_local_gmax or 16)")
+    ap.add_argument("--gmax", type=float, default=None,
+                    help="build: faintest G (default: config gaia_local_gmax or 16); fetch: 16 (the ready-made one)")
     ap.add_argument("--workers", type=int, default=6, help="build: parallel downloads")
     ap.add_argument("--groups", default="quality", help="fetch: optional parts, comma-separated (quality,extras; "
                                                         "'none' for the core only)")
     ap.add_argument("--no-xmatch", action="store_true", help="build: leave the 2-parameter stars without proper motion")
     ap.add_argument("--keep-archive", action="store_true")
+    ap.add_argument("--mirror", help="fetch/add: another folder address with the archives (as env "
+                                     "PYSYZYGOS_CATALOG_MIRROR)")
     ap.add_argument("--out", default="release", help="pack: folder for the archives")
     a = ap.parse_args(argv)
     groups = [] if a.groups.strip().lower() in ("", "none", "core") else [g.strip() for g in a.groups.split(",")]
+    if a.mirror:
+        os.environ["PYSYZYGOS_CATALOG_MIRROR"] = a.mirror
     if a.cmd == "build":
-        st = build(a.dir, a.gmax, a.workers)
+        st = build(a.dir, g0 if a.gmax is None else a.gmax, a.workers)
         if st["complete"] and not a.no_xmatch and not (st.get("pm_xmatch") or {}):
             xmatch(a.dir)
     elif a.cmd == "fetch":
-        fetch(a.dir, a.gmax, groups, a.keep_archive)
+        fetch(a.dir, 16.0 if a.gmax is None else a.gmax, groups, a.keep_archive)
     elif a.cmd == "add":
         add_group(a.dir, a.group, a.keep_archive)
     elif a.cmd == "remove":

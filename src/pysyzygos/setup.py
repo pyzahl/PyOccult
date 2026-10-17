@@ -371,7 +371,7 @@ def catalog_source(source, d, gmax, st):
         return "esa"
     if not sys.stdin.isatty():
         return "zenodo"
-    k = input(f"   [Enter] download the ready-made catalog from Zenodo (~{ZENODO_GB[16.0]:g} GB), or [b]uild it from "
+    k = input(f"   [Enter] download the ready-made catalog (Zenodo or a mirror, the faster; ~{ZENODO_GB[16.0]:g} GB), or [b]uild it from "
               f"ESA's files (753 GB streamed, about 2 h): ").strip().lower()
     return "esa" if k.startswith("b") else "zenodo"
 
