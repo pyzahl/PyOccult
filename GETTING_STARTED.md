@@ -29,9 +29,9 @@ kept, so later runs take seconds. See [Why the first run is slow](#why-the-first
    uv run pysyzygos setup
    ```
 
-   It asks a few questions; pressing **Enter** takes the recommended answer each time:
-   * **your site**: a guess from your internet address, or type a town name. Approximate is fine for now; you set
-     the exact position in the next step.
+   It asks a few questions:
+   * **your site**: type **s** (skip) and Enter. Setup then uses an example site (New York), and you set up your
+     own in the web interface in the next step, on a map, which is easier.
    * **the star catalog**: Enter = stars to magnitude G 16, the right choice for most telescopes.
    * **its parts**: Enter = core + quality (4 GB on disk).
 
@@ -47,11 +47,17 @@ uv run pysyzygos
 Your web browser opens PySyzygos (it runs only on your computer). Work through the tabs from left to right.
 
 In the **Site** tab:
-* Move the marker to where you observe, or paste your coordinates from a map or GPS into the Latitude field (most
-  formats work, e.g. `40.7128, -74.0060`). An exact position matters: a shadow can be only a few km wide.
+* Move the marker to where you observe, or paste your coordinates from a map or GPS into the **Latitude** field
+  (most formats work, e.g. `40.7128, -74.0060`). An exact position matters: a shadow can be only a few km wide.
 * Enter your telescope: aperture, focal length, and your camera (type its name or sensor, e.g. "174", in
   **Sensor (cameras)**).
-* Click **Save sites.py**.
+* **Give your site a name**: type it in **New site name** (e.g. "Home" or "Backyard"), then click **Add as new
+  site**. Your site is saved and selected at the top right (**Site for all runs**), where every run takes it from.
+  The example site can go: select it at the top right and click **Remove site**.
+
+Later changes to a site (another camera, a correction of the position): select it at the top right, change the
+form, and click **Save sites.py**. You can keep several sites, e.g. home and a dark-sky spot, and switch between
+them at the top right.
 
 From this, PySyzygos works out how faint a star your equipment can use (shown as **Star G limit** in the next
 tabs).
