@@ -667,7 +667,8 @@ light time from each observer all fixed or added; sections 3 and 4).
   be seen in this listing**, only the means over all points (across +6 to +11 m depending on the JPL solution, i.e.
   0.01-0.02 mas); along the track Occult's shadow is 11 ms later (0.15 km; in the fundamental plane 0.17 mas, 42 m rms
   around it). The along-track difference is +5 ms - 21.4 ms x sin(star altitude): the light time from the
-  fundamental plane to the site (below).
+  fundamental plane to the site, which Occult's predictions leave out by design (confirmed by its author; its
+  reductions include it) and PySyzygos includes (below).
 - **What the remaining 11 ms is measured against** (Paolo Tanga, Gaia/OCA): two programs computing the same orbit
   solution and the same star should agree at the level of their numerical precision, whatever the uncertainty of the
   prediction; the 1-sigma path (0.69 km here) and even the ephemeris uncertainty propagated by JPL (Horizons, 1 sigma
@@ -679,8 +680,12 @@ light time from each observer all fixed or added; sections 3 and 4).
   rounding (2.9 ms). So the two programs relate the time in the fundamental plane to the time at the site
   differently, by that site's height above the plane (R⊕ sin altitude) over c: PySyzygos solves each point with
   its own light time at the site's reception time (exact by construction); Occult's times come out later by z/c, as
-  if the plane's time were used for the site. To confirm with Occult's author. What is left (+5 ms, 0.05 km) is
-  within the orbit difference (#1016 / #1018). Ruled out so far: the orbit (osculating elements vs SPK: 8 mm), the Besselian elements' hourly cubic
+  if the plane's time were used for the site. **Confirmed by Occult's author** (D. Herald, IOTA list,
+  2026-10-17): Occult's predictions leave out the light time from the observer's topocentric position to the
+  fundamental plane (negligible against a prediction's other uncertainties); its reductions add it to each
+  observer's event time. PySyzygos's predicted times are the site's own (as Occult's reduced ones). What is left
+  (+5 ms, 0.05 km) is within the orbit difference (#1016 / #1018). **With this, nothing unexplained remains
+  between the two programs for this path.** Ruled out so far: the orbit (osculating elements vs SPK: 8 mm), the Besselian elements' hourly cubic
   interpolation (emulated: < 1 m), the Earth orientation (0.2 m against astropy/IERS), the star (Occult's printed place
   equals ours to its rounding; ours equals the Gaia archive's propagation to 0.002 mas). Open: how Occult reads its
   Horizons positions (Horizons' ephemerides for observers leave out light deflection and are printed rounded) and the
