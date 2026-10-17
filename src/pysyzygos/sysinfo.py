@@ -76,10 +76,20 @@ def time_earth():
 
 def stars(in_use=None):
     """[(label, value)]: each local Gaia catalog (the one in use marked), supplements, indexes, extra star data."""
-    from pysyzygos import gaia_local as GL, starrv, geoid
+    from pysyzygos import gaia_local as GL, starrv, geoid, starcat
     out = []
     for d in sorted(glob.glob("gaia_dr3_*")):
         if not os.path.isfile(os.path.join(d, "catalog.json")):
+            continue
+        mark = "  ← in use" if in_use and os.path.basename(os.path.normpath(in_use)) == d else ""
+        if starcat.is_format2(d):
+            st = starcat.status(d)
+            pmx = st.get("pm_xmatch") or {}
+            parts = ", ".join(f"{g} {_gb(starcat.group_bytes(d, g))}" for g in st["groups"])
+            out.append((f"Catalog {d}{mark}", f"G ≤ {st['gmax']:g}, {st['n_stars'] / 1e6:.1f} M stars incl. high-RUWE "
+                        f"and 2-parameter (flagged), {_gb(st['gb'] * 1e9)}; parts: {parts}"
+                        + (f"; 2-parameter stars with a proper motion: {pmx['ucac5'] + pmx['ucac4']} of "
+                           f"{pmx['two_param']}" if pmx else "")))
             continue
         st = GL.status(d)
         files = [f for f in glob.glob(os.path.join(d, "*.npy")) if f.count(".") == 1 and "bright" not in f]
@@ -88,8 +98,7 @@ def stars(in_use=None):
             n = sum(np.load(f, mmap_mode="r").shape[0] for f in files)
         except Exception:
             n = None
-        mark = "  ← in use" if in_use and os.path.basename(os.path.normpath(in_use)) == d else ""
-        out.append((f"Catalog {d}{mark}", f"G ≤ {st.get('gmax', '?')}, {n / 1e6:.1f} M stars, "
+        out.append((f"Catalog {d}{mark}", f"G ≤ {st.get('gmax', '?')}, {n / 1e6:.1f} M stars (old format), "
                     f"{_gb(_size(files))}, {st['done']}/{st['total']} files" + ("" if st["complete"] else " (incomplete)")
                     if n is not None else f"{st['done']}/{st['total']} files"))
         sd = GL.supplement_dir(d)
@@ -154,6 +163,58 @@ def asteroids(cache_path):
     return out
 
 
+def planets(cache_path):
+    """[(label, value)]: planets and moons as targets: the moons' list, NAIF kernels (offline), Horizons files in the
+    cache."""
+    from pysyzygos import bodies
+    out = []
+    try:
+        meta = json.load(open(bodies.SAT_FILE, encoding="utf-8"))["meta"]
+        out.append(("Moons (data/satellites.json)", f"{meta.get('satellites', '?')} moons, {meta.get('usable', '?')} "
+                    f"with size and brightness (searchable), from JPL Horizons of {meta.get('date', '?')}"))
+    except (OSError, ValueError, KeyError):
+        out.append(("Moons (data/satellites.json)", "missing: the Galilean moons only"))
+    spice = None
+    try:
+        import spiceypy as spice
+        from pysyzygos import kernels as K
+        spice.furnsh(K.lsk_file("."))
+    except Exception:
+        spice = None
+    missing = []
+    for group, (fname, size) in bodies.NAIF_KERNELS.items():
+        path = bodies.naif_kernel(group)
+        if not path:
+            missing.append(f"{group.capitalize()} ({fname}, {size})")
+            continue
+        span = ""
+        if spice is not None:
+            try:
+                ids = spice.spkobj(path)
+                cov = spice.spkcov(path, int(ids[0]))
+                a, b = spice.wnfetd(cov, 0)
+                span = f", {spice.et2utc(a, 'ISOC', 0)[:10]} to {spice.et2utc(b, 'ISOC', 0)[:10]}, {len(ids)} bodies"
+            except Exception:
+                pass
+        out.append((f"{group.capitalize()} system (NAIF)", f"{fname}: {_gb(os.path.getsize(path))}{span} "
+                    f"(downloaded {_age(os.path.getmtime(path))}; used where it covers the window)"))
+    if missing:
+        out.append(("Systems without NAIF kernel", ", ".join(missing) + ": positions from JPL Horizons per search "
+                    "(for offline use: pysyzygos setup --planet-kernels)"))
+    names = {b["naif"]: b["name"] for b in bodies.REGISTRY.values()}
+    files = glob.glob(os.path.join(cache_path, "PySyzygos_body_*.bsp"))
+    if files:
+        got = sorted({names.get(int(m[1]), m[1]) for m in (re.match(r"PySyzygos_body_(\d+)_", os.path.basename(f))
+                                                          for f in files) if m})
+        shown = ", ".join(got[:12]) + (f" and {len(got) - 12} more" if len(got) > 12 else "")
+        out.append(("Horizons files (cache)",
+                    f"{len(files)} files, {_gb(_size(files))}: {shown}; oldest downloaded "
+                    f"{_age(min(os.path.getmtime(f) for f in files))} ({cache_path})"))
+    else:
+        out.append(("Horizons files (cache)", "none (from searches of the Planets & Moons tab)"))
+    return out
+
+
 def results(results_db="pysyzygos.db"):
     out = []
     if os.path.isfile(results_db):
@@ -177,7 +238,7 @@ def summary():
     from pysyzygos import config
     in_use = os.environ.get("PYSYZYGOS_CATALOG") or getattr(config, "gaia_local_dir", None)
     return [("Time and Earth", time_earth()), ("Stars", stars(in_use)),
-            ("Asteroids", asteroids(config.cache_path)), ("Results", results(getattr(config, "results_db", "pysyzygos.db")))]
+            ("Asteroids", asteroids(config.cache_path)), ("Planets and moons", planets(config.cache_path)), ("Results", results(getattr(config, "results_db", "pysyzygos.db")))]
 
 
 def main(argv=None):

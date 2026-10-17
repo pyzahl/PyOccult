@@ -282,8 +282,9 @@ applies parallax and deflection stands (section 3 confirms it on a whole path).
 **PRELIMINARY RESULTS -- PENDING DETAILS FROM OCCULT RUN**
 
 A whole path, not only one event time: Occult's listing of the shadow's centre line and limits on the Earth, compared
-point by point with PySyzygos's path at the same instants. Both computed on the same day (2026-10-14), so both use the
-same JPL orbit solution. (Occult was run by Steve Preston, IOTA; his listing and plot are kept privately in
+point by point with PySyzygos's path at the same instants. The first comparison was computed on the same day as
+Occult's (2026-10-14), so with the same JPL orbit solution (#1016); the later reruns (`path-check run` downloads the
+current orbit) used #1017 and #1018, see "What the listing can resolve" below. (Occult was run by Steve Preston, IOTA; his listing and plot are kept privately in
 `owc_refs/occult_paths/` with the comparison scripts.)
 
 The comparison can be repeated for any event with `pysyzygos path-check` (GUI: Favorites, "Path verification"),
@@ -395,7 +396,10 @@ Occult's printed place by 1.9 mas from ours; it agrees to 0.3 mas.
   UT1 - UTC, as if it rotated the Earth with UTC; PySyzygos uses the measured Earth orientation (NAIF's high-precision
   Earth orientation file with IERS data). It adds at most about 75 m east-west (0.16 s of the Earth's rotation at the
   equator) and improves the fit only from 70 to 66 m rms, so it is an indication, not a finding; to ask the Occult
-  side.
+  side. **Resolved:** the rotation term was taking up PySyzygos's own error (the geocentric light time for every
+  observer, fixed 2026-10-16: with each point's own light time the fitted rotation is gone, see "light time from each
+  observer" below), and Occult's author confirmed that Occult rotates the Earth with UT1 from the IERS Earth
+  orientation parameters (since 1962), as PySyzygos does. Both label times in UTC.
 - **Earth model.** PySyzygos computes on the WGS84 ellipsoid at height 0. Occult's listing is "at MSL" (mean sea level,
   the geoid): if that means height 0 on the geoid rather than on the ellipsoid, a point moves by the geoid height
   divided by the tangent of the star's altitude towards the star's azimuth: geoid heights are tens of metres, so
@@ -510,7 +514,8 @@ All 732 points: **across -0.027 to +0.032 km (mean +0.006 km)**: across the trac
 listing's rounding. Along the track Occult's shadow is 0.011 s later (mean; -0.021 to +0.007 s; 0.15 km at 10.8 km/s
 in the plane). Fit in the plane: constant offset x +0.10, y -0.14 mas (0.12 km), rms 42 m (before 70 m), largest
 residual 152 m (before 313 m); the Earth-rotation term is gone (it had taken up this effect). The offset points
-against the shadow's motion (direction -0.60, +0.80 in the plane), so it is a pure timing difference of about 11 ms.
+against the shadow's motion (direction -0.60, +0.80 in the plane), so it is a pure timing difference of about 11 ms
+(on average; it depends on the star's altitude as z/c, see section 5).
 
 | PySyzygos | Offset in the plane x, y (mas) | Across (km) | Along (s) | rms |
 |---|---|---|---|---|
@@ -519,7 +524,18 @@ against the shadow's motion (direction -0.60, +0.80 in the plane), so it is a pu
 | light time from each observer | **+0.10, -0.14** | **-0.03 to +0.03** | **-0.021 to +0.007** | **42 m** |
 
 (Across ranges with the star above 20 deg for the first two rows, all points for the last.) Open: the 11 ms along the
-track. The regression against OWC (section 1, rerun 2026-10-16 with the sites the lists were made for) is unchanged:
+track.
+
+**What the listing can resolve.** Occult's listing gives positions to whole arcseconds: 1" is 31 m in latitude and
+about 23-28 m in longitude at these latitudes, so a single point carries up to ±15 m of rounding, 8-9 m rms per
+coordinate (times: 0.01 s, 2.9 ms rms). **Differences of a single point below about 30 m therefore say nothing**: the
+across range of ±30 m is that rounding, and our scatter about the mean (10 m rms) is no larger than the rounding
+alone. Only the means over all 732 points are measured well (the rounding averages out): across +11.1 ± 0.4 m, along
+-10.1 ms. The orbit solutions differ too: Occult used JPL#1016, PySyzygos #1017 (2026-10-15, the table above) and, in a
+rerun the next day, #1018 (2026-10-16): the new solution alone moved the mean across by 5 m (from +6 to +11 m;
+range -0.022 to +0.037 km, along -10 ms, unchanged with the 1.3.0 star catalog). At Phaethon's distance 1 mas is
+690 m, so +11 m is 0.016 mas. A comparison with both sides on the same solution (Occult run the same day, JPL number
+noted) and Occult's coordinates to 0.1" would resolve point differences ten times finer. The regression against OWC (section 1, rerun 2026-10-16 with the sites the lists were made for) is unchanged:
 Test site 1 15 of 16 (only 218001's drop, as before), Test site 2 45 of 50 (69085 now found through the
 supplement); |time - OWC| median 0.70 s and 0.45 s, the same as with 1.1.0. The fix moves those events' times by
 -0.32 to +0.18 s and their paths' distance from the site by up to 0.38 km, below what separates PySyzygos from OWC
@@ -643,16 +659,28 @@ anyway (other orbits; OWC times to 0.1 s).
 State of version 1.1.1 (2026-10-16: light deflection of the asteroid, Gaia proper-motion bias and the
 light time from each observer all fixed or added; sections 3 and 4).
 
-- **Geometry against Occult: the same to the listing's rounding across the track, 11 ms apart along it.** A whole
-  path, (3200) Phaethon on 2019-07-29 with the same JPL orbit solution and the same Gaia star (section 3): across the
-  track -0.03 to +0.03 km at all 732 points, which is Occult's rounding to whole arcseconds (24-31 m); along the track
-  Occult's shadow is 11 ms later (0.15 km; in the fundamental plane 0.17 mas, 42 m rms around it).
+- **Geometry against Occult: the same to the listing's rounding across the track; along it a light-time convention
+  (z/c, up to 21 ms).** A whole
+  path, (3200) Phaethon on 2019-07-29 with the same Gaia star and nearly the same JPL orbit (Occult #1016, PySyzygos
+  #1017 / #1018; section 3): across the track -0.03 to +0.03 km at all 732 points, which is Occult's rounding to whole
+  arcseconds (1" = 31 m in latitude, 23-28 m in longitude): **a difference below about 30 m at a single point cannot
+  be seen in this listing**, only the means over all points (across +6 to +11 m depending on the JPL solution, i.e.
+  0.01-0.02 mas); along the track Occult's shadow is 11 ms later (0.15 km; in the fundamental plane 0.17 mas, 42 m rms
+  around it). The along-track difference is +5 ms - 21.4 ms x sin(star altitude): the light time from the
+  fundamental plane to the site (below).
 - **What the remaining 11 ms is measured against** (Paolo Tanga, Gaia/OCA): two programs computing the same orbit
   solution and the same star should agree at the level of their numerical precision, whatever the uncertainty of the
   prediction; the 1-sigma path (0.69 km here) and even the ephemeris uncertainty propagated by JPL (Horizons, 1 sigma
   0.91 x 0.17 mas for Phaethon then) are the wrong yardstick for it. So the 11 ms (0.17 mas) is an implementation
-  difference still to be found, not noise: it is beyond Occult's 0.01 s rounding over 732 points and constant along the
-  track. Ruled out so far: the orbit (osculating elements vs SPK: 8 mm), the Besselian elements' hourly cubic
+  difference still to be found, not noise: it is beyond Occult's 0.01 s rounding over 732 points. **It is not
+  constant along the track** (found 2026-10-17): fitted against the star's altitude, Occult minus PySyzygos =
+  +5.1 ms - 21.4 ms x sin(altitude), and 21.4 ms is R⊕/c (21.3 ms), the light time between the fundamental plane
+  through the geocentre and a site with the star at the zenith; the scatter drops from 5.3 to 3.1 ms, the listing's
+  rounding (2.9 ms). So the two programs relate the time in the fundamental plane to the time at the site
+  differently, by that site's height above the plane (R⊕ sin altitude) over c: PySyzygos solves each point with
+  its own light time at the site's reception time (exact by construction); Occult's times come out later by z/c, as
+  if the plane's time were used for the site. To confirm with Occult's author. What is left (+5 ms, 0.05 km) is
+  within the orbit difference (#1016 / #1018). Ruled out so far: the orbit (osculating elements vs SPK: 8 mm), the Besselian elements' hourly cubic
   interpolation (emulated: < 1 m), the Earth orientation (0.2 m against astropy/IERS), the star (Occult's printed place
   equals ours to its rounding; ours equals the Gaia archive's propagation to 0.002 mas). Open: how Occult reads its
   Horizons positions (Horizons' ephemerides for observers leave out light deflection and are printed rounded) and the

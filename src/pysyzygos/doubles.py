@@ -9,9 +9,12 @@ the local catalog's limits (fainter stars, and stars with RUWE >= 1.4 that the c
 doubles), and Gaia's flags for the target star: non_single_star (a known binary solution), ipd_frac_multi_peak
 (% of scans with two peaks: a resolved close pair), duplicated_source, ruwe.
 
+With a format-2 catalog that has its quality part (starcat.py), Gaia's flags of the star and its error ellipse come
+from the local catalog at once (no network); the online check still adds neighbours fainter than the catalog.
+
 Record fields: blend_n (neighbours within the radius), blend_sep_arcsec and blend_g (the closest one),
-mag_drop_blended, double_hint (text for the report), double_check ("local" or "gaia online"); online also gaia_ruwe,
-gaia_nss, gaia_multi_peak, gaia_dup. Reference information: events are flagged, not removed.
+mag_drop_blended, double_hint (text for the report), double_check ("local" or "gaia online"); online, or locally with
+the quality part, also gaia_ruwe, gaia_nss, gaia_multi_peak, gaia_dup and the star's error ellipse (star_err_*). Reference information: events are flagged, not removed.
 """
 from pysyzygos.version import __version__
 import csv, math, os, tempfile, threading
@@ -167,23 +170,33 @@ def fetch_star_errors(source_ids, timeout_s=120):
     return {int(r["source_id"]): r for r in box["rows"]}
 
 
+def star_flags(stars, star_id, years):
+    """Gaia's flags and the 1-sigma error ellipse of the star from catalog rows with Gaia's column names (the online
+    check's archive rows, or a format-2 local catalog with its quality part: starcat.StarCatalog.cone); {} if the star
+    is not there or the rows have no such columns."""
+    if stars is None or len(stars) == 0 or "non_single_star" not in stars:
+        return {}
+    me = stars[stars["source_id"].astype("int64") == int(star_id)]
+    if not len(me):
+        return {}
+    m = me.iloc[0]
+    g = lambda k: None if k not in m or m[k] is None or (isinstance(m[k], float) and not np.isfinite(m[k])) else m[k]
+    flags = dict(gaia_ruwe=g("ruwe"), gaia_nss=int(g("non_single_star") or 0),
+                 gaia_multi_peak=int(g("ipd_frac_multi_peak") or 0), gaia_dup=bool(g("duplicated_source")))
+    from pysyzygos import ellipses
+    se = ellipses.star_ellipse(m, years) if "ra_error" in m else None
+    if se:                                                        # the star's 1-sigma ellipse at the event date
+        flags.update(star_err_smaa_mas=se[0], star_err_smia_mas=se[1], star_err_pa_deg=se[2])
+    return flags
+
+
 def online_fields(records, radius_arcsec, archive):
     """Per record (dicts with star, star_ra, star_dec, mag, m_ast, best_et): the fields from the archive stars."""
     out = []
     for r in records:
         years = 2000.0 + float(r["best_et"]) / (365.25 * 86400) - GAIA_EPOCH
         sid = int(r["star"])
-        me = archive[archive["source_id"].astype("int64") == sid]
-        flags = {}
-        if len(me):
-            m = me.iloc[0]
-            g = lambda k: None if m[k] is None or (isinstance(m[k], float) and not np.isfinite(m[k])) else m[k]
-            flags = dict(gaia_ruwe=g("ruwe"), gaia_nss=int(g("non_single_star") or 0),
-                         gaia_multi_peak=int(g("ipd_frac_multi_peak") or 0), gaia_dup=bool(g("duplicated_source")))
-            from pysyzygos import ellipses
-            se = ellipses.star_ellipse(m, years) if "ra_error" in m else None
-            if se:                                                # the star's 1-sigma ellipse at the event date
-                flags.update(star_err_smaa_mas=se[0], star_err_smia_mas=se[1], star_err_pa_deg=se[2])
+        flags = star_flags(archive, sid, years)
         comps = companions(archive, sid, float(r["star_ra"]), float(r["star_dec"]), float(r["mag"]), years,
                            radius_arcsec)
         out.append(fields(comps, float(r["mag"]), r.get("m_ast"), "gaia online", flags))

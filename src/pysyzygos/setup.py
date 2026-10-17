@@ -1,13 +1,16 @@
 """setup.py - one-time setup of everything PySyzygos needs locally. Safe to rerun: finished parts are skipped,
-an interrupted Gaia build continues where it stopped.
+an interrupted catalog build or download continues where it stopped.
 
-    pysyzygos setup              # kernels + local Gaia catalog + bright-star index
-    pysyzygos setup --source zenodo   # catalog: ready-made copy from Zenodo (G <= 16 or 18), no question
-    pysyzygos setup --source esa      # catalog: build it from ESA's Gaia files instead
-    pysyzygos setup --no-gaia    # SPICE kernels only
-    pysyzygos setup --status     # show what is there
-    pysyzygos setup --no-geoip   # do not guess your site from your IP address
-    pysyzygos setup --gmax 16    # a catalog to G 16 instead (own folder gaia_dr3_g16, ~3 GB)
+    pysyzygos setup                   # kernels + the star catalog (asks the limit and its parts in a terminal)
+    pysyzygos setup --source zenodo   # catalog: the ready-made G <= 16 from Zenodo, no question
+    pysyzygos setup --source esa      # catalog: build it from ESA's Gaia files instead (any limit)
+    pysyzygos setup --groups quality,extras   # the catalog's optional parts (all, none); on an installed catalog
+                                      #   adds or removes parts to match
+    pysyzygos setup --upgrade-catalog # replace a catalog of the old format (before 1.3.0) by the new one
+    pysyzygos setup --no-gaia         # SPICE kernels only
+    pysyzygos setup --status          # show what is there
+    pysyzygos setup --no-geoip        # do not guess your site from your IP address
+    pysyzygos setup --gmax 18         # a catalog to G 18 (built from ESA's files; own folder gaia_dr3_g18)
     pysyzygos setup --gmax 17 --dir /data/gaia_g17
     pysyzygos setup --home ~/PySyzygos      # keep all data in this folder from now on (default for installed copies)
 
@@ -15,21 +18,20 @@ an interrupted Gaia build continues where it stopped.
      place name (Open-Meteo geocoding), or typed in; non-interactive runs copy sites_example.py.
 
   1. SPICE kernels (naif0012.tls, de440.bsp, pck00010.tpc, earth_latest_high_prec.bpc; ~120 MB) into this folder.
-  2. Local Gaia DR3 catalog, G <= gaia_local_gmax, into gaia_local_dir (pysyzygos_config.py). Needed by search.py
-     (corridor mode). Two ways, same result:
-       zenodo: download the ready-made copy (doi:10.5281/zenodo.23113337; G <= 18: 8.2 GB, G <= 16: 2.1 GB), check
-               its SHA-256 and unpack it (~11 / ~3 GB). Only for G <= 16 and 18. Resumable.
-       esa:    build it from ESA's bulk files: 753 GB streamed, ~11 GB kept for G <= 18, about 1.5-2 h at
-               1.4 Gbit/s. Any limit. Resumable.
-     In a terminal, setup first asks for the limit (Enter = 16; skipped with --gmax), then --source auto (default)
-     asks zenodo or esa (Enter = zenodo). Without a terminal: the config's limit, zenodo. auto resumes an interrupted
-     esa build, and uses esa for limits Zenodo does not have.
-  3. Bright-star index (G <= 15, ~1.3 GB) next to the catalog, for pick.py. ~30 s.
+  2. The star catalog (starcat.py, format 2), G <= gaia_local_gmax, into gaia_local_dir (pysyzygos_config.py): all Gaia
+     DR3 stars to that limit, sorted by sky cell and G, in parts: core (2.4 GB for G <= 16; needed), quality (1.6 GB:
+     Gaia's errors and flags without network) and extras (0.8 GB: colours, radial velocity, Teff). Two ways:
+       zenodo: the ready-made G <= 16 (doi:10.5281/zenodo.23113337), SHA-256 checked, unpacked; parts added any time.
+       esa:    built here from ESA's bulk files (753 GB streamed, about 2 h), any limit; then proper motions of the
+               2-parameter stars from UCAC5/UCAC4 (CDS XMatch). Resumable.
+     In a terminal setup asks for the limit (Enter = 16), the parts (Enter = core + quality) and, for G 16, the source
+     (Enter = zenodo). A catalog of the old format (before 1.3.0) keeps working; setup offers the upgrade (installed
+     next to it, swapped in, the old one deleted on request).
 """
 from pysyzygos.version import __version__
 import argparse, json, os, shutil, sys
 
-from pysyzygos import home
+from pysyzygos import home, starcat
 from pysyzygos.home import PKG
 
 
@@ -250,8 +252,16 @@ def show_status(d=None):
         print("  local Gaia catalog            gaia_local_dir not set in pysyzygos_config.py")
         return
     st = gaia.status(d)
+    if starcat.is_format2(d):
+        pmx = st.get("pm_xmatch") or {}
+        print(f"  star catalog {d:18s}  G <= {st['gmax']:g}, {st['n_stars'] / 1e6:.1f} M stars, {st['gb']:.1f} GB; "
+              f"parts: {', '.join(st['groups'])}" + (f"; 2-param stars with pm {pmx['ucac5'] + pmx['ucac4']} of "
+                                                       f"{pmx['two_param']}" if pmx else ""))
+        _list_catalogs(d)
+        return
     print(f"  local Gaia catalog {d:12s}  {st['done']}/{st['total'] or '?'} files, {st['gb']:.1f} GB"
-          + (" (complete)" if st["complete"] else ""))
+          + (" (complete)" if st["complete"] else "") + ("; old format: pysyzygos setup --upgrade-catalog"
+                                                         if st["complete"] else ""))
     gmax = index_limit(d)
     have = os.path.isfile(os.path.join(d, f"bright_G{gmax:.1f}.v2.npy"))
     print(f"  bright-star index G <= {gmax:<5g}  {'ok' if have else 'missing'}")
@@ -268,6 +278,10 @@ def show_status(d=None):
           if ss["complete"] else
           f"incomplete {ss['done']}/{ss['total']} (pysyzygos setup --supplement resumes)" if ss["total"] else
           "not built (optional: pysyzygos setup --supplement)"))
+    _list_catalogs(d)
+
+
+def _list_catalogs(d):
     found = gaia.find_catalogs(".")
     if len(found) > 1 or (found and found[0][0] != d):
         print("  catalogs found (choose with gaia_local_dir, or PYSYZYGOS_CATALOG=<folder> for one run):")
@@ -338,35 +352,36 @@ def index_limit(d):
     return float(lim)
 
 
-ZENODO_GB = {16.0: 2.1, 18.0: 8.2}                  # download sizes, for the question only
+ZENODO_GB = {16.0: 3.2}                             # download size of core + quality, for the question only
 
 
 def catalog_source(source, d, gmax, st):
-    """'zenodo' or 'esa' for building catalog d (status st) to G <= gmax; source is the --source option."""
-    if source == "zenodo" and gmax not in gaia.ZENODO_GMAX:
-        sys.exit(f"   Zenodo has catalogs for G <= 16 and 18 only, not {gmax:g}: use --source esa")
+    """'zenodo' or 'esa' for a new catalog d (status st) to G <= gmax; source is the --source option. Zenodo has the
+    ready-made G <= 16; every other limit is a local build from ESA's files."""
+    ready = float(gmax) in starcat.ZENODO_STEM
+    if source == "zenodo" and not ready:
+        sys.exit(f"   Zenodo has the catalog for G <= 16 only, not {gmax:g}: use --source esa")
     if source != "auto":
         return source
-    if gmax not in gaia.ZENODO_GMAX:
-        print(f"   no ready-made catalog for G <= {gmax:g} on Zenodo (16 and 18 only): building from ESA's files")
+    if not ready:
+        print(f"   G <= {gmax:g}: built from ESA's files (753 GB streamed, about 2 h)")
         return "esa"
     if st["done"]:
         print(f"   resuming the ESA build ({st['done']}/{st['total']} files done); --source zenodo downloads instead")
         return "esa"
     if not sys.stdin.isatty():
         return "zenodo"
-    gb = ZENODO_GB.get(gmax, 0)
-    k = input(f"   [Enter] download the ready-made catalog from Zenodo ({gb:g} GB), or [b]uild it from ESA's files "
-              f"(753 GB streamed, 1.5-2 h): ").strip().lower()
+    k = input(f"   [Enter] download the ready-made catalog from Zenodo (~{ZENODO_GB[16.0]:g} GB), or [b]uild it from "
+              f"ESA's files (753 GB streamed, about 2 h): ").strip().lower()
     return "esa" if k.startswith("b") else "zenodo"
 
 
 def ask_gmax(default):
     """Ask for the catalog's magnitude limit (terminal only). Returns a float G."""
     print("   Faintest star (Gaia G) kept in the local catalog; fainter stars are never searched:")
-    print(f"     16   ~3 GB on disk;  ready-made on Zenodo ({ZENODO_GB[16.0]:g} GB download); enough for most telescopes")
-    print(f"     18   ~11 GB on disk; ready-made on Zenodo ({ZENODO_GB[18.0]:g} GB download); for large apertures")
-    print("     other limits are built from ESA's files (753 GB streamed, 1.5-2 h)")
+    print(f"     16   2.4-4.8 GB on disk; ready-made on Zenodo; enough for most telescopes")
+    print("     other limits (e.g. 17, 18 for large apertures) are built here from ESA's files (753 GB streamed, about "
+          "2 h; G <= 18: ~300 M stars, 9-18 GB)")
     while True:
         k = input(f"   limit [Enter = {default:g}]: ").strip()
         try:
@@ -407,6 +422,133 @@ def network_failure(e, d, source):
             + "   - or copy a finished catalog folder from another computer (gaia_dr3_g16 / gaia_dr3_g18)")
 
 
+# ----------------------------------------------------------------------------------------------- star catalog
+GROUP_GB = {"core": 2.4, "quality": 1.6, "extras": 0.8}       # G <= 16 on disk (starcat.py)
+
+
+def parse_groups(text):
+    """--groups text -> list of optional parts ('none'/'core': none, 'all': every one)."""
+    t = (text or "").strip().lower()
+    if t in ("", "none", "core"):
+        return []
+    if t == "all":
+        return list(starcat.GROUPS)
+    out = [g.strip() for g in t.split(",") if g.strip()]
+    bad = [g for g in out if g not in starcat.GROUPS]
+    if bad:
+        sys.exit(f"--groups: unknown part(s) {', '.join(bad)}; choose from {', '.join(starcat.GROUPS)}, all or none")
+    return out
+
+
+def ask_groups(build=False):
+    """The optional parts of a new catalog (terminal question). Returns a list."""
+    q, e = GROUP_GB["quality"], GROUP_GB["extras"]
+    print("   The catalog's parts (sizes for G <= 16):")
+    print(f"     core      {GROUP_GB['core']:g} GB  {starcat.GROUP_TEXT['core']}")
+    print(f"     quality   {q:g} GB  {starcat.GROUP_TEXT['quality']}")
+    print(f"     extras    {e:g} GB  {starcat.GROUP_TEXT['extras']}")
+    print("   Parts can be removed later (System tab, pysyzygos catalog remove) and, for the ready-made catalog, added "
+          "later." + (" For a build from ESA's files they can only be added by a new build." if build else ""))
+    k = input(f"   [Enter] core + quality ({GROUP_GB['core'] + q:.1f} GB, recommended), [m]inimal core only, "
+              f"[a]ll ({sum(GROUP_GB.values()):.1f} GB): ").strip().lower()
+    return [] if k.startswith("m") else list(starcat.GROUPS) if k.startswith("a") else ["quality"]
+
+
+def install_catalog(d, gmax, groups, source, workers, keep_archive):
+    """A new format-2 catalog in d: the ready-made one from Zenodo (G <= 16) or a build from ESA's files (any limit;
+    then the proper motions of its 2-parameter stars from UCAC5/UCAC4). Returns the source used."""
+    src = catalog_source(source, d, gmax, starcat.status(d))
+    if src == "zenodo":
+        starcat.fetch(d, gmax, groups, keep_archive)
+    else:
+        st = starcat.build(d, gmax, workers, groups=groups)
+        if st["complete"] and not st.get("pm_xmatch"):
+            print("   proper motions for the 2-parameter stars (UCAC5 / UCAC4 via CDS XMatch, a few minutes)")
+            try:
+                starcat.xmatch(d)
+            except (OSError, RuntimeError, ValueError) as e:
+                print(f"   not done ({str(e)[:200]}): their events stay flagged 'NO proper motion'; later: "
+                      f"pysyzygos catalog xmatch --dir {d}")
+    return src
+
+
+def catalog_step(a):
+    """Step 2: the star catalog. Format 2 (starcat.py) for new installs; an old-format catalog is kept unless it is
+    upgraded (--upgrade-catalog, or asked in a terminal): the new one is installed next to it and swapped in.
+    Returns (folder, new_install)."""
+    tty = sys.stdin.isatty()
+    d, gmax = catalog_target(a.gmax, a.dir)
+    st = gaia.status(d)
+    groups = None if a.groups is None else parse_groups(a.groups)
+    src = None
+    try:
+        if starcat.is_format2(d):
+            print(f"2. star catalog G <= {st['gmax']:g} in {d}: complete ({', '.join(st['groups'])}; {st['gb']:.1f} GB)")
+            for g in [g for g in (groups or []) if g not in st["groups"]]:
+                starcat.add_group(d, g, a.keep_archive)
+            for g in [g for g in st["groups"][1:] if groups is not None and g not in groups]:
+                starcat.remove_group(d, g)
+                print(f"   removed: {g}")
+            return d, SITES_CREATED
+        if st["complete"]:                                         # the old format (before 1.3.0)
+            print(f"2. local Gaia catalog G <= {st['gmax']:g} in {d}: the old format (before 1.3.0)")
+            up = a.upgrade_catalog
+            if not up and tty:
+                gm = st["gmax"]
+                how = (f"the ready-made G <= {gm:g} from Zenodo" if float(gm) in starcat.ZENODO_STEM else
+                       "a build from ESA's files (753 GB streamed, ~2 h)")
+                k = input(f"   The new catalog: one sort order for every lookup, the high-RUWE and 2-parameter stars "
+                          f"included, Gaia's errors and flags offline;\n   {how}, installed next to the old one and "
+                          f"swapped in.\n   [u]pgrade now, or [Enter] keep the old one for now: ").strip().lower()
+                up = k.startswith("u")
+            if up:
+                gmax = float(st["gmax"]) if a.gmax is None else gmax
+                new = starcat.staging_dir(d)
+                print(f"   new catalog G <= {gmax:g} in {new}, then swapped in")
+                if groups is None:
+                    groups = ask_groups(build=float(gmax) not in starcat.ZENODO_STEM) if tty else ["quality"]
+                src = install_catalog(new, gmax, groups, a.source, a.workers, a.keep_archive)
+                if not starcat.is_format2(new):
+                    sys.exit(f"\n   the new catalog in {new} is not complete yet: rerun setup --upgrade-catalog "
+                             f"to resume (nothing is lost)")
+                old = starcat.swap_in(d)
+                gb = sum(os.path.getsize(os.path.join(r, f)) for r, _, fs in os.walk(old) for f in fs) / 1e9
+                print(f"   ok: the new catalog is in {d}; the old one moved to {old} ({gb:.1f} GB)")
+                if tty and input(f"   delete {old}? [Enter] yes, [k]eep: ").strip().lower() != "k":
+                    shutil.rmtree(old)
+                    print(f"   deleted {old}")
+                else:
+                    print(f"   delete it when it is no longer needed (or: pysyzygos cleanup lists it)")
+                return d, SITES_CREATED
+            print("   kept (upgrade later: pysyzygos setup --upgrade-catalog, or the System tab)")
+            print("3. bright-star index")
+            gaia.BrightIndex(d, index_limit(d))
+            print("   ok")
+            supplement_step(d, gmax, a.supplement, min(a.supplement_gmax, gmax), a.workers,
+                            ask=tty and SITES_CREATED, source=a.source)
+            return d, SITES_CREATED
+        # a new catalog (or the rest of an interrupted build)
+        if st["total"] and not os.path.isfile(os.path.join(d, "build.json")):
+            sys.exit(f"   {d} holds a half-built catalog of the old format: delete that folder and rerun setup")
+        if a.gmax is None and tty and not st["total"]:
+            print("2. star catalog")
+            d, gmax = catalog_target(ask_gmax(gmax if float(gmax) in starcat.ZENODO_STEM else 16.0), a.dir)
+        else:
+            print(f"2. star catalog G <= {gmax:g} in {d}" + (" (resuming the build)" if st["total"] else ""))
+        if groups is None:
+            groups = ask_groups(build=float(gmax) not in starcat.ZENODO_STEM) if tty and not st["total"] else ["quality"]
+        src = install_catalog(d, gmax, groups, a.source, a.workers, a.keep_archive)
+        if not starcat.is_format2(d):
+            sys.exit(f"\n   catalog {d} is not complete yet: rerun setup to resume (nothing is lost)")
+        print(f"   ok: {', '.join(starcat.status(d)['groups'])}")
+    except (OSError, RuntimeError, ValueError, KeyError) as e:      # network (requests' errors are OSErrors), disk
+        sys.exit(network_failure(e, d, src))
+    if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 16.0)):
+        print(f"\n   To search with this catalog, set in pysyzygos_config.py:\n"
+              f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")
+    return d, True
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"PySyzygos {__version__}")
@@ -423,6 +565,12 @@ def main():
     ap.add_argument("--planet-kernels", action="store_true",
                     help="download NAIF's satellite kernels for planets and moons (Jupiter: jup365.bsp, 1.1 GB) for "
                          "offline use; otherwise their positions come from JPL Horizons per search")
+    ap.add_argument("--groups", help="optional parts of the star catalog: quality, extras (comma-separated), all or "
+                                      "none (default: asked; without a terminal: quality); on an installed catalog "
+                                      "adds or removes parts to match")
+    ap.add_argument("--upgrade-catalog", action="store_true",
+                    help="replace an old-format catalog (before 1.3.0) by the new one: installed next to it "
+                         "(<folder>.new), then swapped in; the old one goes to <folder>.old")
     ap.add_argument("--supplement", action="store_true",
                     help="also install the catalog's high-RUWE supplement: the stars the catalog leaves out (Gaia "
                          "RUWE >= 1.4, 2-parameter), flagged in the results; ~8 M stars to G 16: 0.35 GB from Zenodo "
@@ -462,52 +610,7 @@ def main():
         print(f"   historic Earth orientation: {h or 'not available (offline?), rerun later'}")
     d, new_install = None, False
     if not a.no_gaia:
-        d, gmax = catalog_target(a.gmax, a.dir)
-        st = gaia.status(d)
-        if not st["complete"] and a.gmax is None and sys.stdin.isatty():   # new catalog: ask its limit first
-            print("2. local Gaia catalog")
-            ask = st["gmax"] if st["total"] else (gmax if gmax in gaia.ZENODO_GMAX else 16.0)
-            d, gmax = catalog_target(ask_gmax(ask), a.dir)
-            st = gaia.status(d)
-            print(f"   G <= {gmax:g} in {d}")
-        else:
-            print(f"2. local Gaia catalog G <= {gmax:g} in {d}")
-            if not st["complete"] and a.gmax is None and not sys.stdin.isatty():
-                print(f"   note: no terminal (background run), so no questions: catalog limit G <= {gmax:g} from "
-                      f"pysyzygos_config.py; give --gmax (and --source) to choose")
-        if st["total"] and abs(st.get("gmax", gmax) - gmax) > 1e-9:
-            what = (f"a {'complete' if st['complete'] else 'half-built'} catalog with G <= {st['gmax']:g} "
-                    f"({st['done']}/{st['total']} files, {st['gb']:.1f} GB)")
-            if not sys.stdin.isatty():
-                sys.exit(f"   {d} already holds {what}. Delete that folder, or use --dir for G <= {gmax:g}")
-            k = input(f"   {d} already holds {what}.\n   [d]elete it and install G <= {gmax:g} there, "
-                      f"or [Enter] cancel: ").strip().lower()
-            if k != "d":
-                sys.exit(f"   cancelled; use --dir <folder> to install G <= {gmax:g} elsewhere")
-            shutil.rmtree(d)
-            print(f"   deleted {d}")
-            st = gaia.status(d)
-        src = None
-        new_install = SITES_CREATED or not st["complete"]           # first-time setup: ask the optional questions
-        try:
-            if st["complete"]:
-                print("   complete")
-            elif (src := catalog_source(a.source, d, gmax, st)) == "zenodo":
-                gaia.fetch_zenodo(d, gmax, a.keep_archive)
-            else:
-                gaia.build(d, gmax, a.workers)
-            if not gaia.status(d)["complete"]:
-                sys.exit(f"\n   catalog {d} is not complete yet: rerun setup to resume (nothing is lost)")
-            print("3. bright-star index")
-            gaia.BrightIndex(d, index_limit(d))
-            print("   ok")
-        except (OSError, RuntimeError, ValueError, KeyError) as e:  # network (requests' errors are OSErrors), disk
-            sys.exit(network_failure(e, d, src if gmax in gaia.ZENODO_GMAX else None))
-        supplement_step(d, gmax, a.supplement, min(a.supplement_gmax, gmax), a.workers,
-                        ask=sys.stdin.isatty() and new_install, source=a.source)
-        if d != getattr(config, "gaia_local_dir", None) or gmax != float(getattr(config, "gaia_local_gmax", 16.0)):
-            print(f"\n   To search with this catalog, set in pysyzygos_config.py:\n"
-                  f"       gaia_local_dir = \"{d}\"\n       gaia_local_gmax = {gmax:g}")
+        d, new_install = catalog_step(a)
     planet_kernels(a.planet_kernels, ask=sys.stdin.isatty() and new_install)
     print()
     show_status(d)

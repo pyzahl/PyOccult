@@ -14,7 +14,8 @@ Deleted (in the data folder, see `pysyzygos setup --status`):
   downloads      SPICE kernels, NAIF planet kernels, the MPC observatory list, old caches
   caches         PySyzygos's own files in cache_path (asteroid and body SPKs, SBDB caches, CSV exports) - nothing else there
   catalog extras in every gaia_dr3_* folder: the bright-star indexes and the high-RUWE supplement (setup restores
-                 both: rebuilt in a minute, the supplement downloaded from Zenodo in minutes); the star files are kept
+                 both: rebuilt in a minute, the supplement downloaded from Zenodo in minutes); the star files are kept;
+                 a whole gaia_dr3_*.old folder (the catalog before an upgrade to the new format)
   run outputs    results database, logs, reports, maps, picks, pre-screens, targets.py, OWC-check outputs, backups
 Never deleted: owc_refs/, owc_reference.*, private-docs/, release/, run.sh, .venv, the program, git, the catalogs'
 star files. Afterwards `pysyzygos setup` sets everything up again (with --all it asks for your site again).
@@ -92,6 +93,9 @@ def plan(keep_results=False, everything=False):
             add("caches", pat, cp)
     for d in sorted(glob.glob(os.path.join(home, "gaia_dr3_*"))):
         if os.path.isdir(d) and d.endswith(".unpack"):               # an interrupted Zenodo unpack
+            out.append(("catalog extras", d))
+            continue
+        if os.path.isdir(d) and d.endswith(".old"):                  # the catalog before an upgrade (starcat.swap_in)
             out.append(("catalog extras", d))
             continue
         if not os.path.isfile(os.path.join(d, "catalog.json")):

@@ -4,6 +4,33 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
+## [1.3.0] "Beyond Horizons" - 2026-10-16
+
+### Added
+- **New star catalog** (`pysyzygos/starcat.py`, `pysyzygos catalog build|fetch|add|remove|status|xmatch|pack`): all
+  Gaia DR3 stars to the limit in one catalog, the high-RUWE and 2-parameter stars included (flagged; no separate
+  supplement), sorted by 0.25 deg sky cell and G, so searches, picks, pre-screens and previews read one sort order
+  and the pick needs no separate star index (1.3-2.8 GB less). Positions stored to 0.0002 mas in 8 bytes. In parts:
+  **core** (2.4 GB for G <= 16, needed), **quality** (1.6 GB: RUWE, Gaia's errors, correlations and double-star flags)
+  and **extras** (0.8 GB: BP/RP, radial velocity, Teff). G <= 16: 78.0 M stars, built from ESA's files in 1 h 49 min,
+  465,590 of the 573,735 2-parameter stars with a UCAC5/UCAC4 proper motion. Checked against the earlier catalogs: the
+  same stars, positions within 0.0001 mas, the same events for a 20-day search and a 4-day pick (times within 1 ms);
+  search strips 2-7x faster.
+- **The star's Gaia flags and error ellipse offline**: with the quality part they come from the local catalog for
+  every event; the online Gaia check now only asks about stars whose neighbours the catalog may miss (the star less
+  than 5 mag brighter than the catalog limit), so for bright stars the run does not wait for the archive.
+- **Setup**: new installs get the new catalog (G <= 16 from Zenodo, other limits built from ESA's files),
+  `--groups` for the parts, `--upgrade-catalog` for a catalog of the old format (installed next to it as
+  `<folder>.new`, swapped in, the old one moved to `<folder>.old` and deleted on request).
+- **System tab**: section "Star catalog" with a checkbox per optional part (download / remove), "Install the new
+  catalog" for an old one and "Delete" for a leftover `.old` folder; "Data in use" shows the parts, and a new group
+  **Planets and moons** (the moons' list, NAIF kernels with their range, Horizons files in the cache).
+
+### Changed
+- Zenodo carries the ready-made catalog for G <= 16 only (new archives `gaia_dr3_g16_v2_<part>.tar.xz`); deeper
+  catalogs (G 17, 18, ...) are built locally from ESA's files. Catalogs of the old format keep working (marked "old
+  format" in the GUI); `--supplement` and `pysyzygos gaia` remain for them.
+
 ## [1.2.0] "Beyond Horizons" - 2026-10-16
 
 Released as tag `v1.2.01`: the tag `v1.2.0` was set one commit too early (still version 1.1.1, without the globe fix).
@@ -711,6 +738,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[1.3.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.3.0
 [1.2.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.2.01
 [1.1.1]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.1
 [1.1.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.0

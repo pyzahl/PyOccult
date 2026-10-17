@@ -6,7 +6,7 @@
 > An occultation is one: for a few seconds the observer, the asteroid and the star stand in one line. Up to version
 > 0.18 the project was called PyOccult.
 
-Python Occultation Searcher by PyZahl (C) 2026, version 1.2.0 “Beyond Horizons”. Free software under the GNU GPL v3 or later (see License below).
+Python Occultation Searcher by PyZahl (C) 2026, version 1.3.0 “Beyond Horizons”. Free software under the GNU GPL v3 or later (see License below).
 The version and its code name (it changes at major milestones) are kept in `pysyzygos/version.py`; the GUI header and
 its **About** box show both, the report and `--version` of every tool show the version. What changed in each version:
 [CHANGELOG.md](CHANGELOG.md). How the predictions were verified: [VERIFICATION.md](VERIFICATION.md).
@@ -36,7 +36,7 @@ NiceGUI: a local web interface to plan and run all tasks for easy event explorat
 - [If something goes wrong: start over](#if-something-goes-wrong-start-over)
 - [Where your data and settings live](#where-your-data-and-settings-live)
 - [Site Configuration and Run Setup](#site-configuration-and-run-setup)
-- [Local Gaia catalog (required)](#local-gaia-catalog-required)
+- [Star catalog (required)](#star-catalog-required)
 - [Pick tool: choose targets](#pick-tool-choose-targets)
 - [Web interface (GUI)](#web-interface-gui)
 - [Planets and moons](#planets-and-moons)
@@ -98,8 +98,9 @@ everything: `pysyzygos` (the web interface) or `pysyzygos <command>`, e.g. `pysy
 | `pysyzygos/stellarium.py` | points a running Stellarium at an event (Remote Control plugin, HTTP); the report's Stellarium button |
 | `pysyzygos/favorites.py` | the favorites list (`favorites/`, private): events starred in the report, with copies of map and preview; `list` |
 | `pysyzygos/pathcheck.py` | path verification: a favorite's geodetic path, fresh, compared with Occult's path listing (`pysyzygos path-check`; GUI Favorites) |
-| `pysyzygos/setup.py` | one-time setup: SPICE kernels, local Gaia catalog, bright-star index |
-| `pysyzygos/gaia_local.py` | builds and reads the local Gaia catalog (used by `pysyzygos/setup.py` and the search) |
+| `pysyzygos/setup.py` | one-time setup: SPICE kernels, the star catalog (download or build, its parts, the upgrade of an old one) |
+| `pysyzygos/starcat.py` | the star catalog (since 1.3.0): build from ESA's files, Zenodo download, parts, lookups (`pysyzygos catalog`) |
+| `pysyzygos/gaia_local.py` | reads catalogs of the old format (before 1.3.0) and hands new ones to `starcat.py` |
 | `pysyzygos/gui.py` | local web interface: sites on a map, run search and pick, live log, results (NiceGUI) |
 | `pysyzygos/owc_check.py` | regression check against an OWC search result you paste into `owc_reference.txt` (private) |
 | supporting modules | `pysyzygos/corridor.py` (star corridor), `pysyzygos/screen.py` + `pysyzygos/orbits.py` (pick tool engine), `pysyzygos/preview.py` (event preview image), `pysyzygos/globe.py` (whole-Earth plot), `pysyzygos/doubles.py` (close and double stars), `pysyzygos/binaries.py` (asteroid satellites), `pysyzygos/occultations.py` (earlier occultations), `pysyzygos/sbdb.py` (asteroid size cache), `pysyzygos/cameras.py` (sensor list), `pysyzygos/kernels.py` (kernel download), `pysyzygos/geo.py` (place and IP lookup), `pysyzygos/runner.py` (runs with per-run settings) |
@@ -308,25 +309,33 @@ as before). Without activating the environment, use `.venv/bin/pysyzygos` (Windo
 PySyzygos works offline from local data: SPICE kernels for the planets and Earth orientation, and a local copy of the
 Gaia star catalog. `pysyzygos/setup.py` installs all of it.
 
-The Gaia catalog can be installed two ways, with the same result:
+The star catalog holds all Gaia DR3 stars to a magnitude limit (G <= 16 by default: 78 M stars) in three parts:
 
-* **zenodo** (recommended): download the ready-made catalog from Zenodo,
-  [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it contains). Setup checks its SHA-256 and
-  unpacks it. Available for G <= 16 (`gaia_dr3_g16.tar.xz`, 2.1 GB, the default) and G <= 18 (`gaia_dr3_g18.tar.xz`,
-  8.2 GB).
-* **esa**: build it yourself from ESA's Gaia DR3 bulk files. Takes much longer, but works for any magnitude limit.
+| Part | G <= 16 | What it holds | Needed? |
+|---|---|---|---|
+| core | 2.4 GB | positions, parallaxes, proper motions, G, flags (incl. the high-RUWE and 2-parameter stars, marked) | yes |
+| quality | 1.6 GB | Gaia's RUWE, errors and correlations, double-star flags: the star's error ellipse and double-star hints without network | recommended (default) |
+| extras | 0.8 GB | BP/RP magnitudes (colour), radial velocity, Teff: for a star-size model later | optional |
+
+It can be installed two ways, with the same result:
+
+* **zenodo** (recommended, G <= 16): download the ready-made catalog from Zenodo,
+  [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it
+  contains), one archive per part. Setup checks each SHA-256 and unpacks it; parts can be added or removed later.
+* **esa**: build it yourself from ESA's Gaia DR3 bulk files: any magnitude limit (e.g. G <= 18 for large apertures),
+  753 GB streamed, about 2 h. The parts you choose are built with it (a part can be removed later, but added only by
+  another build).
 
 **What you need**
 
-| | Kernels | Gaia catalog G <= 16 (default), zenodo | Gaia catalog G <= 18, zenodo | Gaia catalog, esa | Bright-star index |
-|---|---|---|---|---|---|
-| Download | ~120 MB | 2.1 GB | 8.2 GB | 753 GB (streamed, not stored) | none (built from the catalog) |
-| Disk | ~120 MB | ~3 GB (~5 GB while unpacking) | ~11 GB (~20 GB while unpacking) | ~3 GB (G 16), ~11 GB (G 18) | ~1.3 GB |
-| Time | a minute | download time + ~2 min | download time + ~5 min to check and unpack | 1.5-2 h at ~1.4 Gbit/s, longer on slower lines | ~30 s |
+| | Kernels | Catalog G <= 16, zenodo | Catalog, esa |
+|---|---|---|---|
+| Download | ~120 MB | 3.2 GB (core 2.0 + quality 1.1; extras 0.5) | 753 GB (streamed, not stored) |
+| Disk | ~120 MB | 4.0 GB (core + quality; 2.4 GB core only, 4.8 GB all) | G 16: as zenodo; G 18 roughly 4x (~300 M stars) |
+| Time | a minute | download time + a few minutes to check and unpack | about 2 h at ~1.4 Gbit/s (CPU-bound), longer on slower lines |
 
-G 16 suits most amateur telescopes (a 25-30 cm telescope with a video camera reaches about G 15-16); take G 18 for
-large apertures or long exposures. Also needed: `curl` (for the kernels)
-and a few GB of free RAM while the index is built.
+G 16 suits most amateur telescopes (a 25-30 cm telescope with a video camera reaches about G 15-16); build G 17 or 18
+for large apertures or long exposures. Also needed: `curl` (for the kernels).
 
 **Before you start**: your observing site goes into `sites.py` (see "Observing sites" below). If it does not exist
 yet, `pysyzygos/setup.py` helps you create it: it guesses your position from your IP address (ipinfo.io; city level,
@@ -336,11 +345,10 @@ APPROXIMATE in `sites.py`, and `--status` keeps warning until you replace it wit
 a shadow can be only a few km wide). Without a terminal, setup copies `src/pysyzygos/templates/sites_example.py` instead. Also check these in
 `pysyzygos_config.py`:
 
-* `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g16` in the data folder). Pick a disk with ~5 GB free
-  for G 16, ~22 GB for G 18 (while the Zenodo archive is unpacked; it is saved next to the folder and deleted
-  afterwards).
+* `gaia_local_dir`: where the catalog goes (default `gaia_dr3_g16` in the data folder). Pick a disk with ~8 GB free
+  for G 16 (while an archive is unpacked; it is saved next to the folder and deleted afterwards).
 * `gaia_local_gmax`: faintest star kept (default 16). Fainter stars are never searched; it also caps the site's star
-  limit, so set it to the catalog you have (18 with `gaia_dr3_g18`).
+  limit, so set it to the catalog you have (18 with a `gaia_dr3_g18` you built).
   A different value needs a new folder (`--gmax`, see below).
 * `cache_path`: where the smaller caches go (asteroid orbits, SBDB data). Defaults to `/dev/shm` on Linux (RAM, emptied
   on reboot) and to the system temp folder elsewhere.
@@ -348,13 +356,14 @@ a shadow can be only a few km wide). Without a terminal, setup copies `src/pysyz
 **Run it**
 
 ```bash
-pysyzygos setup              # kernels + local Gaia catalog + bright-star index (asks: zenodo or esa)
-pysyzygos setup --source zenodo   # catalog from Zenodo without asking (G <= 16 or 18 only)
-pysyzygos setup --source esa      # build the catalog from ESA's files without asking
+pysyzygos setup                  # kernels + star catalog (asks: limit, parts, zenodo or esa)
+pysyzygos setup --source zenodo  # the ready-made G <= 16 from Zenodo without asking
+pysyzygos setup --source esa     # build the catalog from ESA's files without asking
+pysyzygos setup --groups all     # the catalog's parts: quality (default), extras, all, none
+pysyzygos setup --upgrade-catalog   # replace a catalog of the old format (PySyzygos before 1.3.0)
 pysyzygos setup --no-gaia        # kernels only (e.g. to try the old "windows" search mode)
 pysyzygos setup --status         # what is installed
-pysyzygos setup --gmax 18        # the larger catalog to G 18 (own folder gaia_dr3_g18, ~11 GB); --dir to choose the folder
-pysyzygos setup --supplement     # also the high-RUWE supplement (Gaia stars the catalog leaves out) + their proper motions
+pysyzygos setup --gmax 18        # a catalog to G 18, built from ESA's files (own folder gaia_dr3_g18); --dir to choose
 pysyzygos setup --planet-kernels # NAIF kernels for planets and moons, for offline use (Jupiter: 1.1 GB)
 ```
 
@@ -362,57 +371,57 @@ All options of `pysyzygos setup` (also `pysyzygos setup --help`):
 
 | Option | What it does |
 |---|---|
-| (none) | everything that is missing: your site (first run), SPICE kernels, local Gaia catalog, bright-star index; asks where questions are needed |
-| `--status` | only show what is installed (data folder, site, kernels, catalog, index, supplement, planet kernels) |
-| `--gmax G` | faintest Gaia G of the catalog (default `gaia_local_gmax`, 16); another limit gets its own folder `gaia_dr3_g<G>` |
+| (none) | everything that is missing: your site (first run), SPICE kernels, the star catalog; asks where questions are needed |
+| `--status` | only show what is installed (data folder, site, kernels, catalog and its parts, planet kernels) |
+| `--gmax G` | faintest Gaia G of the catalog (default `gaia_local_gmax`, 16); another limit gets its own folder `gaia_dr3_g<G>` and is built from ESA's files |
 | `--dir FOLDER` | the catalog folder (default `gaia_local_dir`, or `gaia_dr3_g<G>` for another `--gmax`) |
-| `--source auto\|zenodo\|esa` | where the catalog comes from: `auto` asks (Enter = Zenodo), `zenodo` the ready-made download (G 16 or 18), `esa` built from ESA's files (any limit, 1.5-2 h); also for the supplement |
-| `--keep-archive` | keep the downloaded Zenodo `.tar.xz` (deleted after unpacking otherwise) |
+| `--source auto\|zenodo\|esa` | where the catalog comes from: `auto` asks (Enter = Zenodo) for G 16 and builds other limits, `zenodo` the ready-made G 16, `esa` a build from ESA's files (any limit, about 2 h) |
+| `--groups LIST` | the catalog's optional parts: `quality`, `extras` (comma-separated), `all` or `none`; default: asked in a terminal, else `quality`. On an installed catalog it adds (Zenodo) or removes parts to match |
+| `--upgrade-catalog` | replace a catalog of the old format (before 1.3.0) by the new one: installed next to it (`<folder>.new`), swapped in, the old one moved to `<folder>.old` (setup asks to delete it) |
+| `--keep-archive` | keep the downloaded Zenodo `.tar.xz` files (deleted after unpacking otherwise) |
 | `--workers N` | parallel downloads for an ESA build (default 6) |
 | `--no-gaia` | kernels (and site) only, no catalog |
-| `--supplement` | also the high-RUWE supplement of the catalog (Gaia stars with RUWE >= 1.4 or without proper motion, flagged in the results): 0.35 GB from Zenodo, then proper motions for its 2-parameter stars from UCAC5/UCAC4 (a few minutes); `--source esa` builds it instead (~2 h). A first-time setup offers it |
-| `--supplement-gmax G` | faintest G of the supplement (default 16, at most the catalog's limit; Zenodo has G 16) |
 | `--planet-kernels` | download NAIF's kernels for planets and moons (e.g. Jupiter's `jup365.bsp`, 1.1 GB) for offline use; without them positions come from JPL Horizons per search |
 | `--no-geoip` | do not guess your site from your IP address (first run) |
 | `--historic-earth` | also download NAIF's historic Earth orientation file (`earth_1962_*_combined.bpc`, ~31 MB) for dates before 2000, e.g. to check historic events; a search or pick before 2000 fetches it by itself when online |
 | `--home FOLDER` | use FOLDER as the data folder from now on (saved as a setting; files are not moved); see "Where your data and settings live" |
 | `--version` | show PySyzygos's version |
 
+The options `--supplement` and `--supplement-gmax` remain for catalogs of the old format only.
+
 The catalog limit defaults to `gaia_local_gmax` (16). Another limit with `--gmax` is built in its own folder
 (`gaia_dr3_g<limit>`, or `--dir`); setup then prints the two lines to set in `pysyzygos_config.py` (`gaia_local_dir`,
 `gaia_local_gmax`) so the search uses it. Stars fainter than the catalog limit are never searched.
 
-In a terminal, setup first asks for the catalog's limit (Enter = 16; `--gmax` skips the question), and names the
-folder after it (`gaia_dr3_g<limit>`). Where the catalog comes from (`--source`, default `auto`): in a terminal, setup
-then asks, and Enter takes Zenodo. Without
-a terminal it takes Zenodo. It builds from ESA's files when the limit is not 16 or 18, or when an interrupted ESA
-build is already in the folder (it resumes that one). `--keep-archive` keeps the downloaded `.tar.xz`. If you already
-have the archive (downloaded by hand from the DOI page), put it next to the catalog folder, e.g.
-`gaia_dr3_g18.tar.xz` beside `gaia_dr3_g18/`. Setup then checks it and unpacks it without downloading.
+In a terminal, setup asks for the catalog's limit (Enter = 16; `--gmax` skips the question), its parts (Enter = core +
+quality; `--groups` skips it) and, for G 16, where it comes from (Enter = Zenodo; `--source` skips it). Without a
+terminal it takes the config's limit, core + quality, and Zenodo for G 16. If you already have the archives (downloaded
+by hand from the DOI page), put them next to the catalog folder, e.g. `gaia_dr3_g16_v2_core.tar.xz` beside
+`gaia_dr3_g16/`; setup then checks and unpacks them without downloading.
 
-The download takes a while, the ESA build much longer. To let it run on its own and check on it later (Linux,
-macOS), answer setup's questions first and then start only the catalog in the background, with your answers given as
-options. In the background setup cannot ask: it would take the example site (New York) and the catalog limit from
+The download takes a while, an ESA build longer. To let it run on its own and check on it later (Linux, macOS),
+answer setup's questions first and then start only the catalog in the background, with your answers given as options.
+In the background setup cannot ask: it would take the example site (New York) and the catalog limit from
 `pysyzygos_config.py`.
 
 ```bash
-pysyzygos setup --no-gaia                                           # in the terminal: your site and the kernels
-nohup pysyzygos setup --gmax 18 --source zenodo > setup.log 2>&1 &  # then the catalog in the background
+pysyzygos setup --no-gaia                                              # in the terminal: your site and the kernels
+nohup pysyzygos setup --source zenodo --groups quality > setup.log 2>&1 &   # then the catalog in the background
 tail -f setup.log                     # progress with speed and ETA: a new line every 30 s
 ```
 
-`--gmax 16` for the smaller catalog; `--source esa` to build it from ESA's files instead.
+`--gmax 18 --source esa` builds a deeper catalog instead.
 
 It is safe to stop and rerun: a Zenodo download continues where it stopped, and an ESA build skips finished files, so
-the same command resumes. `--status` should end with
-`3386/3386 files ... (complete)` and `bright-star index ... ok`. The search (`pysyzygos/search.py`) refuses to run on an
-incomplete catalog and tells you to rerun the setup. See "Local Gaia catalog" below for what is kept and why.
+the same command resumes. `--status` should show `star catalog gaia_dr3_g16 ... parts: core, quality`. The search
+(`pysyzygos/search.py`) refuses to run on an incomplete catalog and tells you to rerun the setup. See "Star catalog"
+below for what is kept and why.
 
 **Downloads fail (offline, server down, proxy or firewall).** Setup stops with a message naming the address instead
 of a traceback; what is already downloaded is kept, so rerun it later. Behind a proxy, tell curl and Python about it
 first: `export https_proxy=http://<proxy>:<port> HTTPS_PROXY=http://<proxy>:<port>`. If a proxy blocks one source,
 try the other (`--source zenodo` or `--source esa`), or copy the kernel files (`*.tls *.bsp *.tpc *.bpc`) and a
-finished catalog folder (`gaia_dr3_g16`, `gaia_dr3_g18`) from another computer. All addresses are listed in
+finished catalog folder (e.g. `gaia_dr3_g16`) from another computer. All addresses are listed in
 `pysyzygos/urls.py`. An ESA build skips a file that still fails after its retries (a rerun fetches it) and stops early
 if the first files all fail.
 
@@ -508,7 +517,8 @@ pysyzygos                 # opens http://127.0.0.1:8080 in your browser (local o
    `pysyzygos info` on the command line): leap seconds, the Earth orientation (measured to, predicted to, valid
    from), DE440's range, the star catalogs (the one in use marked; stars, size, supplement, star indexes), the
    asteroid data in the cache (list date and age, size data, orbit files), the offline copies (copies of past picks
-   and searches), saved picks, pre-screens and the results database; and **offline use**: the pick's asteroid list (JPL
+   and searches), saved picks, pre-screens, planets and moons (the moons' list, NAIF kernels with their range, Horizons
+   files in the cache) and the results database; and **offline use**: the pick's asteroid list (JPL
    SBDB) and the searches' orbit files (JPL Horizons) are cached in memory (`/dev/shm`, lost at a restart). With
    "Keep copies of orbit downloads for use without network" every download is also kept in the data folder's
    `offline/` (the list compressed, ~34 MB for H < 17; orbit files and size data small); without network a pick or
@@ -530,7 +540,7 @@ commands" at the top of Install). The site is
 
 | Step | Command | What it does |
 |---|---|---|
-| once | `pysyzygos setup` | SPICE kernels, local Gaia catalog (Zenodo download or ESA build), bright-star index, `sites.py` |
+| once | `pysyzygos setup` | SPICE kernels, the star catalog (Zenodo download or ESA build), `sites.py` |
 | choose | `pysyzygos pick --start 2026-10-01 --days 20` | screen all asteroids for events at the site; writes `pick_events.csv`, `targets.py` and the saved pick in `picks/` |
 | predict | `pysyzygos search` | exact search for the targets (the saved pick of the site covering the window, else `targets.py`); adds the events to the current results list in `pysyzygos.db`, writes it as `hits_log.csv`, and `maps/` |
 | present | `pysyzygos report hits_log.csv` | HTML event list with maps and previews (`hits_report.html`) |
@@ -549,7 +559,8 @@ targets" below), `pysyzygos picks list` (saved picks), `PYSYZYGOS_CATALOG=gaia_d
 
 **Starting over** (e.g. to test a fresh install): `pysyzygos cleanup` lists, with sizes, what it would delete in the
 data folder: downloads (SPICE and planet kernels, the MPC list), PySyzygos's own cache files in `cache_path` (nothing
-else there), the catalogs' bright-star indexes and high-RUWE supplement, and the run outputs (results database,
+else there), for catalogs of the old format their bright-star indexes and high-RUWE supplement, a catalog replaced by an upgrade
+(`gaia_dr3_*.old`), and the run outputs (results database,
 reports, maps, picks, pre-screens, logs). Nothing is deleted until you add `--yes`. The catalogs' star files (the
 large Zenodo downloads) stay, and so do `owc_refs/`, `private-docs/`, `release/`, `run.sh` and `.venv`.
 `--keep-results` keeps the run outputs; `--all` also removes your settings (`sites.py`, `pysyzygos_config.py`,
@@ -602,8 +613,8 @@ starting over takes minutes, not hours. Go step by step, from the gentlest:
 1. **Run setup again**: `uv run pysyzygos setup` (or `pysyzygos setup`). It checks everything, resumes unfinished
    downloads and builds, and fixes most problems on its own.
 2. **Fresh downloads and caches, keep your results**: `uv run pysyzygos cleanup --keep-results --yes`, then
-   `uv run pysyzygos setup`. Removes the SPICE kernels, cached orbit and size data, the bright-star indexes and the
-   high-RUWE supplement; keeps your site, settings, results, picks, pre-screens and favorites.
+   `uv run pysyzygos setup`. Removes the SPICE kernels, cached orbit and size data (and, for an old-format catalog, its
+   bright-star indexes and high-RUWE supplement); keeps your site, settings, results, picks, pre-screens and favorites.
 3. **Everything generated, keep your site**: `uv run pysyzygos cleanup --yes`, then `uv run pysyzygos setup`. As 2,
    plus the run outputs (results database, reports, maps, picks, pre-screens, logs).
 4. **Like a first install**: `uv run pysyzygos cleanup --all --yes`, then `uv run pysyzygos setup`. As 3, plus your
@@ -626,7 +637,7 @@ Good to know:
 | what | files |
 |---|---|
 | your sites and settings | `sites.py`, `pysyzygos_config.py` (created from `src/pysyzygos/templates/pysyzygos_config.py` on first use), `csv_exports.py` (the columns of the CSV buttons; created at the first CSV download) |
-| downloaded data | SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`, ~120 MB), Gaia catalogs (`gaia_dr3_g16/` ~4 GB, `gaia_dr3_g18/` ~13 GB), `data/ObsCodes.html` (MPC observatory list) |
+| downloaded data | SPICE kernels (`*.bsp`, `*.bpc`, `*.tls`, `*.tpc`, ~120 MB), the star catalog (`gaia_dr3_g16/` 2.4-4.8 GB with its parts; a G 18 build roughly 4x), `data/ObsCodes.html` (MPC observatory list) |
 | your results | `pysyzygos.db` (the results database: every search run and its events, kept per "results list", and the favorites), `hits_log.csv` (+ `.runs.jsonl`: the current results list, exported from the database after each search), `hits_report.html`, `maps/` (KML, previews, globe plots), `favorites/` (map and preview copies of the favorites), `picks/` (saved picks), `targets.py`, `pick_events.csv` |
 
 **Which folder is the data folder** (first match wins; `pysyzygos setup --status`, the GUI's About box and its
@@ -730,7 +741,7 @@ for s in home field; do PYSYZYGOS_SITE=$s pysyzygos pick -o pick_$s.csv --target
 | `star_parallax`, `light_deflection` | `True`, `True` | astrometric corrections of the star: seen from the Earth (Gaia parallax), and the light bending by Sun, Jupiter and Saturn (ABOUT.md Part 6). Off reproduces the results before 0.10.0 |
 | `min_mag_drop` | `0.1` | events with a smaller magnitude drop are not logged; also caps the star magnitude searched per asteroid |
 | `corridor_step_s` | `600` | path step of the corridor candidate scan, s |
-| `gaia_local_dir`, `gaia_local_gmax` | `"gaia_dr3_g16"`, `16.0` | local Gaia catalog folder and its faintest G (see "Local Gaia catalog"); the environment variable `PYSYZYGOS_CATALOG=<folder>` chooses another catalog for one run |
+| `gaia_local_dir`, `gaia_local_gmax` | `"gaia_dr3_g16"`, `16.0` | local Gaia catalog folder and its faintest G (see "Star catalog"); the environment variable `PYSYZYGOS_CATALOG=<folder>` chooses another catalog for one run |
 
 **Observer**
 
@@ -779,93 +790,70 @@ loading, search, maps, time per asteroid and per exact solve, counts) and append
 limits, as one line to `hits_log.runs.jsonl`; the report shows the latest one in its header.
 
 
-## Local Gaia catalog (required)
+## Star catalog (required)
 
 The corridor search (the default) needs the Gaia stars along each asteroid's path. The Gaia archive took many minutes
-per asteroid for that, or hung (it warns it is unstable while DR4 is being prepared), so the stars come from a local,
-magnitude-limited copy that you build once, or download ready-made from Zenodo
-([doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337), G <= 16 and G <= 18, same files as a build):
+per asteroid for that, or hung, so the stars come from a local, magnitude-limited catalog that you download
+ready-made from Zenodo ([doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337), G <= 16) or build
+once from ESA's files (any limit).
 
 ```
-pysyzygos setup                       # does all of it (kernels, catalog, bright-star index)
-pysyzygos gaia build            # the catalog alone; folder and G limit from gaia_local_dir / gaia_local_gmax
-pysyzygos gaia build --dir gaia_dr3_g18 --gmax 18 --workers 6
-pysyzygos gaia status
-pysyzygos gaia zenodo --dir gaia_dr3_g18 --gmax 18   # or the ready-made copy from Zenodo
+pysyzygos setup                                   # does all of it (kernels, catalog)
+pysyzygos catalog fetch --dir gaia_dr3_g16        # the ready-made G <= 16 (core + --groups, default quality)
+pysyzygos catalog build --dir gaia_dr3_g18 --gmax 18 --workers 6   # a build from ESA's files, any limit
+pysyzygos catalog add quality                     # optional parts, any time (Zenodo catalog)
+pysyzygos catalog remove extras
+pysyzygos catalog status
 ```
 
-`pysyzygos/setup.py --gmax N` passes another limit through to this build (see step 4).
+**What is in it.** All Gaia DR3 stars to the limit (G <= 16: 78.0 M stars, built in 1 h 49 min from 753 GB of ESA
+files), in one sort order (sky cells of 0.25 degrees, by G within a cell), so a search strip, a pick over all
+asteroids, a pre-screen and a preview all read only the stars they need, without a separate index. Positions are
+stored to 0.0002 mas, parallaxes and proper motions as Gaia gives them (compared with the earlier format: the same
+stars, positions within 0.0001 mas, the same events to 1 ms). The parts:
 
-* It streams all of Gaia DR3 `gaia_source` from ESA's CDN (3386 files, **753 GB download**), keeps G <= gmax with full
-  astrometry and ruwe < 1.4 (7 columns, binary), and deletes each download. G <= 18 keeps about 11 GB
-  (280 M of 1.81 G stars), G <= 16 about 3 GB.
-  At about 1.4 Gbit/s it takes 1.5 to 2 hours.
-* It is resumable: rerun the same command after an interruption, finished files are skipped.
-* `gaia_local_dir` in pysyzygos_config.py must name that folder. pysyzygos/search.py refuses a missing or incomplete catalog.
-* Several catalogs can sit side by side (e.g. `gaia_dr3_g16` and `gaia_dr3_g18`). Choose one per run with
-  `PYSYZYGOS_CATALOG=gaia_dr3_g16 pysyzygos search` (the pick tool follows it too), or in the GUI header;
-  `pysyzygos setup --status` lists the catalogs it finds.
-* A strip lookup takes about 1 s (2 s in the Galactic bulge), no network. Gaia is not cached elsewhere any more.
-* Stars fainter than `gaia_local_gmax` are not searched, whatever `MAG_MIN` says.
+* **core** (31 bytes per star, 2.4 GB for G <= 16): source id, position, parallax, proper motion, G and flags: the
+  kind of astrometry (below), duplicated source, non-single star. Enough to find and compute every event.
+* **quality** (20 bytes, 1.6 GB): RUWE, the errors and correlations of position, parallax and proper motion, Gaia's
+  non-single-star code and multi-peak fraction. With it the search gives each event the star's error ellipse and
+  Gaia's double-star hints at once, also without network, and asks the Gaia archive only about neighbours fainter
+  than the catalog (stars at least 5 mag brighter than the catalog limit are not asked at all).
+* **extras** (10 bytes, 0.8 GB): BP and RP magnitudes, radial velocity, Teff: not used yet (a star-size model is
+  planned).
 
-**Adding a catalog later.** Run setup again with the limit you want, e.g. `pysyzygos setup --gmax 16`.
-It asks Zenodo or ESA as on the first run and installs into its own folder `gaia_dr3_g<limit>`, next to the ones you
-have. The GUI's **Catalog** selector (top right) lists every catalog folder it finds after a restart; a half-built one
-is shown as "incomplete n/3386" and runs refuse it until setup has finished it (rerun the same command, it resumes).
-If a folder already holds a catalog with another limit (e.g. an interrupted build), setup asks before deleting it.
+Parts are switched in the GUI's **System** tab (checkboxes) or with `pysyzygos catalog add|remove`. A part belongs to
+its build (checked by a build id): a ready-made catalog gets its parts from Zenodo; a catalog you built gets them only
+from its own build (which writes all the parts you chose).
 
-**High-RUWE supplement (optional, recommended).** The catalog keeps only stars with good single-star astrometry
-(Gaia RUWE < 1.4, with parallax and proper motion). The others, about 1 star in 10 (1 in 5 brighter than G 12), are
-often unresolved doubles or lack proper motions, and OWC predicts events on them, so without them PySyzygos misses
-such events: for example (86288) 1999 UC45 on 2026-09-30 05:28 UT, a G 11.7 star with RUWE 1.65, observed from three
-California sites. Build the supplement once, into the catalog's folder:
+**High-RUWE and 2-parameter stars.** About 1 star in 10 (1 in 5 brighter than G 12) has no good single-star
+astrometry: Gaia RUWE >= 1.4 (often unresolved doubles: 7.4 M stars to G 16) or only a position (2-parameter, no
+parallax or proper motion: 0.57 M). OWC predicts events on them, so they are in the catalog, flagged: for example
+(86288) 1999 UC45 on 2026-09-30 05:28 UT, a G 11.7 star with RUWE 1.65, observed from three California sites. For the
+2-parameter stars the build looks up proper motions in UCAC5 and UCAC4 through the CDS cross-match service, as
+OWC/Occult take them from other catalogs: 294 k from UCAC5, 171 k from UCAC4, 108 k stay without ("NO proper
+motion"). The matching is strict, so a close neighbour cannot be taken by mistake: UCAC5's position (Gaia DR1, 2015)
+must lie within 0.2" of Gaia DR3's and G within 0.5 mag (UCAC4: 0.5" and 1 mag; for (4089) Galbraith's star, a double,
+the companion 2.9" away is rejected). Every event on such a star is flagged **⚑ RUWE 1.65** or **⚑ 2-param** in the
+results, report, favorites and CSV, and the star's position uncertainty is added to the path's sigma lines and chance;
+where it is larger than the asteroid, the report shows a red **⚠ star ±… km**: such an event may well not happen at
+your site, compare with other predictions before observing. Switch: GUI header **+ high-RUWE stars**, config
+`gaia_supplement`. Pre-screens remember whether they were built with them; a pick with them only uses one that was.
 
-```bash
-pysyzygos setup --supplement                                # for the configured catalog (asked on a first setup)
-pysyzygos gaia supplement --dir gaia_dr3_g18 --gmax 16     # the same for a given catalog folder
-```
+**Several catalogs** can sit side by side (e.g. the ready-made `gaia_dr3_g16` and a `gaia_dr3_g18` you built). Choose
+one per run with `PYSYZYGOS_CATALOG=gaia_dr3_g18 pysyzygos search` (the pick follows it too), or in the GUI header;
+`pysyzygos setup --status` lists the catalogs it finds. Stars fainter than `gaia_local_gmax` are not searched, whatever
+`MAG_MIN` says. A half-built catalog is not listed; rerun the same command, it resumes.
 
-Both download the ready-made supplement from Zenodo (with the catalogs, concept DOI 10.5281/zenodo.23113337, since
-version 2, [10.5281/zenodo.23298192](https://doi.org/10.5281/zenodo.23298192)): 0.35 GB, checked by SHA-256, resumable,
-8.0 M stars to G 16, the same for any catalog folder (G 16 or 18). `--source esa` builds it from ESA's files instead
-(106 min at ~1.4 Gbit/s; other limits with `--supplement-gmax` / `--gmax`). `pysyzygos setup --status` shows whether it
-is there.
+**Catalogs of the old format** (PySyzygos before 1.3.0: per-file `.npy` stars, a separate high-RUWE supplement and a
+bright-star index for the pick) keep working, marked "old format" in the GUI. To change to the new one, run
+`pysyzygos setup --upgrade-catalog` (or the System tab's **Install the new catalog**): it installs the new catalog
+next to the old one (`gaia_dr3_g16.new`), swaps it in, and moves the old one to `gaia_dr3_g16.old`, deleted when you
+say so (setup asks; the System tab has a Delete button; `pysyzygos cleanup` lists it). For G 16 that is the Zenodo
+download; another limit is rebuilt from ESA's files.
 
-**Proper motions for the supplement's 2-parameter stars** (since 0.18.0). Gaia DR3 has no proper motion for these
-574k stars, so their position in the 2020s can be off by 0.1-0.3", which is 100-400 km on the ground for a main-belt
-asteroid. Right after installing the supplement, setup therefore looks up proper motions in UCAC5 and UCAC4 through
-the CDS cross-match service (cdsxmatch.u-strasbg.fr; ~2-3 minutes, needs the network) and stores them in the
-supplement, as OWC/Occult do: about 51 % from UCAC5, 30 % from UCAC4; the remaining 19 % stay flagged "NO proper
-motion". The matching is strict, so a close neighbour cannot be taken by mistake: UCAC5's position (Gaia DR1, 2015)
-must lie within 0.2" of Gaia DR3's and G within 0.5 mag (UCAC4: 0.5" and 1 mag; for (4089) Galbraith's star, a
-double, the companion 2.9" away is rejected). It happens automatically with `pysyzygos setup --supplement` (step "3c") and
-`pysyzygos gaia supplement`.
-
-* **New install**: answer the setup question about the supplement with Enter (or run `pysyzygos setup --supplement`):
-  download, proper motions and its star index in one go.
-* **Supplement installed with an earlier version** (no proper motions yet): run `pysyzygos setup --supplement` again
-  (it sees the supplement is complete and only adds the proper motions), or directly
-  `pysyzygos gaia supplement-pm --dir gaia_dr3_g18` (or `gaia_dr3_g16`: your catalog folder).
-* **Check**: `pysyzygos setup --status` shows e.g. `high-RUWE supplement  ok, G <= 16, 0.4 GB; 2-param stars with pm:
-  465566 of 573735 (UCAC5 294328, UCAC4 171238)`.
-* **Offline** during setup: the step is skipped with a message (the events stay flagged "NO proper motion"); rerun
-  `pysyzygos setup --supplement` later.
-* **Pre-screens** built with the supplement before the proper motions were added used zero motion for these stars:
-  rebuild them.
-
-It is then used by picks, searches and pre-screens (switch: GUI header **+ high-RUWE stars**, config
-`gaia_supplement`), and every event on such a star is flagged **⚑ RUWE 1.65** or **⚑ 2-param** in the results,
-report, favorites and CSV: its position, and so the shadow path, is less certain than usual. For the "2-parameter"
-stars PySyzygos uses the UCAC5/UCAC4 proper motions (see above; as OWC does) and adds each star's position uncertainty to the path's sigma lines and chance; where that
-uncertainty is larger than the asteroid, the report shows a red **⚠ star ±… km**: such an event may well not happen
-at your site, compare with other predictions before observing. Pre-screens remember
-whether they were built with it; a pick with the supplement only uses one that was (auto falls back otherwise).
-
-**Other catalog sources.** The search does not care where a catalog comes from: any folder with a `catalog.json`
-(`gmax`, `files`) and, per listed file, the three `.npy` files described at the top of `pysyzygos/gaia_local.py`
-(stars with the 7 Gaia columns, sky cells, fast movers) is found and can be selected. A converter for another source
-only has to write that layout.
-
+**Other catalog sources.** The search does not care where a catalog comes from: any folder with the files described at
+the top of `pysyzygos/starcat.py` (catalog.json, offsets, core, fast movers, optional parts) is found and can be
+selected. A converter for another source (e.g. Gaia DR4 when it comes) only has to write that layout.
 
 ## Pick tool: choose targets
 
@@ -907,8 +895,8 @@ uses the current JPL Horizons orbit for the final prediction anyway).
 * Asteroids: one bulk download from JPL's Small-Body Database (numbered, H < `pick_hmax`, full-precision orbital
   elements), cached as `PySyzygos_sbdb_cache.json` in `cache_path` and refreshed after `sbdb_max_age_days`.
 * Orbits are integrated with the planets' gravity for the whole window (agrees with JPL Horizons to about 0.01").
-* The stars are the actual Gaia stars along each path, from the bright-star index of the local catalog
-  (`pysyzygos setup` builds it). Only times when the asteroid is up and the Sun is down are searched.
+* The stars are the actual Gaia stars along each path, from the local star catalog (sorted by sky cell and G, so only
+  the stars bright enough for the camera are read). Only times when the asteroid is up and the Sun is down are searched.
 * Each event is solved for your site and kept if the shadow passes within the asteroid radius + your reach
   (the site's `reach_km`, else `max_shadow_dist`).
 * Detection follows OWC's General Observability Criterion with the site's equipment (see "Observing sites"):

@@ -122,6 +122,10 @@ def sample_rows(rows):
     return sorted({int(round(f * (n - 1))) for f in SAMPLE_FRACTIONS}) if n else []
 
 
+ARCSEC_M = 30.87          # 1" of latitude on the ground, m (the listing's coordinates are whole arcseconds)
+R_EARTH_KM, C_KM_S = 6378.137, 299792.458
+
+
 def summary(points):
     """Statistics of the compared points (dicts with across, along, dt, star_alt): all and star above 20 deg."""
     out = {}
@@ -129,9 +133,11 @@ def summary(points):
         if not sel:
             continue
         a = np.array([[p["across"], p["along"], p["dt"], p["dist"]] for p in sel])
+        k = math.sqrt(len(sel))
         out[label] = dict(n=len(sel), across_min=a[:, 0].min(), across_max=a[:, 0].max(), across_mean=a[:, 0].mean(),
                           along_mean=a[:, 1].mean(), dt_min=a[:, 2].min(), dt_max=a[:, 2].max(),
-                          dt_mean=a[:, 2].mean(), dist_max=a[:, 3].max())
+                          dt_mean=a[:, 2].mean(), dist_max=a[:, 3].max(), across_rms=a[:, 0].std(),
+                          across_sem=a[:, 0].std() / k, dt_rms=a[:, 2].std(), dt_sem=a[:, 2].std() / k)
     return out
 
 
@@ -180,6 +186,27 @@ def markdown(meta, title, header, points, stats, fit, mas_per_km, speed_kms, our
             L.append(f"- **{label}** ({s['n']}): across {s['across_min']:+.3f} to {s['across_max']:+.3f} km "
                      f"(mean {s['across_mean']:+.3f}); along {s['dt_min']:+.3f} to {s['dt_max']:+.3f} s "
                      f"(mean {s['dt_mean']:+.3f} s); largest distance {s['dist_max']:.3f} km.")
+    lats = [abs(p["lat"]) for p in points if p.get("lat") is not None]
+    if lats and "all" in stats:
+        s, m_lat = stats["all"], ARCSEC_M
+        m_lon = ARCSEC_M * math.cos(math.radians(float(np.median(lats))))
+        L += ["", f"**What the listing can resolve.** Occult's positions are whole arcseconds: 1\" = {m_lat:.0f} m in "
+              f"latitude, {m_lon:.0f} m in longitude here, so each point carries up to ±{m_lat / 2:.0f} m of rounding "
+              f"({m_lat / math.sqrt(12):.0f} m rms); times are to 0.01 s ({10 / math.sqrt(12):.1f} ms rms). A "
+              f"difference below about {m_lat:.0f} m at a single point says nothing. Scatter about the mean here: "
+              f"{s['across_rms'] * 1000:.0f} m across, {s['dt_rms'] * 1000:.1f} ms along. The means over all "
+              f"{s['n']} points are measured well: across {s['across_mean'] * 1000:+.1f} ± "
+              f"{s['across_sem'] * 1000:.1f} m, along {s['dt_mean'] * 1000:+.1f} ± {s['dt_sem'] * 1000:.1f} ms."]
+    alts = np.array([p["star_alt"] for p in points], float)
+    if len(alts) > 10 and np.ptp(alts) > 10:                       # the time difference against the site's height
+        dts = np.array([p["dt"] for p in points], float) * 1000.0  # above the fundamental plane (R sin alt)
+        A_ = np.vstack([np.ones_like(alts), np.sin(np.radians(alts))]).T
+        (c0, c1), *_ = np.linalg.lstsq(A_, dts, rcond=None)
+        L += ["", f"**Time against the star's altitude.** Along (s) fitted as a + b x sin(star altitude): a = "
+              f"{c0:+.1f} ms, b = {c1:+.1f} ms (R⊕/c = {R_EARTH_KM / C_KM_S * 1000:.1f} ms: the light time between the "
+              f"fundamental plane through the geocentre and a site with the star at the zenith); rms {dts.std():.1f} "
+              f"ms before, {np.std(dts - A_ @ np.array([c0, c1])):.1f} ms after. A b near ±R⊕/c means the two "
+              f"programs relate the time in the fundamental plane to the time at the site differently."]
     cx, cy, rms, mx = fit["const"]
     rx, ry, ang, rrms, rmx, scx, scy, sang = fit["rot"]
     L += ["", "| Fit in the fundamental plane | Result | rms (max) |", "|---|---|---|",
@@ -362,7 +389,7 @@ def compare(out, listing_text, header_text=""):
         a0 = np.asarray(spice.spkpos(tid, et - 0.5, "J2000", "CN", "399")[0])
         a1 = np.asarray(spice.spkpos(tid, et + 0.5, "J2000", "CN", "399")[0])
         rot = spice.pxform("ITRF93", "J2000", et) @ np.cross([0.0, 0.0, 1.0], Q)
-        points.append(dict(utc=r["sec"], star_alt=r["star_alt"], across=float(d @ n), along=float(d @ u),
+        points.append(dict(utc=r["sec"], lat=float(r["lat"]), star_alt=r["star_alt"], across=float(d @ n), along=float(d @ u),
                            dt=float(d @ u) / speed, dist=float(np.linalg.norm(d)), w_occ=w_occ, w_our=w_our,
                            px=float(-(rel @ x_ax)), py=float(-(rel @ y_ax)),
                            dvx=float(-((a1 - a0) @ x_ax)), dvy=float(-((a1 - a0) @ y_ax)),
@@ -493,6 +520,7 @@ def steps(out, folder_key=None):
     tdb = lambda et: spice.timout(et, "YYYY-MM-DD HR:MN:SC.### ::TDB")
 
     # ---- the star, at the centre instant: catalog, then each correction
+    from pysyzygos import starcat
     gl = gaia_local.LocalGaia(config.gaia_local_dir)
     ra0, de0 = float(z["star_ra"]), float(z["star_dec"])
     cone = gl.cone(ra0, de0, 30.0 / 3600.0)
@@ -502,6 +530,10 @@ def steps(out, folder_key=None):
     row = row.iloc[[0]]
     r0 = row.iloc[0]                       # a mixed row: numbers become float64, so never read the id from it
     sid = int(row["source_id"].to_numpy(np.int64)[0])        # the exact 19-digit id from the int64 column
+    ruwe = getattr(r0, "ruwe", None)
+    ruwe_text = (f"RUWE {float(ruwe):.3f}" if ruwe is not None and ruwe == ruwe else
+                 "RUWE < 1.4 (the value is not stored in this catalog: an old-format catalog, or one without its "
+                 "quality part)" if int(getattr(r0, "star_kind", 0) or 0) == 0 else "RUWE not stored in this catalog")
     cat = A.unit([math.cos(math.radians(r0.dec)) * math.cos(math.radians(r0.ra)),
                   math.cos(math.radians(r0.dec)) * math.sin(math.radians(r0.ra)), math.sin(math.radians(r0.dec))])
     t_c = utc(et_c)
@@ -565,11 +597,14 @@ def steps(out, folder_key=None):
           "each point's own light time (bisection to 0.01 s). Centre: the axis's closest approach to the Earth's centre.",
           "", "## 2. The star (at the centre instant)", "",
           "| Gaia DR3 catalog (epoch 2016.0 TCB) | |", "|---|---|",
+          f"| local catalog | {os.path.basename(os.path.normpath(config.gaia_local_dir))} "
+          f"({'format 2, parts: ' + ', '.join(starcat.groups_present(config.gaia_local_dir)) if starcat.is_format2(config.gaia_local_dir) else 'old format'}) |",
           f"| source_id | {sid} |", f"| G | {float(r0.phot_g_mean_mag):.3f} |",
           f"| RA, Dec | {float(r0.ra):.9f}°, {float(r0.dec):.9f}° ({_hms(float(r0.ra))} {_dms_s(float(r0.dec))}) |",
           f"| parallax | {plx:.4f} mas |", f"| pmRA·cosDec, pmDec | {float(r0.pmra):.4f}, {float(r0.pmdec):.4f} mas/yr |",
           f"| radial velocity | {rv:.3f} km/s" + (" (from data/gaia_dr3_rv_fast.npy)" if rv else " (not used: below the threshold or none)") + " |",
-          f"| kind, RUWE | {int(getattr(r0, 'star_kind', 0) or 0)} (0 = main catalog), {getattr(r0, 'ruwe', float('nan'))} |", "",
+          f"| kind, RUWE | {int(getattr(r0, 'star_kind', 0) or 0)} (0 = 5/6-parameter astrometry, RUWE < 1.4), "
+          f"{ruwe_text} |", "",
           "| Step | RA | Dec | Shift of the position by this step (RA·cosDec, Dec; mas, not mas/yr) |", "|---|---|---|---|"]
     prev = cat
     years = (et_c - spice.str2et("2016-01-01 12:00:00 TDB")) / (365.25 * 86400.0)
@@ -582,18 +617,32 @@ def steps(out, folder_key=None):
         sx, sy = _shift_mas(prev, v)
         L.append(f"| {label} | {ra_:.9f}° ({_hms(ra_)}) | {de_:.9f}° ({_dms_s(de_)}) | {sx:+.3f}, {sy:+.3f} |")
         prev = v
-    ra_, de_ = _radec(p6)
-    sx, sy = _shift_mas(p5, p6)
-    L.append(f"| **star direction used**: star deflection minus the asteroid's | {ra_:.9f}° | {de_:.9f}° | {sx:+.3f}, {sy:+.3f} (vs the line above) |")
-    L += ["", "| Light deflection at the centre instant (mas, RA·cosDec, Dec) | Star | Asteroid (its own light) | Star minus asteroid |",
+    L += ["", "The last line is **the star's direction**: GCRS astrometric (geocentric, with parallax) plus the deflection "
+              "of the star's own light. The asteroid's light is deflected too (by the same bodies, less, as it is "
+              "nearer): that deflection belongs to the asteroid's position (section 3).", "",
+          "| Light deflection at the centre instant (mas, RA·cosDec, Dec) | Star | Asteroid (its own light) | Star minus asteroid |",
           "|---|---|---|---|"]
     for k in defl_star:
         a_ = _shift_mas(p4, A.unit(p4 + defl_star[k]))
         b_ = _shift_mas(p4, A.unit(p4 + defl_ast[k]))
         L.append(f"| {k} | {a_[0]:+.3f}, {a_[1]:+.3f} | {b_[0]:+.3f}, {b_[1]:+.3f} | {a_[0] - b_[0]:+.3f}, {a_[1] - b_[1]:+.3f} |")
     chk = A.angle_mas(p6, star_used)
-    L += ["", f"The search computed its star direction once per candidate (at its first time estimate); against the "
-              f"direction above it differs by {chk:.4f} mas. Unit vector used (ICRF): "
+    # the same geometry two ways at the centre instant: the asteroid's deflection on the asteroid (the definition), or
+    # as the equivalent change of the star direction (how the search applies it: once per event, not per position)
+    ast_c_def = np.linalg.norm(ast_c) * A.unit(A.unit(ast_c) + sum(defl_ast.values()))
+    def _axis(z, ast):
+        xa = np.cross([0.0, 0.0, 1.0], z)
+        xa /= np.linalg.norm(xa)
+        return np.array([ast @ xa, ast @ np.cross(z, xa)])
+    equiv_cm = float(np.linalg.norm(_axis(p5, ast_c_def) - _axis(p6, ast_c))) * 1e5
+    sx, sy = _shift_mas(p5, p6)
+    L += ["", f"**How the search applies it.** Instead of moving every asteroid position by the asteroid's own "
+              f"deflection, the search subtracts that deflection from the star direction once per event (the "
+              f"relative direction asteroid-star, which makes the shadow, is the same): its working direction is "
+              f"{sx:+.3f}, {sy:+.3f} mas from the star's (RA·cosDec, Dec). Both give the same shadow axis at the centre "
+              f"instant to {equiv_cm:.1f} cm (a second-order difference: deflection x the axis's distance from the "
+              f"geocentre). The search's working direction differs from the one computed here by {chk:.4f} mas "
+              f"(it is computed once per candidate, at its first time estimate). Unit vector (ICRF): "
               f"({star_used[0]:.12f}, {star_used[1]:.12f}, {star_used[2]:.12f}).", ""]
     rd = _radec(rpn_c @ p5)
     L.append(f"Of date (true equator and equinox; IAU 2006/2000A precession-nutation of the geocentric direction with "
@@ -620,7 +669,12 @@ def steps(out, folder_key=None):
     L += ["", "At a point on the Earth the light time is that point's own (shorter by up to 21 ms), with the asteroid "
               "moving at its barycentric velocity in between (SPICE spkcpo per site and per path point).", "",
           "## 4. Fundamental plane (Besselian elements)", "",
-          "ICRF axes: z = the star direction used, x = (0,0,1) × z (east), y = z × x (north). Of date: the same plane, "
+          "The fundamental plane's axes by definition (Besselian elements): z parallel to the shadow axis, i.e. the "
+          "direction from the asteroid along the star's light (for a star this far: the star's direction), x along "
+          "the true equator of date (east), y north. PySyzygos computes in ICRF-oriented axes (x = (0,0,1) × z, "
+          "y = z × x): the same plane, rotated about z, so x, y differ from the elements of date by that rotation "
+          "while every distance in the plane, and so the path, is the same; both sets are given. "
+          "ICRF axes: z = the search's working direction, x = (0,0,1) × z (east), y = z × x (north). Of date: the same plane, "
           "with x east and y north of the true pole of date; d = the star's declination of date, mu = its Greenwich "
           "hour angle (GAST - RA of date, UT1 from IERS). x, y in km and in Earth radii (6378.137 km); rates per second "
           "and per hour.", "",

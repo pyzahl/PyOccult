@@ -980,12 +980,14 @@ def handle_star(loc, obs_geo, target_id, size, row, ra_col, dec_col, et_guess, b
                   calc_s=time.time() - t_start)
     # close and double stars (doubles.py): neighbours whose light stays in the camera image; online check after the run
     rad = float(getattr(config, "companion_radius_arcsec", 4.0))
-    comps = []
+    comps, flags = [], {}
     if LOCAL is not None:
         years = 2000.0 + res['best_et'] / (365.25 * 86400) - corridor.GAIA_EPOCH_YEAR
-        comps = doubles.companions(LOCAL.cone(record["star_ra"], record["star_dec"], (rad + 3.0) / 3600.0),
-                                   row.source_id, record["star_ra"], record["star_dec"], row.phot_g_mean_mag, years, rad)
-    record.update(doubles.fields(comps, row.phot_g_mean_mag, m_ast, "local" if LOCAL is not None else "none"))
+        near = LOCAL.cone(record["star_ra"], record["star_dec"], (rad + 3.0) / 3600.0)
+        comps = doubles.companions(near, row.source_id, record["star_ra"], record["star_dec"], row.phot_g_mean_mag,
+                                   years, rad)
+        flags = doubles.star_flags(near, row.source_id, years)      # format-2 catalog with its quality part
+    record.update(doubles.fields(comps, row.phot_g_mean_mag, m_ast, "local" if LOCAL is not None else "none", flags))
     # chance that the shadow covers the site, from the path uncertainty (Horizons 3-sigma RSS, else the default)
     if bodies.is_body(target_id):                        # planet or moon: no Horizons RSS; rough per-body value
         sigma3_h, src = bodies.sigma3_km(target_id), "ephemeris estimate"
@@ -1114,6 +1116,17 @@ def online_double_check(records):
     query for all; updates their rows in the hit log. Skipped quietly when off, offline or slow."""
     if not records or not getattr(config, "gaia_online_check", True):
         return
+    # a format-2 catalog with its quality part has the star's flags, and every neighbour that matters (up to DMAG
+    # fainter) when it reaches that deep with all stars (supplement on): the archive adds nothing for such events
+    local_all = (LOCAL is not None and getattr(LOCAL, "quality", None) is not None and getattr(LOCAL, "sup", False))
+    if local_all:
+        skip = [r for r in records if float(r["mag"]) + doubles.DMAG <= LOCAL.gmax]
+        records = [r for r in records if float(r["mag"]) + doubles.DMAG > LOCAL.gmax]
+        if skip:
+            print(f"* Gaia online check: {len(skip)} event star(s) fully covered by the local catalog (G <= "
+                  f"{LOCAL.gmax:g} with Gaia's flags), not asked")
+        if not records:
+            return
     rad = float(getattr(config, "companion_radius_arcsec", 4.0))
     print(f"* Gaia online check of {len(records)} event star(s) (close and double stars) ...")
     archive = doubles.fetch_online([(r["star_ra"], r["star_dec"]) for r in records], rad)

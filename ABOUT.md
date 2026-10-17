@@ -19,7 +19,7 @@ during an occultation. Up to version 0.18 it was called PyOccult.
   - [2.1 Pipeline (corridor mode, the default)](#21-pipeline-corridor-mode-the-default)
   - [2.2 Fundamental (Besselian) plane, frames and time scales: besselian_offsets](#22-fundamental-besselian-plane-frames-and-time-scales-besselian_offsets)
   - [2.3 Star magnitude cap and corridor width: plan_corridor](#23-star-magnitude-cap-and-corridor-width-plan_corridor)
-  - [2.4 Local Gaia catalog: pysyzygos/gaia_local.py](#24-local-gaia-catalog-pysyzygosgaia_localpy)
+  - [2.4 Star catalog: pysyzygos/starcat.py](#24-star-catalog-pysyzygosstarcatpy)
   - [2.5 Candidate scan: find_candidates](#25-candidate-scan-find_candidates)
   - [2.6 Exact closest approach: star_test](#26-exact-closest-approach-star_test)
   - [2.7 Checks before logging: handle_star](#27-checks-before-logging-handle_star)
@@ -32,7 +32,7 @@ during an occultation. Up to version 0.18 it was called PyOccult.
   - [3.1 Orbits: pysyzygos/orbits.py](#31-orbits-pysyzygosorbitspy)
   - [3.2 The screen: pysyzygos/screen.py](#32-the-screen-pysyzygosscreenpy)
   - [3.3 Detection rule](#33-detection-rule)
-  - [3.4 Bright-star index: BrightIndex](#34-bright-star-index-brightindex)
+  - [3.4 Stars for the screen](#34-stars-for-the-screen)
   - [3.5 Speed and output](#35-speed-and-output)
   - [3.6 Saved picks: pysyzygos/picks.py](#36-saved-picks-pysyzygospickspy)
   - [3.7 Pre-screens: pysyzygos/prescreen.py, pysyzygos/shadowtrack.py (0.16.0)](#37-pre-screens-pysyzygosprescreenpy-pysyzygosshadowtrackpy-0160)
@@ -53,7 +53,7 @@ during an occultation. Up to version 0.18 it was called PyOccult.
 
 | Step | Tool | What it does |
 |---|---|---|
-| once | `pysyzygos/setup.py` | downloads the SPICE kernels, installs the local Gaia catalog (ready-made from Zenodo, or built from ESA's files) and builds the bright-star index |
+| once | `pysyzygos/setup.py` | downloads the SPICE kernels, installs the star catalog (ready-made G <= 16 from Zenodo, or built from ESA's files) |
 | choose | `pysyzygos/pick.py` | screens all asteroids for actual events at the site in a window, writes `targets.py` and saves the pick per site and window in `picks/` |
 | pre-screen | `pysyzygos/prescreen.py`, `pysyzygos/shadowtrack.py` | once per window: the asteroids with possible events in a region, or the shadow elements of every event on the Earth, so picks there take seconds |
 | predict | `pysyzygos/search.py` | computes the events of the target asteroids exactly, appends them to `hits_log.csv`, writes KML maps |
@@ -61,8 +61,8 @@ during an occultation. Up to version 0.18 it was called PyOccult.
 | operate | `pysyzygos/gui.py` | local web interface (NiceGUI): sites on a map, runs, live log, results |
 | check | `pysyzygos/owc_check.py` | reruns an OWC search result you saved (`owc_reference.txt`, private) and compares event by event |
 
-Supporting modules: `pysyzygos/corridor.py` (per-asteroid star corridor and candidate scan), `pysyzygos/gaia_local.py`
-(local Gaia catalog and bright-star index), `pysyzygos/screen.py` (the pick tool's event screen),
+Supporting modules: `pysyzygos/corridor.py` (per-asteroid star corridor and candidate scan), `pysyzygos/starcat.py`
+(the star catalog; `gaia_local.py` reads the earlier format), `pysyzygos/screen.py` (the pick tool's event screen),
 `pysyzygos/orbits.py` (fast orbit integration), `pysyzygos/paths.py` (shadow ground track), `pysyzygos/sbdb.py` (shared
 asteroid size cache), `pysyzygos/kernels.py` (kernel download, Earth orientation coverage), `pysyzygos/picks.py` (saved
 picks: which one a search uses), `pysyzygos/kstars.py` (points KStars at an event over D-Bus, Linux), `pysyzygos/favorites.py` (starred events with their
@@ -136,47 +136,59 @@ comparison; it shares the per-star solve and checks (`handle_star`).
   (the observer can be anywhere on the Earth's disc) and a proper-motion pad for stars up to 1500 mas/yr over the time
   since Gaia's epoch 2016.0. Faster stars are added from an all-sky list kept with the catalog.
 
-### 2.4 Local Gaia catalog: `pysyzygos/gaia_local.py`
+### 2.4 Star catalog: `pysyzygos/starcat.py`
 
-- Built from ESA's bulk Gaia DR3 `gaia_source` files (3386 gzipped CSV files, 753 GB, streamed and not kept). Kept:
-  G <= `gaia_local_gmax` (18), 5-parameter astrometry, RUWE < 1.4; columns `source_id, ra, dec, parallax, pmra, pmdec,
-  phot_g_mean_mag` as binary. Result for G <= 18: 280.3 M of 1811.7 M stars, 11.2 GB, 101 min at ~1.4 Gbit/s.
-- One `.npy` per source file (written last, atomically: its presence marks the file done, so the build resumes), a list
-  of the 1 x 1 deg sky cells each file covers (the lookup index; no HEALPix library needed), and its stars faster than
-  1500 mas/yr.
-- Lookup for a corridor: the cells the strip touches (probed densely enough that no cell is skipped, whole dec bands
-  near a pole), then coarse discs along the path (0.05 deg chunks), a superset that the candidate scan narrows down.
-  About 1 s per asteroid (2 s in the Galactic bulge).
+- Built from ESA's bulk Gaia DR3 `gaia_source` files (3386 gzipped CSV files, 753 GB, streamed and not kept): every
+  star with G <= `gaia_local_gmax` and a position. G <= 16: 78.0 M of 1811.7 M stars, 1 h 49 min at ~1.4 Gbit/s with
+  6 workers (CPU-bound: 30 columns are parsed); each source file becomes a part file first (written last,
+  atomically: the build resumes), then all parts are merged.
+- One sort order for every lookup: sky cells of 0.25 x 0.25 deg (plain ra/dec grid, no HEALPix library; whole dec
+  bands near a pole) and, within a cell, G. `offsets.npy` gives each cell's rows, so a lookup with a magnitude cap
+  reads only the bright end of the cells it touches. Positions are stored as 32-bit offsets inside the cell (steps
+  of 0.25 deg / 2^32 = 0.0002 mas), G in millimag; parallax and proper motion as Gaia's 4-byte values.
+- Parts, the same rows in separate files: **core** (31 bytes per star, 2.4 GB for G <= 16: `source_id`, position,
+  parallax, proper motion, G, flags: astrometry kind, duplicated source, non-single star), **quality** (20 bytes, 1.6
+  GB: RUWE, the five errors as 2-byte floats, the six position/motion correlations x127 as bytes, non-single-star code,
+  multi-peak fraction) and **extras** (10 bytes, 0.8 GB: BP and RP in millimag, radial velocity and its error, Teff).
+  Each optional part carries the build id of its core (`<part>.json`), so a part of another build is never joined.
+  Stars faster than 1500 mas/yr (can leave a strip's pad) are listed in `hpm.npy`.
+- Lookup for a corridor (`StarCatalog.corridor_stars`): the cells within 1.5 x the strip's half-width of the path,
+  sampled every 0.05 deg, then coarse discs along the path (0.05 deg chunks), a superset that the candidate scan
+  narrows down; plus the fast movers. Cones (`cone`, for companions, previews and the globe's star field) return the
+  quality and extras columns under Gaia's names, so the double-star check reads the star's flags and error ellipse
+  locally (`doubles.star_flags`, the same code as the online check).
+- Checked against the earlier format (2026-10-16): the same 69,993,732 main and 7,958,666 high-RUWE / 2-parameter
+  stars, positions within 0.0001 mas, parallaxes and proper motions bit-identical, 60 random cones with the same
+  stars; a 20-day search of 19 asteroids and a 4-day pick of 464,740 asteroids gave the same events (times within
+  1 ms); search strips 2-7x faster (one sort order, no per-file reads), the pick as fast without its 1.3-2.8 GB index.
 - Why local: the Gaia archive took 12-14 min per strip query (or never answered) in October 2026 and warns it is
   unstable while DR4 is prepared.
-- Ready-made copies for G <= 16 and G <= 18 (the same files a build writes, without the bright-star index) are on
-  Zenodo, [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC 4.0, the terms of the Gaia data it contains): `gaia_dr3_g16.tar.xz`
-  (2.1 GB) and `gaia_dr3_g18.tar.xz` (8.2 GB), each with a `.sha256`. `fetch_zenodo` downloads one (resumable), checks
-  the SHA-256 and unpacks it into any folder name; `pysyzygos/setup.py` offers it before the ESA build.
-
-- **Supplement** (`<catalog>/supplement/`, `pysyzygos gaia supplement --dir <catalog> --gmax 16`, 0.17.0): the stars
-  the main catalog leaves out, from the same pass over ESA's files with the opposite filter: RUWE >= 1.4 (kind 1)
-  and 2-parameter sources without parallax or proper motion (kind 2; stored as 0, so their position is that of 2016),
-  with `ruwe`, `ra_error`, `dec_error` (`SUPP_DTYPE`). From a 1 % archive sample: G < 12 ~0.6 M stars, G < 16 ~8 M
-  (~0.3 GB), G < 18 ~25 M (~1 GB), about 9-10 % of the main catalog at each limit, mostly high RUWE (at G < 12 one star
-  in five). `LocalGaia` merges it into `cone` and `corridor_stars` (columns `star_kind`, `ruwe`), `open_index` merges its
-  bright-star index (`MergedIndex`, `COMMON_DTYPE`) for picks and pre-screens; `use_supplement()` = env
-  `PYSYZYGOS_SUPPLEMENT` (GUI switch) else config `gaia_supplement` (default on). Events on such stars carry
-  `star_kind`, `star_ruwe`, `star_flag` ("RUWE 1.65", "2-param") at the end of the record and the pick's events, shown
-  as ⚑ after the star magnitude.
+- Ready-made for G <= 16 on Zenodo, [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (CC BY-NC
+  4.0, the terms of the Gaia data it contains): `gaia_dr3_g16_v2_core.tar.xz`, `..._quality.tar.xz`,
+  `..._extras.tar.xz`, each with a `.sha256` (`fetch`, resumable, unpacks into any folder). Other limits are built
+  locally (`pysyzygos catalog build --gmax 18`): deep catalogs serve few amateur set-ups.
+- **High-RUWE and 2-parameter stars** are in the catalog, flagged by kind: RUWE >= 1.4 (kind 1; often unresolved
+  doubles: 7.38 M to G 16) and 2-parameter sources without parallax or proper motion (kind 2; stored as 0, so their
+  position is that of 2016: 0.57 M), about 10 % of the stars (one in five at G < 12). The GUI switch / `use_supplement()`
+  (env `PYSYZYGOS_SUPPLEMENT`, else config `gaia_supplement`, default on) keeps or drops them. Events on such stars
+  carry `star_kind`, `star_ruwe`, `star_flag` ("RUWE 1.65", "2-param") at the end of the record and the pick's events,
+  shown as ⚑ after the star magnitude.
   **2-parameter stars have no proper motion in Gaia DR3**, so their 2026 position can be 0.1-0.3" off, 100-400 km at
-  main-belt distances ((4089) Galbraith, 2026-10-13: a false "hit"). `supplement_pm` gives them proper motions from
-  UCAC5 (Zacharias et al. 2017: pm from Gaia DR1 and UCAC; matched by its Gaia DR1 2015.0 position within 0.2" of the
-  DR3 2016.0 one and G within 0.5 mag), else UCAC4 (its J2000 position moved to 2016 within 0.5", magnitude within 1),
-  through CDS XMatch (kinds 3, 4; Gaia's position kept). Of 573,735: 51 % UCAC5, 30 % UCAC4, 19 % none (kind 2).
-  `star_sigma_mas`: the star's 1-sigma position at the event date (2-parameter: position + pm error or 10 mas/yr per
-  axis, times the years; high RUWE: Gaia's errors x RUWE), in km at the asteroid combined with the orbit's sigma.
-  On Zenodo with the catalogs since version 2 (2026-10-11,
-  [doi:10.5281/zenodo.23298192](https://doi.org/10.5281/zenodo.23298192)): `gaia_dr3_g18_supplement_g16.tar.xz`
-  (0.35 GB, `.sha256`; top folder `supplement/`), fetched by `fetch_zenodo(..., supplement=True)` into any catalog
-  folder (the cut does not depend on the catalog's limit); built here in 106 min, the download is identical. Found
-  with (86288) 1999 UC45, 2026-09-30: its G 11.73 target (RUWE 1.65), observed by
-  three stations, was not in the local catalog, so the event was not predictable.
+  main-belt distances ((4089) Galbraith, 2026-10-13: a false "hit"). `xmatch` gives them proper motions from UCAC5
+  (Zacharias et al. 2017: pm from Gaia DR1 and UCAC; matched by its Gaia DR1 2015.0 position within 0.2" of the DR3
+  2016.0 one and G within 0.5 mag), else UCAC4 (its J2000 position moved to 2016 within 0.5", magnitude within 1),
+  through CDS XMatch (kinds 3, 4; Gaia's position kept; the UCAC errors as the proper-motion errors). Of 573,735:
+  294,496 UCAC5, 171,094 UCAC4, 108,145 none (kind 2). `gaia_local.star_sigma_mas`: the star's 1-sigma position at
+  the event date (2-parameter: position + pm error or 10 mas/yr per axis, times the years; high RUWE: Gaia's errors x
+  RUWE), in km at the asteroid combined with the orbit's sigma. Found with (86288) 1999 UC45, 2026-09-30: its G 11.73
+  target (RUWE 1.65), observed by three stations, was not in the first local catalog, so the event was not
+  predictable.
+- **The earlier format** (`pysyzygos/gaia_local.py`, PySyzygos before 1.3.0; still read): one `.npy` per source file
+  with 7 columns (40 bytes per star, only RUWE < 1.4 with 5-parameter astrometry), a 1 x 1 deg cell list per file, a
+  separate supplement (`<catalog>/supplement/`) and a bright-star index for the pick (3.4). `LocalGaia`, `open_index`
+  and `status` hand a format-2 folder over to `starcat.StarCatalog`, so the search, pick, pre-screens and previews do
+  not care which format a catalog has. `pysyzygos setup --upgrade-catalog` installs the new one next to an old one and
+  swaps it in.
 
 ### 2.5 Candidate scan: `find_candidates`
 
@@ -322,7 +334,7 @@ Per chunk of asteroids, positions every 600 s over the window, then per asteroid
    site) are searched.
 2. The faintest useful star follows from the drop rule (2.3) and the observability rule (3.3), so small or fast asteroids
    search only bright stars.
-3. Stars along the visible path from the bright-star index (3.4), then the candidate scan (2.5).
+3. Stars along the visible path from the catalog (3.4), then the candidate scan (2.5).
 4. Each candidate is solved for the site: Newton iteration on the plane offset of the shadow axis from the observer on
    the rotating Earth (asteroid positions by cubic interpolation, observer from `pxform`), within the bracket of 2.6.
 5. Kept if the miss is below `r_max + reach`, the star is high enough and the Sun low enough at that time, and the
@@ -343,15 +355,14 @@ G 15.0 at 25 cm, as in the OWC search). For sizes estimated from H (uncertain by
 upper size bound, so an event is kept if it *can* be observable; the reported duration is nominal. `mag_margin`
 reports how far below the limit the star is.
 
-### 3.4 Bright-star index: `BrightIndex`
+### 3.4 Stars for the screen
 
-All catalog stars with G <= 15 (32.4 M, 1.3 GB), sorted by a 0.25 deg sky cell and, within a cell, by magnitude, so a
-lookup with a bright cap reads only the bright end of each cell. Built once from the catalog (~30-70 s), opened
-memory-mapped. A lookup takes 5-50 ms. A star limit above G 15 needs a deeper index, in whole magnitudes
-(`bright_G16.0.v2.npy`: ~90 M stars, ~3.7 GB; G 18 would be the whole catalog again, ~11 GB). The pick builds a
-missing one once, in the main process before the workers start, with little memory: it counts the stars per cell,
-writes each catalog file's stars into their cell's slots of a memory-mapped file and then sorts each cell by G, a
-block at a time (peak about one catalog file or block, not the whole index).
+The catalog itself (2.4): sorted by 0.25 deg sky cell and, within a cell, by magnitude, so a lookup with a bright
+cap (the camera's limit) reads only the bright end of each cell; memory-mapped and shared by the worker processes. A
+lookup takes 5-50 ms. Catalogs of the earlier format need a separate bright-star index (`BrightIndex`: the stars to
+G 15, 32.4 M, 1.3 GB, or deeper in whole magnitudes: `bright_G16.0.v2.npy`, 2.8 GB, a copy of the whole G 16
+catalog), built once by the first pick that needs it, with little memory (count per cell, write each file's stars
+into their cell's slots of a memory-mapped file, sort each cell by G a block at a time).
 
 ### 3.5 Speed and output
 
@@ -376,7 +387,7 @@ workers x (0.5 GB + 55 MB x days) well below the free memory.
 * **H limit**: almost no effect on memory, only on time. More asteroids are more chunks, and a worker handles one
   chunk at a time. Only the main process grows a little with the asteroid list (well under 1 GB, even for all
   numbered asteroids).
-* **Star limit (G)**: mostly shared memory. The bright-star index is memory-mapped, so the workers share it in the
+* **Star limit (G)**: mostly shared memory. The star catalog is memory-mapped, so the workers share it in the
   file cache (it shows as SHR in `top`, and the system can free it): 1.3 GB for G <= 15, ~3.7 GB for G <= 16. Per
   asteroid, the list of stars near its path grows ~2.5-3x per magnitude, but it is temporary and small next to the
   chunk arrays.
@@ -547,7 +558,7 @@ setup of OccultWatcher Cloud, whose server keeps its predictions ready; locally,
 | Elements, sizes for all asteroids | SBDB Query API (`sbdb_query.api`, numbered, full precision), cached | `pysyzygos/pick.py` |
 | Asteroid names | SBDB full name, from the same per-asteroid cache as the size | `get_asteroid_name` |
 | Stars | Gaia DR3 bulk files, `cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/` | local catalog |
-| Stars, ready-made | Zenodo [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (G <= 16, G <= 18) | local catalog without the build |
+| Stars, ready-made | Zenodo [doi:10.5281/zenodo.23113337](https://doi.org/10.5281/zenodo.23113337) (G <= 16) | local catalog without the build |
 | Path uncertainty | Horizons observer table, RSS 3-sigma position | 3-sigma map lines |
 | Asteroid satellites | W. R. Johnston, Binary Minor Planets Compilation V3.0 (NASA PDS 2019, [doi:10.26033/bb68-pw96](https://doi.org/10.26033/bb68-pw96)) plus satellites seen in occultations (archive below); extract `pysyzygos/data/binaries.json` | "+moon" in the tables, satellite line in the favorites panel, satellite zone on the maps |
 | Earlier occultations | NASA PDS Small Bodies Node, "Small Bodies Occultations" V4.0 (Herald, Dunham et al., [doi:10.26033/ehqs-jp27](https://doi.org/10.26033/ehqs-jp27)), extract shipped as `pysyzygos/data/occultations_pds.json` | reference line in the favorites panel (not used for the prediction) |
@@ -631,8 +642,8 @@ All checks, with their numbers and the discussion of the differences, are in
      motion) and poorly measured stars (RUWE >= 1.4, often unresolved doubles). OWC lists them. Seen in the OWC set of
      Oct 8-11 2026: 2 of 50 events, both on 2-parameter stars of G 11.6 and 12.0 (VERIFICATION.md, 1.5), and an
      observed event of (86288) 1999 UC45 on 2026-09-30 (target RUWE 1.65). **Addressed by the supplement (2.4,
-     2026-10-10, on Zenodo since 2026-10-11)**; open: a 2-parameter star's position error (grows with the years
-     since 2016) in the path uncertainty.
+     2026-10-10; since 1.3.0 part of the catalog), with proper motions from UCAC5/UCAC4 and the star's position
+     error in the path uncertainty (`star_sigma_mas`)**.
   3. Step events: for a known pair, the two shadows (offset by separation x distance) and the drop of each step.
 
 - **218001**: OWC lists a 1.56 mag drop and 0.51 s, PySyzygos 12.97 mag and 0.25 s. The duration difference is the

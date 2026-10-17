@@ -104,7 +104,22 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   runs `.venv/bin/pysyzygos setup` then `exec`s `.venv/bin/pysyzygos`; `set -e`, rerunnable. Keep it in step with setup/GUI changes.
 - `pysyzygos/setup.py`: one-time bootstrap (kernels via `pysyzygos/kernels.py`, local Gaia catalog, bright-star index);
   rerunnable, resumes. `pysyzygos/kernels.py`: the kernel download, also called by pysyzygos/search.py at start-up.
-- `pysyzygos/gaia_local.py`: builds/reads a local G-limited Gaia DR3 copy from ESA's CDN bulk files (`build`, `status`);
+- `pysyzygos/starcat.py` (2026-10-16, catalog format 2, `pysyzygos catalog build|fetch|add|remove|status|xmatch|pack`):
+  one catalog of ALL Gaia stars to G (supplement stars included, kind in `flags` bits 0-2, FLAG_DUP, FLAG_NSS), rows
+  sorted by 0.25 deg cell (cell_of: dec band * 1440 + ra band) then G (u2 mmag), positions as u4 offsets in the cell
+  (SCALE = 0.25/2^32 deg, 0.0002 mas; `encode`/`decode`). Files: catalog.json (format 2, build_id, groups; written
+  last), offsets.npy, core.npy (CORE 31 B), hpm.npy (rows), optional quality.npy (QUALITY 20 B: ruwe, errors f2, corr
+  i1 x127, nss, multi_peak) and extras.npy (EXTRAS 10 B: bp/rp mmag, rv, rv_error, teff), each with <group>.json
+  (build_id, n_stars; `group_ok`). Build: ESA files -> parts/<stem>.npy (PART, resumable, build.json) -> `merge`
+  (memmaps, low memory) -> `xmatch` (UCAC5/4 pm for kind 2, in place). `StarCatalog`: LocalGaia + BrightIndex methods
+  (cone with quality/extras columns under Gaia's names, corridor_stars, near_path -> ROWS, high_pm, frame); supplement
+  switch filters kind 0. gaia_local hands format-2 folders over (`LocalGaia.__new__`, `open_index`, `status`,
+  `has_supplement`); old-format folders keep the old code. `doubles.star_flags` (shared with the online check) gives
+  Gaia's flags + error ellipse locally when the cone has the columns. Zenodo: G 16 only (`ZENODO_STEM`,
+  `<stem>_<group>.tar.xz`), other limits are local ESA builds. Upgrade: `staging_dir` (<d>.new) + `swap_in` (old ->
+  <d>.old; cleanup lists it). setup `catalog_step` (--groups, --upgrade-catalog), GUI System tab "Star catalog"
+  (`cat_refresh`, `cat_part`, `cat_upgrade`, `cat_delete_old`). tests/test_starcat.py.
+- `pysyzygos/gaia_local.py`: (old format, before 1.3.0) builds/reads a local G-limited Gaia DR3 copy from ESA's CDN bulk files (`build`, `status`);
   one `.npy` per source file plus `.cells.npy` (1x1 deg cell index) and `.hpm.npy` (pm > 1500 mas/yr). No healpy.
   Ready-made copies (G <= 16, 18; no bright index) on Zenodo, concept DOI 10.5281/zenodo.23113337 (first version
   ...338, packed by `release/pack.sh`, untracked): `fetch_zenodo` (resumable, SHA-256, unpacks into any folder name);
@@ -408,6 +423,15 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
   from `file://`. Map dialog reopen bug fixed 2026-10-02 (the box was cleared on every open, removing Leaflet's panes).
 
 ## Ideas not built yet
+- Catalog additions for the next rebuild (ideally with Gaia DR4, 2026-12-02): compared with Occult's G16 subset (D.
+  Herald, 2026-10-16: 77,951,442 stars, 58 B/star, 4.52 GB, zip 2.64 GB; ours 77,952,398): 1) star diameter from
+  Gaia FLAME (`radius_flame`, astrophysical_parameters files on ESA's CDN, join by source_id; + a flag "other
+  estimates exist") into extras, for the star-size model (218001); 2) Hip/Tyc2 ids from Gaia's best_neighbour tables;
+  3) stars too bright for Gaia from Hipparcos 2 (own kind). A core flag bit "entries in other Gaia files" (2 free).
+- Catalog mirrors (2026-10-16; Zenodo downloads were as slow as 0.1 MB/s at times): Zenodo stays the reference (DOI,
+  SHA-256); mirrors serve the same file names: GitHub Releases first (2 GiB per file), Cloudflare R2 or B2, a community
+  server. Code: `URL_CATALOG_MIRRORS` in urls.py; starcat.fetch takes the SHA-256 from Zenodo (stored copy as
+  fallback), probes each source's speed on the first MB, resumes the .part across sources (Range), `--mirror <url>`.
 - Live search engine (ABOUT.md 3.8, timings of 2026-10-10): resident process with kernels, catalog, global
   pre-screen + index, SBDB list and orbits in memory; site test + exact solves in ~1-2 s; maps on demand; rolling
   nightly pre-screen builds. Locally: one combined pick + search run (saves a ~5 s start-up), SBDB rows only for

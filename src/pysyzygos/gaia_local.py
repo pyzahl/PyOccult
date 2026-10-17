@@ -520,9 +520,10 @@ def _sha256(path):
     return h.hexdigest()
 
 
-def unpack_archive(archive, out_dir):
+def unpack_archive(archive, out_dir, need="catalog.json"):
     """Unpack a catalog .tar.xz (one top folder, any name) into out_dir. Unpacks into out_dir.unpack first, then moves
-    the files over (overwriting a partial build of the same limit), so an interruption leaves no half-written files."""
+    the files over (overwriting a partial build of the same limit), so an interruption leaves no half-written files.
+    need: the file the archive must hold (moved last: its presence marks the unpack done)."""
     import tarfile
     stage = os.path.abspath(out_dir) + ".unpack"
     shutil.rmtree(stage, ignore_errors=True)
@@ -542,10 +543,10 @@ def unpack_archive(archive, out_dir):
                 tf.extract(m, stage)
             n += 1
     prog.finish(f"{n} files")
-    if not os.path.isfile(os.path.join(stage, "catalog.json")):
-        sys.exit(f"{archive} holds no catalog.json: not a PySyzygos catalog archive")
+    if not os.path.isfile(os.path.join(stage, need)):
+        sys.exit(f"{archive} holds no {need}: not a PySyzygos catalog archive")
     os.makedirs(out_dir, exist_ok=True)
-    for f in sorted(os.listdir(stage), key=lambda f: f == "catalog.json"):   # catalog.json last
+    for f in sorted(os.listdir(stage), key=lambda f: f == need):           # the marker file last
         replace_file(os.path.join(stage, f), os.path.join(out_dir, f))
     os.rmdir(stage)
 
@@ -605,7 +606,15 @@ def find_catalogs(root="."):
     return sorted(out, key=lambda c: (c[1] if c[1] is not None else 99, c[0]))
 
 
+def _format2(d):
+    from pysyzygos import starcat
+    return starcat.is_format2(d) or os.path.isfile(os.path.join(d, "build.json"))
+
+
 def status(out_dir):
+    if _format2(out_dir):                                            # the new format (starcat.py)
+        from pysyzygos import starcat
+        return starcat.status(out_dir)
     man_path = os.path.join(out_dir, "catalog.json")
     if not os.path.isfile(man_path):
         return dict(total=0, done=0, gb=0.0, complete=False)
@@ -622,7 +631,10 @@ def supplement_dir(catalog_dir):
 
 
 def has_supplement(catalog_dir):
-    """Is there a complete supplement in this catalog's folder?"""
+    """Is there a complete supplement in this catalog's folder? (A format-2 catalog holds those stars itself.)"""
+    from pysyzygos import starcat
+    if starcat.is_format2(catalog_dir):
+        return True
     d = supplement_dir(catalog_dir)
     return os.path.isfile(os.path.join(d, "catalog.json")) and status(d)["complete"]
 
@@ -690,6 +702,12 @@ def _frame(arr):
 class LocalGaia:
     """Read side. LocalGaia(dir).corridor_stars(plan) -> DataFrame like the archive query (epoch 2016.0), with
     star_kind / ruwe; with supplement (default use_supplement()) the supplement's stars are merged in, flagged."""
+
+    def __new__(cls, out_dir, allow_partial=False, supplement=None):
+        from pysyzygos import starcat
+        if starcat.is_format2(out_dir):                              # the new format: its own reader, same methods
+            return starcat.StarCatalog(out_dir, supplement=supplement)
+        return super().__new__(cls)
 
     def __init__(self, out_dir, allow_partial=False, supplement=None):
         self.dir = out_dir
@@ -896,7 +914,11 @@ class MergedIndex:
 
 def open_index(catalog_dir, gmax, supplement=None):
     """The bright-star index for a pick or pre-screen: the catalog's, merged with its supplement's when there is one
-    and it is in use (use_supplement()). Builds missing indexes (main process before workers start)."""
+    and it is in use (use_supplement()). Builds missing indexes (main process before workers start). A format-2
+    catalog is its own index (sorted by cell and G)."""
+    from pysyzygos import starcat
+    if starcat.is_format2(catalog_dir):
+        return starcat.StarCatalog(catalog_dir, supplement=supplement)
     main = BrightIndex(catalog_dir, gmax)
     if (use_supplement() if supplement is None else supplement) and has_supplement(catalog_dir):
         sd = supplement_dir(catalog_dir)

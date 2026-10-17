@@ -9,7 +9,7 @@ It listens on this computer only (127.0.0.1), because it can start programs. Eve
 not changed. Saving a site rewrites sites.py (comments in it are not kept).
 """
 from pysyzygos.version import __version__, __codename__, __author__, __copyright__, __license__, __url__
-import argparse, asyncio, csv, json, math, os, re, sys, time
+import argparse, asyncio, csv, json, math, os, re, shutil, sys, time
 
 from pysyzygos import home
 from pysyzygos.home import HOME as ROOT, PKG                      # ROOT: the data folder (sites.py, maps/, ...)
@@ -21,6 +21,7 @@ from pysyzygos import cameras
 from pysyzygos import occultations
 from pysyzygos import binaries
 from pysyzygos import exports
+from pysyzygos import starcat
 
 PY = sys.executable
 PYSYZYGOS = [PY, "-u", "-m", "pysyzygos"]                             # how runs are started: PYSYZYGOS + [command, ...]
@@ -180,8 +181,9 @@ def index():
         found = gaia_local.find_catalogs(ROOT)
         complete = {d for d, g, ok, _ in found if ok}
         cat_gmax = {d: float(g) for d, g, ok, _ in found if g is not None}
-        cats = {d: f"{d} (G \u2264 {g:g})" + ("" if ok else f", incomplete {gaia_local.status(os.path.join(ROOT, d))['done']}"
-                                                         f"/{gaia_local.status(os.path.join(ROOT, d))['total']}")
+        cats = {d: f"{d} (G \u2264 {g:g}" + ("" if starcat.is_format2(os.path.join(ROOT, d)) else ", old format") + ")"
+                + ("" if ok else f", incomplete {gaia_local.status(os.path.join(ROOT, d))['done']}"
+                                 f"/{gaia_local.status(os.path.join(ROOT, d))['total']}")
                 for d, g, ok, _ in found}
         ui.label("Catalog:").classes("text-slate-300")
         cat_sel = ui.select(cats, value=last["catalog"] if last.get("catalog") in complete else
@@ -617,6 +619,11 @@ def index():
                     f"Delete PySyzygos's files in {config.cache_path}: orbit files, the pick's asteroid list (the next "
                     "pick downloads it again, ~100 MB), size data, CSV exports. The offline copies stay")
             ui.separator()
+            with ui.row().classes("items-center gap-2"):
+                ui.label("Star catalog").classes("font-semibold")
+                ui.label("(the one selected in the header)").classes("text-xs text-slate-500")
+            cat_box = ui.column().classes("w-full gap-1")
+            ui.separator()
             ui.label("Offline use").classes("font-semibold")
             ui.label("The pick's asteroid list (JPL SBDB) and the searches' orbit files (JPL Horizons) are cached in "
                      f"{config.cache_path}, which is lost when the computer restarts where it is /dev/shm. With copies "
@@ -714,7 +721,8 @@ def index():
                         else mag_source(s))
                 if kind == "pick":
                     n = max(15, math.ceil(v - 1e-9))
-                    if not os.path.isfile(os.path.join(cat_sel.value or "", f"bright_G{float(n):.1f}.v2.npy")):
+                    cd = os.path.join(ROOT, cat_sel.value or "")
+                    if not starcat.is_format2(cd) and not os.path.isfile(os.path.join(cd, f"bright_G{float(n):.1f}.v2.npy")):
                         text += (f" · the G ≤ {n} star index is not built yet: the next pick builds it once "
                                  f"(several minutes, ~{INDEX_GB.get(n, 10):g} GB on disk)")
                 note.text = text
@@ -942,6 +950,11 @@ def index():
         d = os.path.join(ROOT, cat_sel.value) if cat_sel.value else None
         have = bool(d and gaia_local.has_supplement(d))
         sup_chk.set_enabled(have)
+        if d and starcat.is_format2(d):
+            sup_chk.tooltip("Also search the stars with Gaia RUWE >= 1.4 (often unresolved doubles) and the "
+                            "2-parameter sources (no or a cross-matched proper motion). This catalog includes them; "
+                            "they are flagged \u2691 in the results (position, and so the path, less certain).")
+            return
         sup_chk.tooltip("Also search the stars the main catalog leaves out: Gaia RUWE >= 1.4 (often unresolved "
                         "doubles) and 2-parameter sources (no proper motion). OWC predicts events on them; here they "
                         "are flagged \u2691 in the results (position, and so the path, less certain). "
@@ -1405,6 +1418,78 @@ def index():
                 ui.button("Cancel", on_click=d.close).props("flat")
         d.open()
 
+    def cat_refresh(*_):
+        """The System tab's catalog section: parts of a format-2 catalog (checkboxes), or the upgrade of an old one."""
+        cat_box.clear()
+        d = os.path.join(ROOT, cat_sel.value) if cat_sel.value else None
+        with cat_box:
+            if not d:
+                ui.label("No catalog: pysyzygos setup").classes("text-sm text-red-700")
+                return
+            if starcat.is_format2(d):
+                st = starcat.status(d)
+                ui.label(f"{cat_sel.value}: G \u2264 {st['gmax']:g}, {st['n_stars'] / 1e6:.1f} M stars, "
+                         f"{st['gb']:.1f} GB (format 2)").classes("text-sm text-slate-700")
+                ready = float(st["gmax"]) in starcat.ZENODO_STEM
+                ui.checkbox(f"core ({starcat.group_bytes(d, 'core') / 1e9:.1f} GB): {starcat.GROUP_TEXT['core']}",
+                            value=True).props("dense disable")
+                for g in starcat.GROUPS:
+                    have = g in st["groups"]
+                    size = starcat.group_bytes(d, g) / 1e9 if have else None
+                    label = f"{g}" + (f" ({size:.1f} GB)" if have else "") + f": {starcat.GROUP_TEXT[g]}"
+                    cb = ui.checkbox(label, value=have).props("dense")
+                    if not have and not ready:
+                        cb.set_enabled(False)
+                        cb.tooltip("This catalog was built from ESA's files: a part comes only with a new build "
+                                   "(pysyzygos catalog build writes all parts)")
+                    cb.on_value_change(lambda e, g=g: cat_part(d, g, e.value))
+            else:
+                st = gaia_local.status(d)
+                ui.label(f"{cat_sel.value}: G \u2264 {st.get('gmax', 0):g}, {st['gb']:.1f} GB, the old format (before "
+                         f"1.3.0)").classes("text-sm text-slate-700")
+                ui.label("The new format: one sort order for every lookup (no separate pick index), the high-RUWE and "
+                         "2-parameter stars included, and optional parts: Gaia's errors and flags (quality), colours "
+                         "and radial velocities (extras). G \u2264 16 is ready-made on Zenodo; other limits are built "
+                         "from ESA's files (about 2 h). It is installed next to the old one and swapped in; the old "
+                         "one is kept as <folder>.old until you delete it.").classes("text-xs text-slate-500")
+                ui.button("Install the new catalog", on_click=lambda: cat_upgrade(cat_sel.value)).props(
+                    "outline dense")
+            for old in sorted(f for f in os.listdir(ROOT) if f.startswith("gaia_dr3_") and f.endswith(".old")):
+                with ui.row().classes("items-center gap-2"):
+                    ui.label(f"{old}: the catalog before the upgrade").classes("text-sm text-slate-600")
+                    ui.button("Delete", on_click=lambda o=old: cat_delete_old(o)).props("flat dense color=negative")
+
+    async def cat_part(d, g, on):
+        if on:
+            ui.notify(f"Downloading the catalog part '{g}' (see the log)")
+            await run_process(PYSYZYGOS + ["catalog", "add", g, "--dir", d], log)
+        else:
+            await run.io_bound(starcat.remove_group, d, g)
+            ui.notify(f"Removed the catalog part '{g}'", type="positive")
+        cat_refresh()
+        await sys_info_refresh()
+
+    async def cat_upgrade(name):
+        ui.notify("Installing the new catalog (see the log; G 16 from Zenodo, other limits about 2 h)")
+        await run_process(PYSYZYGOS + ["setup", "--upgrade-catalog", "--no-geoip", "--groups", "quality",
+                                       "--dir", name], log)
+        cat_refresh()
+        await sys_info_refresh()
+
+    def cat_delete_old(name):
+        async def go():
+            d.close()
+            await run.io_bound(shutil.rmtree, os.path.join(ROOT, name), True)
+            ui.notify(f"Deleted {name}", type="positive")
+            cat_refresh()
+
+        with ui.dialog() as d, ui.card():
+            ui.label(f"Delete {name} (the catalog before the upgrade, with its star indexes and supplement)?")
+            with ui.row():
+                ui.button("Delete", on_click=go).props("color=negative")
+                ui.button("Cancel", on_click=d.close).props("flat")
+        d.open()
+
     async def sys_info_refresh():
         import subprocess
         env = dict(os.environ, PYSYZYGOS_HOME=ROOT, PYTHONUTF8="1",
@@ -1430,6 +1515,8 @@ def index():
 
     off_chk.on_value_change(sys_toggle)
     sys_refresh()
+    cat_refresh()
+    cat_sel.on_value_change(cat_refresh)
     tabs.on_value_change(lambda e: sys_info_refresh() if e.value in (t_sys, "System") else None)
 
     # ------------------------------------------------ path verification (pathcheck.py)
@@ -1470,7 +1557,7 @@ def index():
             pc_refresh()
             ui.notify("Our path is computed" if rc == 0 else "Computing our path failed: see the log",
                       type="positive" if rc == 0 else "negative")
-        await run_process(PYSYZYGOS + ["path-check", "run", fav_cur["key"]], log, on_done=done)
+        await run_process(PYSYZYGOS + ["path-check", "run", fav_cur["key"]], log, on_done=done, env_catalog=cat_sel.value)
 
     async def pc_export():
         if not fav_cur["key"]:
@@ -1481,7 +1568,7 @@ def index():
                 ui.download(f, os.path.basename(f))
             else:
                 ui.notify("Export failed: compute our path first (see the log)", type="negative")
-        await run_process(PYSYZYGOS + ["path-check", "export", fav_cur["key"]], log, on_done=done)
+        await run_process(PYSYZYGOS + ["path-check", "export", fav_cur["key"]], log, on_done=done, env_catalog=cat_sel.value)
 
     async def pc_upload(e):
         data = await e.file.read()
@@ -1516,7 +1603,7 @@ def index():
                 pc_show()
             else:
                 ui.notify("The comparison failed: see the log", type="negative")
-        await run_process(PYSYZYGOS + ["path-check", "compare", fav_cur["key"], lp, "--header", hp], log, on_done=done)
+        await run_process(PYSYZYGOS + ["path-check", "compare", fav_cur["key"], lp, "--header", hp], log, on_done=done, env_catalog=cat_sel.value)
 
     async def pc_steps():
         if not fav_cur["key"]:
@@ -1530,7 +1617,7 @@ def index():
                 f_pc_steps.open()
             else:
                 ui.notify("Step by step failed: see the log", type="negative")
-        await run_process(PYSYZYGOS + ["path-check", "steps", fav_cur["key"]], log, on_done=done)
+        await run_process(PYSYZYGOS + ["path-check", "steps", fav_cur["key"]], log, on_done=done, env_catalog=cat_sel.value)
 
     async def pc_keep():
         if fav_cur["key"]:
