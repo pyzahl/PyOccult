@@ -625,8 +625,9 @@ def main():
     print()
     show_status(d)
     if not a.no_gaia:
-        print("\n  Another catalog later: pysyzygos setup --gmax 16   (or 18, or any limit via ESA); "
-              "it goes into its own folder\n  gaia_dr3_g<limit>, and the GUI's catalog selector lists it.")
+        print("\n  Another catalog later: pysyzygos setup --gmax 18   (any limit other than 16 is built from ESA's "
+              "files, about 2 h);\n  it goes into its own folder gaia_dr3_g<limit>, and the GUI's catalog selector "
+              "lists it.")
 
 
 if __name__ == "__main__":

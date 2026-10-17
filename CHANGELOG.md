@@ -32,6 +32,12 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 - The online Gaia check says in the log why it still runs (stars fainter than the catalog limit - 5 mag: their
   neighbours go beyond the catalog; an old-format catalog; no quality part; high-RUWE stars switched off).
 
+### Fixed
+- Runs started by the GUI hung when setup asked a question: they inherited the terminal the GUI was started from,
+  and the question (no line end) never reached the GUI log (seen with "Install the new catalog": it waited after
+  "... then swapped in" until Enter was pressed in that terminal). GUI runs now get an empty input, so setup takes
+  its defaults.
+
 ## [1.3.0] "Beyond Horizons" - 2026-10-16
 
 ### Added

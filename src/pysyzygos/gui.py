@@ -121,7 +121,10 @@ async def run_process(args, log, env_site=None, on_done=None, env_catalog=None):
          + (f"   (catalog {env_catalog})" if env_catalog else ""))
     t0 = time.time()
     Job.proc = await asyncio.create_subprocess_exec(*args, cwd=ROOT, env=env, stdout=asyncio.subprocess.PIPE,
-                                                   stderr=asyncio.subprocess.STDOUT)
+                                                   stderr=asyncio.subprocess.STDOUT,
+                                                   stdin=asyncio.subprocess.DEVNULL)   # never waits for an answer:
+    # without it the run inherits the terminal the GUI was started from, and setup's questions (no line end, so
+    # not shown in the log) wait forever (found 2026-10-17 with "Install the new catalog")
     async for line in Job.proc.stdout:
         push(line.decode(errors="replace").rstrip())
     rc = await Job.proc.wait()
@@ -1520,7 +1523,10 @@ def index():
         d = os.path.join(ROOT, name)
         if starcat.is_format2(d):
             ui.notify(f"{name} is now in the new format" + ("; the old catalog is deleted" if delete_old and
-                      not os.path.exists(d + ".old") else ""), type="positive")
+                      not os.path.exists(d + ".old") else "") + ". The page reloads in 5 s.", type="positive",
+                      timeout=5000)
+            save_ui_state(catalog=name, site=state["name"])            # the reloaded page selects it
+            ui.timer(5.0, ui.navigate.reload, once=True)              # header list and tabs from the new state
         else:
             ui.notify("The upgrade is not finished (see the log); run it again to resume", type="warning")
         opts = catalog_options()
@@ -1549,6 +1555,7 @@ def index():
         if cat_sel.value:
             env["PYSYZYGOS_CATALOG"] = cat_sel.value
         r = await run.io_bound(subprocess.run, PYSYZYGOS + ["info", "--json"], capture_output=True, text=True,
+                               stdin=subprocess.DEVNULL,
                                cwd=ROOT, env=env, timeout=120)
         sys_info.clear()
         with sys_info:
