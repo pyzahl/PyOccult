@@ -631,7 +631,7 @@ def mirrors():
     return [m if m.endswith("/") else m + "/" for m in env + list(getattr(U, "URL_CATALOG_MIRRORS", []))]
 
 
-def _remote_size(url, timeout=30):
+def _remote_size(url, timeout=90):                              # a busy Nextcloud took 23 s to start (2026-10-17)
     """Size of a remote file (bytes) from a 1-byte range request, or None (also: file:// paths)."""
     if url.startswith("file://"):
         p = url[len("file://"):]
@@ -648,7 +648,7 @@ def _remote_size(url, timeout=30):
     return None
 
 
-def _probe(url, nbytes=4 << 20, timeout=20):
+def _probe(url, nbytes=4 << 20, timeout=45):
     """Download speed of a source (bytes/s) from its first nbytes; 0 when it does not answer."""
     if url.startswith("file://"):
         return float("inf") if os.path.isfile(url[len("file://"):]) else 0.0
@@ -673,21 +673,29 @@ def sources(name, files=None, mirror_list=None):
     Zenodo's listing (tests); mirror_list for mirrors()."""
     from pysyzygos import gaia_local as GL
     found, sha_zen = [], None
+    t0 = time.time()
+    print(f"   {name}: asking Zenodo ...", flush=True)
     try:
         fl = files if files is not None else GL.zenodo_files(None, name)
         if name in fl:
             found.append(("Zenodo " + GL.ZENODO_DOI, fl[name][1], fl[name][0]))
             if name + ".sha256" in fl:
                 sha_zen = _get_text(fl[name + ".sha256"][1]).split()[0].lower()
+            print(f"   Zenodo: has it, {fl[name][0] / 1e9:.2f} GB (answer in {time.time() - t0:.0f} s)", flush=True)
     except SystemExit:                                            # not (yet) in the newest Zenodo version
-        print(f"   Zenodo: no {name} there (yet); trying the mirrors", flush=True)
+        print(f"   Zenodo: no {name} there (yet; answer in {time.time() - t0:.0f} s); trying the mirrors", flush=True)
     except (OSError, ValueError, KeyError) as e:                  # Zenodo unreachable
         print(f"   Zenodo: no answer ({str(e)[:80]}); trying the mirrors", flush=True)
     for m in (mirrors() if mirror_list is None else mirror_list):
+        host = m.split("/")[2] if m.startswith(("http://", "https://")) else "(local folder)"
+        t0 = time.time()
+        print(f"   asking mirror {host} ... (a busy server can take a minute to answer)", flush=True)
         size = _remote_size(m + name)
         if size:
-            host = m.split("/")[2] if m.startswith(("http://", "https://")) else "(local folder)"
             found.append((f"mirror {host}", m + name, size))
+            print(f"   mirror {host}: has it, {size / 1e9:.2f} GB (answer in {time.time() - t0:.0f} s)", flush=True)
+        else:
+            print(f"   mirror {host}: no answer or no such file ({time.time() - t0:.0f} s)", flush=True)
     stored = ARCHIVE_SHA256.get(name)
     expect = sha_zen or (stored[1] if stored else None)
     if expect is None:
@@ -700,6 +708,8 @@ def sources(name, files=None, mirror_list=None):
                     continue
     if stored and stored[0] and found:
         found = [f for f in found if f[2] == stored[0] or (sha_zen and sha_zen != stored[1])]
+    if len(found) > 1:
+        print(f"   {len(found)} sources: measuring their speed (a few MB each) ...", flush=True)
     speed = {url: _probe(url) for _, url, _ in found} if len(found) > 1 else {}
     found.sort(key=lambda f: -speed.get(f[1], 0.0))
     for label, url, _ in found:
@@ -734,7 +744,9 @@ def fetch(d, gmax=16.0, groups=("quality",), keep_archive=False, files=None, mir
         print(f"   {name}, {size / 1e9:.2f} GB ({GROUP_TEXT[g]})", flush=True)
         if not os.path.isfile(archive):
             for k, (label, url, _) in enumerate(found):
-                print(f"   from {label}", flush=True)
+                have = os.path.getsize(archive + ".part") if os.path.isfile(archive + ".part") else 0
+                print(f"   downloading from {label}" + (f", resuming at {have / 1e9:.2f} GB" if have else "")
+                      + " (progress every 10 s)", flush=True)
                 try:
                     GL._fetch_resume(url, size, archive + ".part")
                     break
@@ -742,18 +754,21 @@ def fetch(d, gmax=16.0, groups=("quality",), keep_archive=False, files=None, mir
                     if k == len(found) - 1:
                         raise
                     print(f"   {label} failed ({str(e)[:100]}); trying the next source", flush=True)
+            print("   checking the SHA-256 ...", flush=True)
             if GL._sha256(archive + ".part") != expect:
                 os.remove(archive + ".part")
                 sys.exit(f"{name}: SHA-256 mismatch (corrupt download, deleted); rerun to download again")
             GL.replace_file(archive + ".part", archive)
         elif GL._sha256(archive) != expect:
             sys.exit(f"{archive} exists but its SHA-256 does not match; delete it and rerun")
+        print(f"   unpacking {name} ...", flush=True)
         GL.unpack_archive(archive, d, need="catalog.json" if g == "core" else f"{g}.json")
         if g != "core" and not group_ok(d, g):
             remove_group(d, g)
             sys.exit(f"{name} does not belong to the catalog in {d} (another build): download the core again")
         if not keep_archive:
             os.remove(archive)
+        print(f"   {g}: done ({GROUP_TEXT[g]})", flush=True)
     return status(d)
 
 

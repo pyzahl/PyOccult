@@ -26,6 +26,9 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
   messages, 7.2 s; offline: until a timeout); it is now imported only where the old "windows" mode queries the
   archive. Missing orbit files are downloaded two at a time before pass 1 (JPL Horizons answers 503 to more; such
   answers are retried). A 19-target, 20-day search: 8.8 -> 2.6 s with the orbits cached, 23 -> 10 s without.
+- Catalog download: each step is reported (asking Zenodo / each mirror with the answer time, speed measurement,
+  download with resume, SHA-256 check, unpacking, part done), progress every 10 s in the GUI log (was 30 s); a slow
+  mirror gets 90 s to answer (was 30 s: a busy Nextcloud took 23 s and would have been skipped).
 - The online Gaia check says in the log why it still runs (stars fainter than the catalog limit - 5 mag: their
   neighbours go beyond the catalog; an old-format catalog; no quality part; high-RUWE stars switched off).
 

@@ -51,10 +51,11 @@ class Progress:
     """Progress of a long step, so it never looks stuck: in a terminal one line rewritten in place (about once a
     second), else (log file, nohup) a new line every 30 s. p(done, note) updates, p.finish(text) ends it."""
 
-    def __init__(self, label, total, fmt=lambda x: f"{x / 1e9:.2f} GB", rate=lambda r: f"{r / 1e6:.1f} MB/s", start=0):
+    def __init__(self, label, total, fmt=lambda x: f"{x / 1e9:.2f} GB", rate=lambda r: f"{r / 1e6:.1f} MB/s", start=0,
+                 every=30.0):
         self.label, self.total, self.fmt, self.rate, self.start = label, max(total, 1), fmt, rate, start
         self.tty = sys.stdout.isatty()
-        self.every = 1.0 if self.tty else 30.0
+        self.every = 1.0 if self.tty else every                      # a log file / the GUI: a line every `every` s
         self.t0 = self.last = time.time()
         self.width = 0
 
@@ -489,7 +490,7 @@ def _fetch_resume(url, size, dst, tries=6):
                 if have and r.status_code != 206:                            # server ignored the Range: start over
                     have = 0
                 got = 0
-                prog = Progress("download", size, start=have)
+                prog = Progress("download", size, start=have, every=10.0)
                 prog(have, " (resumed)" if have else " (starting)", force=True)
                 with open(dst, "ab" if have else "wb") as f:
                     for c in r.iter_content(1 << 20):
@@ -510,7 +511,7 @@ def _fetch_resume(url, size, dst, tries=6):
 def _sha256(path):
     import hashlib
     h, done = hashlib.sha256(), 0
-    prog = Progress("SHA-256 check", os.path.getsize(path))
+    prog = Progress("SHA-256 check", os.path.getsize(path), every=10.0)
     with open(path, "rb") as f:
         for c in iter(lambda: f.read(1 << 22), b""):
             h.update(c)
@@ -529,7 +530,8 @@ def unpack_archive(archive, out_dir, need="catalog.json"):
     shutil.rmtree(stage, ignore_errors=True)
     os.makedirs(stage)
     n = 0
-    prog = Progress(f"unpack into {out_dir}", os.path.getsize(archive), fmt=lambda x: f"{x / 1e9:.2f} GB", rate=lambda r: f"{r / 1e6:.1f} MB/s")
+    prog = Progress(f"unpack into {out_dir}", os.path.getsize(archive), fmt=lambda x: f"{x / 1e9:.2f} GB",
+                    rate=lambda r: f"{r / 1e6:.1f} MB/s", every=10.0)
     with open(archive, "rb") as raw, tarfile.open(fileobj=raw, mode="r|xz") as tf:   # streaming: one pass, low memory
         for m in tf:
             prog(raw.tell(), f", {n} files")
