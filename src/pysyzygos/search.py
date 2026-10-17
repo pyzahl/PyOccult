@@ -1,6 +1,6 @@
 from pysyzygos.version import __version__
 from pysyzygos import urls as U
-import sys, base64, functools, math, os, re, time
+import sys, base64, functools, math, os, re, threading, time
 T_START = time.time()                    # run statistics: start-up time is measured from here
 from datetime import datetime
 import numpy as np
@@ -17,8 +17,6 @@ from astropy.time import Time
 from astropy.coordinates import EarthLocation
 from astropy.coordinates import SkyCoord
 import astropy.units as u
-from astroquery.jplhorizons import Horizons
-from astroquery.gaia import Gaia
 
 # to Silence Warnings:
 import warnings, erfa
@@ -170,6 +168,7 @@ def gaia_cone(ra_deg, dec_deg, radius_arcmin, mag_limit):
     AND ruwe < 1.4
     """
     try:
+        from astroquery.gaia import Gaia        # here only: importing it contacts the Gaia archive (7 s, 2026-10-16)
         return Gaia.launch_job_async(query).get_results().to_pandas()
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -317,21 +316,74 @@ def load_orbit(target_id, epochs):
 SKIPPED = []                                             # targets without an orbit (run summary)
 
 
+def _spk_file(target_id, epochs, cache_dir=config.cache_path):
+    return Path(cache_dir) / f"PySyzygos_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
+
+
+def _spk_stale(fn):
+    """Missing, or older than orbit_max_age_days: to be downloaded."""
+    max_age = float(getattr(config, "orbit_max_age_days", 1)) * 86400.0
+    return not fn.is_file() or time.time() - fn.stat().st_mtime > max_age
+
+
+def _horizons_spk(target_id, epochs, timeout=60):
+    """The asteroid's SPK from JPL Horizons as bytes (network only, no SPICE: safe in threads). Raises
+    requests.RequestException (network) or RuntimeError (no such object, no SPK)."""
+    for k in range(3):                                        # Horizons answers 503 to too many requests at once
+        resp = requests.get(U.URL_JPL_HORIZONS_API,
+                            params={'format': 'json', 'COMMAND': str(target_id) + ';', 'EPHEM_TYPE': 'SPK',
+                                    'MAKE_EPHEM': 'YES', 'START_TIME': epochs['start'], 'STOP_TIME': epochs['stop'],
+                                    'OBJ_DATA': 'NO'}, timeout=timeout)
+        if resp.status_code != 503 or k == 2:
+            break
+        time.sleep(1.0 + k)
+    resp.raise_for_status()
+    data = resp.json()
+    if 'spk' not in data:
+        text = " ".join(str(data.get('result', data)).split())
+        if "out of bounds" in text or "No matches found" in text:
+            raise RuntimeError(f"no such object in Horizons: {text[:160]}")
+        raise RuntimeError(f"Horizons gave no SPK: {text[:200]}")
+    return base64.b64decode(data['spk'])
+
+
+def _save_spk(fn, blob):
+    from pysyzygos import offline
+    tmp = Path(str(fn) + f".{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_bytes(blob)
+    os.replace(tmp, fn)                                        # atomic: never a half-written orbit file
+    offline.keep_spk(fn)                                       # a copy for offline use, if switched on
+
+
+def prefetch_orbits(targets, epochs, workers=2):
+    """Download the missing or stale orbit files of these asteroids in parallel (network only, threads; SPICE loads
+    them later in the main thread). Failures are left to fetch_target_orbit (fallbacks, messages). Returns the count."""
+    from concurrent.futures import ThreadPoolExecutor
+    todo = [str(t) for t in targets if not bodies.is_body(t) and _spk_stale(_spk_file(t, epochs))]
+    if len(todo) < 2:
+        return 0
+
+    def one(t):
+        try:
+            _save_spk(_spk_file(t, epochs), _horizons_spk(t, epochs))
+            return 1
+        except Exception:
+            return 0
+    t0 = time.time()
+    with ThreadPoolExecutor(max_workers=min(workers, len(todo))) as ex:
+        n = sum(ex.map(one, todo))
+    print(f"orbits: {n} of {len(todo)} downloaded from JPL Horizons in {time.time() - t0:.1f} s ({workers} at a time)")
+    return n
+
+
 def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
     target_id = str(target_id)
-    fn = Path(cache_dir) / f"PySyzygos_asteroid_{target_id}_{epochs['start']}_{epochs['stop']}.bsp"
+    fn = _spk_file(target_id, epochs, cache_dir)
     from pysyzygos import offline
-    resp = None
-    max_age = float(getattr(config, "orbit_max_age_days", 1)) * 86400.0
-    if not fn.is_file() or time.time() - fn.stat().st_mtime > max_age:   # missing or older than orbit_max_age_days
+    blob = None
+    if _spk_stale(fn):                                         # missing or older than orbit_max_age_days
         try:
-            resp = requests.get(
-                U.URL_JPL_HORIZONS_API,
-                params={'format': 'json', 'COMMAND': target_id + ';', 'EPHEM_TYPE': 'SPK',
-                        'MAKE_EPHEM': 'YES', 'START_TIME': epochs['start'],
-                        'STOP_TIME': epochs['stop'], 'OBJ_DATA': 'NO'},
-                timeout=60)
-            resp.raise_for_status()
+            blob = _horizons_spk(target_id, epochs)
         except requests.RequestException as e:                    # no network: this file even if old, else a copy
             old = str(fn) if fn.is_file() else offline.spk_fallback(target_id, str(epochs['start'])[:10],
                                                                    str(epochs['stop'])[:10], (cache_dir,))
@@ -339,16 +391,9 @@ def fetch_target_orbit(target_id, epochs, cache_dir=config.cache_path):
                 raise
             print(f"WARNING: JPL Horizons not reachable ({str(e)[:60]}): orbit of {target_id} from "
                   f"{os.path.basename(old)} (downloaded {time.strftime('%Y-%m-%d', time.gmtime(os.path.getmtime(old)))})")
-            fn, resp = Path(old), None
-    if resp is not None:                                       # downloaded now
-        data = resp.json()
-        if 'spk' not in data:
-            text = " ".join(str(data.get('result', data)).split())
-            if "out of bounds" in text or "No matches found" in text:
-                raise RuntimeError(f"no such object in Horizons: {text[:160]}")
-            raise RuntimeError(f"Horizons gave no SPK: {text[:200]}")
-        fn.write_bytes(base64.b64decode(data['spk']))
-        offline.keep_spk(fn)                                   # a copy for offline use, if switched on
+            fn, blob = Path(old), None
+    if blob is not None:                                       # downloaded now
+        _save_spk(fn, blob)
     if target_id not in _loaded:
         spice.furnsh(str(fn))
         _loaded[target_id] = int(spice.spkobj(str(fn))[0])
@@ -884,7 +929,8 @@ def write_globe(record, target_id, stem, star_dir, paths, sigma3, size, corr):
     d = globe.globe_data(spice, record, target_id, star_dir, paths, sigma3,
                          site=(config.LON, config.LAT, config.site.get("name", config.site_name)), stars=stars,
                          size=size, run_utc=datetime.fromtimestamp(T_START).strftime("%Y-%m-%dT%H:%M:%S"),
-                         corrections=corr, of_date=of_date, style=getattr(config, "globe_style", "color"))
+                         corrections=corr, of_date=of_date, style=getattr(config, "globe_style", "color"),
+                         page=getattr(config, "globe_page", "A4"))
     with open(f"{config.map_dir}/{stem}_globe.svg", "w", encoding="utf-8") as f:
         f.write(globe.render_svg(d))
 
@@ -1127,8 +1173,16 @@ def online_double_check(records):
                   f"{LOCAL.gmax:g} with Gaia's flags), not asked")
         if not records:
             return
+        why = (f"stars fainter than G {LOCAL.gmax - doubles.DMAG:g}: neighbours up to {doubles.DMAG:g} mag fainter go "
+               f"beyond the catalog's G {LOCAL.gmax:g}; Gaia's flags of the stars are local already")
+    elif LOCAL is not None and hasattr(LOCAL, "quality") and LOCAL.quality is None:
+        why = "the catalog has no quality part: Gaia's flags and neighbours from the archive"
+    elif LOCAL is not None and hasattr(LOCAL, "quality"):
+        why = "the high-RUWE stars are switched off: neighbours among them from the archive"
+    else:
+        why = "an old-format catalog (no Gaia flags in it): flags and neighbours from the archive"
     rad = float(getattr(config, "companion_radius_arcsec", 4.0))
-    print(f"* Gaia online check of {len(records)} event star(s) (close and double stars) ...")
+    print(f"* Gaia online check of {len(records)} event star(s) (close and double stars; {why}) ...")
     archive = doubles.fetch_online([(r["star_ra"], r["star_dec"]) for r in records], rad)
     if archive is None:
         return
@@ -1252,6 +1306,7 @@ if __name__ == "__main__":
 
     t_p1 = time.time()
     plans = {}
+    prefetch_orbits(config.targets, epochs)                         # missing orbit files: several downloads at once
     for t in config.targets:
         mag_lim = mag_min
         if bodies.is_body(t):                                      # planet or moon: kernel from Horizons, radii

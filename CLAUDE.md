@@ -242,7 +242,11 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
 - `pysyzygos/globe.py` (0.11.0): whole-Earth view (globe) `maps/<stem>_globe.svg` (written by
   `pysyzygos.write_globe` after the KML; `write_globes`, `globe_style` "color"/"lines"); `globe_data(spice, ...)` +
   pure `render_svg(d)`. Data `data/ne_110m_earth.json` (Natural Earth 110m coast/borders/land, public domain).
-  Report "Globe" button (prevbtn with data-wide); favorites copy it as files["globe"] (+ `backfill_globes` from maps/
+  A4 page (1.3.0, `globe_page` "A4" | "square"; PAGES, W x 1448, width/height in mm): `system_data(spice, et, target,
+  star_dir)` (bodies in the star-Sun plane, deflection curve y(x) = x (d_star - d(x)) via astrometry.deflect) ->
+  `_panel_true_scale` (AU, equal scale), `_panel_light` (x AU, y mas at the target's distance; Sun and, from
+  DEFL_SHOWN_MAS, Jupiter/Saturn as edge markers with a broken distance line) (pure; `_Box`, `_frame` axes,
+  `_ticks` 1/2/2.5/5 x 10^n, FS/LW sizes, `_Labels` placer with padding and leader lines, `_corner_note`). Report "Globe" button (prevbtn with data-wide); favorites copy it as files["globe"] (+ `backfill_globes` from maps/
   at GUI start). Preview lookups exclude `*_globe.svg`.
 - Debug `debug_save_paths` (2026-10-11, default False): search.py `save_path_debug` after `shadow_path` writes
   `<map_dir>/<stem>_path.npz` (np.savez, no pickle): one (n,4) array per path line [et, lon, lat, dur(NaN)], `line_names`,
@@ -388,6 +392,9 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
 - Earth PCK coverage: `pck_comment_dates` reads "Creation date" and "UTC Epoch of last datum" (end of measured EOP)
   from the file's comment block; `pckcov` gives the end of the prediction. Run summary key `earth_pck`; a search window
   past the end exits at start-up.
+- Never import `astroquery.gaia` at module level: its import contacts the Gaia archive (status messages, 7 s;
+  found 2026-10-16 in every search start). Import it inside the function that queries (search.gaia_cone,
+  doubles). search.prefetch_orbits downloads missing SPKs 2 at a time (Horizons answers 503 to more; retried).
 - Worker pools call `pick.single_thread_workers()` before starting (OPENBLAS/OMP/MKL_NUM_THREADS=1 via setdefault,
   inherited by spawn): OpenBLAS otherwise starts a thread per CPU in every worker (4 workers on 8 cores: load 24,
   each worker ~40 % CPU; found 2026-10-10 in a pre-screen build).

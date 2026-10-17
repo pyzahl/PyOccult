@@ -74,4 +74,52 @@ assert pac is not None and square(pac), "seen from the Pacific: Africa/Eurasia d
 assert atl is not None and not square(atl), "seen from the Atlantic: drawn normally"
 aus = next(r_ for r_ in G.earth_lines()["land"] if 110 < min(r_[0::2]) and max(r_[0::2]) < 160 and min(r_[1::2]) < -30)
 assert G._land_path(view(-20, 10), aus[0::2], aus[1::2]) is None, "Australia is on the far side: nothing drawn"
+# the geometry panels (A4 page): system_data from a stand-in for SPICE (spkpos only), checked against astrometry.deflect
+from pysyzygos import astrometry as A
+AU = G.AU_KM
+def unit_at(deg, side=1.0, z=0.0):
+    a = math.radians(deg)
+    v = np.array([math.cos(a), side * math.sin(a), z])
+    return v / np.linalg.norm(v)
+for sun_deg, x_t in ((46.0, 0.95), (170.0, 1.6)):                    # Phaethon-like, and a main-belt one at opposition
+    pos = {"10": 1.0 * AU * unit_at(sun_deg), "5": 4.4 * AU * unit_at(3, -1, 0.02), "6": 9.5 * AU * unit_at(60, -1, 0.1),
+           "T": x_t * AU * star}
+
+    class Spice:
+        def spkpos(self, b, et, frame, ab, obs):
+            assert frame == "J2000" and obs == "399"
+            return (pos[str(b)], 0.0)
+    sy = G.system_data(Spice(), 0.0, "T", star, "Test", "Gaia DR3 1")
+    tot = lambda q_of: sum(A.deflect(star, -pos[b], q_of(b), A.GM[b]) for b in ("10", "5", "6"))
+    d_star = tot(lambda b: star)
+    d_ast = tot(lambda b: A.unit(x_t * AU * star - pos[b]))
+    assert abs(sy["star_mas"] - np.linalg.norm(d_star) * G.RAD2MAS) < 1e-9
+    assert abs(sy["shift_mas"] - np.linalg.norm(d_star - d_ast) * G.RAD2MAS) < 1e-9
+    assert abs(sy["shift_km"] - np.linalg.norm(d_star - d_ast) * x_t * AU) < 1e-6
+    k = sy["curve_x"].index(min(sy["curve_x"], key=lambda x: abs(x - x_t)))
+    assert abs(sy["curve_y"][k] - sy["y_target"]) < 1e-12 * max(1.0, abs(sy["y_target"])) + 1e-15, "the ray passes the target"
+    ticks = G._ticks(-0.37, 6.94)
+    step = ticks[1] - ticks[0]
+    assert round(step / 10 ** math.floor(math.log10(step)), 9) in (1, 2, 2.5, 5), ticks       # human tick steps
+    assert sy["bodies"][0]["name"] == "Sun" and abs(sy["elong"] - sun_deg) < 1e-6
+    # A4 page: the view plus both panels, 210 x 297 mm; labels inside, not overlapping
+    svg = G.render_svg(dict(d, system=sy, page="A4"))
+    r = ET.fromstring(svg)
+    assert r.get("width") == "210mm" and r.get("height") == "297mm" and r.get("viewBox") == f"0 0 {G.W} {G.PAGES['A4']}"
+    texts = [t.text or "" for t in r.iter(ns + "text")]
+    assert any(t.startswith("True scale") for t in texts) and any(t.startswith("Light paths") for t in texts)
+    assert any(f"{sy['shift_mas']:.2f} mas = {sy['shift_km']:.1f} km" == t for t in texts), "shift label"
+    assert any(t.startswith("PySyzygos test") for t in texts), "footer"
+    footer_y = max(float(t.get("y")) for t in r.iter(ns + "text") if (t.text or "").startswith("PySyzygos test"))
+    assert footer_y > G.H + 500, "footer at the page bottom"
+# the square page: the view alone, as before
+r = ET.fromstring(G.render_svg(dict(d, page="square")))
+assert r.get("viewBox") == f"0 0 {G.W} {G.H}" and not any((t.text or "").startswith("Light paths") for t in r.iter(ns + "text"))
+# the label placer: a label never lands on a taken spot while a free one exists
+L = G._Labels(0, 0, 400, 300)
+L.block(200, 150, 10)
+for _ in range(6):
+    L.place(200, 150, ["label text"], "#000")
+boxes = L.taken
+assert all(a[2] < b[0] or a[0] > b[2] or a[3] < b[1] or a[1] > b[3] for i, a in enumerate(boxes) for b in boxes[i + 1:])
 print("GLOBE TESTS PASSED")

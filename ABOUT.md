@@ -310,6 +310,23 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
   motion -2.083 s / -28.67" (Occult -2.087 s / -28.62"), 1 km and 1 mas times, diameter, Sun and Moon all agree;
   the path crosses the same countries at the same minutes.
 - Coastlines, borders and land: `data/ne_110m_earth.json` (Natural Earth 1:110m, public domain, 166 KB).
+- **A4 page with the geometry** (1.3.0, `globe_page = "A4"`, the default; `"square"`: the view alone): below the
+  view two panels, drawn from the event's own values (`system_data`). *True scale* (AU): the Earth, the target on
+  the star's line, the Sun, Jupiter and Saturn in the plane of the star's direction and the Sun (the planets
+  projected, their distance from the plane noted); the deflection is invisible at this scale. *Light paths*: the
+  star's ray that reaches the Earth, computed with `astrometry.deflect` (Sun, Jupiter, Saturn, as the search applies
+  it): a point at distance x on the ray is seen where the star is seen, so its true direction is the star's apparent
+  one minus its own deflection, y(x) = x (d_star - d(x)). The target stands on that ray (the star is hidden); the
+  same target without deflection stands on the straight line; the difference is the shift that moves the shadow
+  (Phaethon 2019-07-29: 9.37 mas in all, 2.43 mas of it on the target's own light, shift 6.94 mas = 4.8 km; (4209)
+  Briggs 2026-10-20: 0.56 mas = 0.9 km, equal to the header's "deflection applied"). Distances along the star's
+  direction are true (AU, at least 2.6 AU or 1.5 x the target's distance); the y axis gives the rays' sideways
+  offsets in mas as seen from the Earth at the target's distance, so the target stands at the shift itself; ticks
+  at 1, 2, 2.5 or 5 x 10^n. The Sun is off scale there: a marker on the panel's edge at its distance along the
+  star's line, with a broken line and its true distance from the line (AU); Jupiter and Saturn likewise when they
+  deflect the star's light by at least 0.001 mas (e.g. (147223) 2002 XB29 on 2026-10-24, Saturn 1 deg from the
+  star: 0.01 mas; (10514) Harlow on 2026-11-01, Jupiter 3 deg away: 0.03 mas). Lines at least 2 px (0.4 mm), labels
+  placed around their points (farther out with a leader line). Plain SVG, sized 210 x 297 mm for printing.
 
 ---
 

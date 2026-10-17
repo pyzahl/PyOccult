@@ -107,6 +107,7 @@ write_maps = True
 map_dir = "maps"
 write_globes = True         # whole-Earth view (globe) per event (<stem>_globe.svg in map_dir; needs write_maps)
 globe_style = "color"       # "color" (sea, land, night side) or "lines" (black on white)
+globe_page = "A4"           # "A4": the whole-Earth view and the geometry panels on an A4 page; "square": the view only
 debug_save_paths = False    # debug: also save each event's geodetic shadow path (all lines, with ET, lon, lat) and the
                             # event (target, star, time, size) as <map_dir>/<event>_path.npz, for later verification
 write_previews = True       # event preview image (star field, camera frame, asteroid track) per hit, as SVG in map_dir
