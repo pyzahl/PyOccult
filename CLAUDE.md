@@ -242,7 +242,7 @@ rodluger/pysyzygy (transit code) owns that PyPI/import name. Read `ABOUT.md` for
 - `pysyzygos/globe.py` (0.11.0): whole-Earth view (globe) `maps/<stem>_globe.svg` (written by
   `pysyzygos.write_globe` after the KML; `write_globes`, `globe_style` "color"/"lines"); `globe_data(spice, ...)` +
   pure `render_svg(d)`. Data `data/ne_110m_earth.json` (Natural Earth 110m coast/borders/land, public domain).
-  A4 page (1.3.0, `globe_page` "A4" | "square"; PAGES, W x 1448, width/height in mm): `system_data(spice, et, target,
+  A4 page (1.3.1, `globe_page` "A4" | "square"; PAGES, W x 1448, width/height in mm): `system_data(spice, et, target,
   star_dir)` (bodies in the star-Sun plane, deflection curve y(x) = x (d_star - d(x)) via astrometry.deflect) ->
   `_panel_true_scale` (AU, equal scale), `_panel_light` (x AU, y mas at the target's distance; Sun and, from
   DEFL_SHOWN_MAS, Jupiter/Saturn as edge markers with a broken distance line) (pure; `_Box`, `_frame` axes,

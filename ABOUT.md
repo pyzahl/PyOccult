@@ -310,7 +310,7 @@ after `sbdb_max_age_days`; the pick tool fills it for its targets from its bulk 
   motion -2.083 s / -28.67" (Occult -2.087 s / -28.62"), 1 km and 1 mas times, diameter, Sun and Moon all agree;
   the path crosses the same countries at the same minutes.
 - Coastlines, borders and land: `data/ne_110m_earth.json` (Natural Earth 1:110m, public domain, 166 KB).
-- **A4 page with the geometry** (1.3.0, `globe_page = "A4"`, the default; `"square"`: the view alone): below the
+- **A4 page with the geometry** (1.3.1, `globe_page = "A4"`, the default; `"square"`: the view alone): below the
   view two panels, drawn from the event's own values (`system_data`). *True scale* (AU): the Earth, the target on
   the star's line, the Sun, Jupiter and Saturn in the plane of the star's direction and the Sun (the planets
   projected, their distance from the plane noted); the deflection is invisible at this scale. *Light paths*: the

@@ -4,6 +4,24 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 [semantic versioning](https://semver.org) (MAJOR.MINOR.PATCH). The version and its code name live in
 `src/pysyzygos/version.py`; the code name changes at major milestones. Details of the computations: `ABOUT.md`.
 
+## [1.3.1] "Beyond Horizons" - 2026-10-17
+
+### Added
+- **Whole-Earth view on an A4 page** (`globe_page = "A4"`, default; `"square"` keeps the view alone): two panels
+  below the view, from the event's own values: the geometry at true scale (Earth, target, Sun, Jupiter, Saturn, AU)
+  and the light paths (AU along the star's direction, sideways offsets in mas): the star's bent ray, the target on
+  it, where it would stand without deflection, and the shift that moves the shadow (e.g. Phaethon 2019-07-29: 6.94
+  mas = 4.8 km); the Sun, and Jupiter or Saturn where they deflect the light, marked with their true distance.
+  Plain SVG, 210 x 297 mm.
+
+### Changed
+- **Search start-up 7 s faster**: `import astroquery.gaia` contacted the Gaia archive at every start (status
+  messages, 7.2 s; offline: until a timeout); it is now imported only where the old "windows" mode queries the
+  archive. Missing orbit files are downloaded two at a time before pass 1 (JPL Horizons answers 503 to more; such
+  answers are retried). A 19-target, 20-day search: 8.8 -> 2.6 s with the orbits cached, 23 -> 10 s without.
+- The online Gaia check says in the log why it still runs (stars fainter than the catalog limit - 5 mag: their
+  neighbours go beyond the catalog; an old-format catalog; no quality part; high-RUWE stars switched off).
+
 ## [1.3.0] "Beyond Horizons" - 2026-10-16
 
 ### Added
@@ -26,21 +44,11 @@ All notable changes to PySyzygos. Newest first. Format: [Keep a Changelog](https
 - **Setup**: new installs get the new catalog (G <= 16 from Zenodo, other limits built from ESA's files),
   `--groups` for the parts, `--upgrade-catalog` for a catalog of the old format (installed next to it as
   `<folder>.new`, swapped in, the old one moved to `<folder>.old` and deleted on request).
-- **Whole-Earth view on an A4 page** (`globe_page = "A4"`, default; `"square"` keeps the view alone): two panels
-  below the view, from the event's own values: the geometry at true scale (Earth, target, Sun, Jupiter, Saturn, AU)
-  and the light paths (AU along the star's direction, sideways offsets in mas): the star's bent ray, the target on
-  it, where it would stand without deflection, and the shift that moves the shadow (e.g. Phaethon 2019-07-29: 6.94
-  mas = 4.8 km); the Sun, and Jupiter or Saturn where they deflect the light, marked with their true distance.
-  Plain SVG, 210 x 297 mm.
 - **System tab**: section "Star catalog" with a checkbox per optional part (download / remove), "Install the new
   catalog" for an old one and "Delete" for a leftover `.old` folder; "Data in use" shows the parts, and a new group
   **Planets and moons** (the moons' list, NAIF kernels with their range, Horizons files in the cache).
 
 ### Changed
-- **Search start-up 7 s faster**: `import astroquery.gaia` contacted the Gaia archive at every start (status
-  messages, 7.2 s; offline: until a timeout); it is now imported only where the old "windows" mode queries the
-  archive. Missing orbit files are downloaded two at a time before pass 1 (JPL Horizons answers 503 to more; such
-  answers are retried). A 19-target, 20-day search: 8.8 -> 2.6 s with the orbits cached, 23 -> 10 s without.
 - Zenodo carries the ready-made catalog for G <= 16 only (new archives `gaia_dr3_g16_v2_<part>.tar.xz`); deeper
   catalogs (G 17, 18, ...) are built locally from ESA's files. Catalogs of the old format keep working (marked "old
   format" in the GUI); `--supplement` and `pysyzygos gaia` remain for them.
@@ -752,6 +760,7 @@ show it). It collects the work since the first commit:
   orientation coverage in the report header, progress output for long downloads, OWC reference comparisons.
 - 2026-10-04: GPL-3.0-or-later licence, `CITATION.cff`, `CONTRIBUTING.md`, references and acknowledgements.
 
+[1.3.1]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.3.1
 [1.3.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.3.0
 [1.2.0]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.2.01
 [1.1.1]: https://github.com/pyzahl/PySyzygos/releases/tag/v1.1.1
